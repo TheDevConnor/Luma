@@ -354,13 +354,17 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // debug_print_scope(&root_scope, 0);
 
   if (tc) {
-    // Stage 5: Memory Analysis - ensure clean line before output
-    print_progress(++step, total_stages, "Memory Analysis");
-    // ensure_clean_line(); // Force newline before memory analysis
-    
-    StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
-    if (analyzer && analyzer->allocations.count > 0) {
+    if (config.check_mem) {
+      // Stage 5: Memory Analysis - ensure clean line before output
+      print_progress(++step, total_stages, "Memory Analysis");
+      // ensure_clean_line(); // Force newline before memory analysis
+
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
+      if (analyzer && analyzer->allocations.count > 0) {
         static_memory_report_leaks(analyzer);
+      }
+    }else {
+      ++step;
     }
 
     // Stage 6: LLVM IR (UPDATED - now uses module system)

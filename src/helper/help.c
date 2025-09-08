@@ -70,18 +70,20 @@ const char *read_file(const char *filename) {
 int print_help() {
   printf("Usage: lux [options] <source_file>\n");
   printf("Options:\n");
-  printf("  -v, --version   Show version information\n");
-  printf("  -h, --help      Show this help message\n");
-  printf("  -lc, --license  Show license information\n");
+  printf("  -v, --version      Show version information\n");
+  printf("  -h, --help         Show this help message\n");
+  printf("  -lc, --license     Show license information\n");
   printf("Crust Compiler Options:\n");
-  printf("  -name <name>    Set the name of the build target\n");
-  printf("  -save           Save the outputed llvm file\n");
-  printf("  build <target>  Build the specified target\n");
-  printf("  clean           Clean the build artifacts\n");
-  printf("  -debug          builds a debug version and shows the allocators "
-         "trace");
-  printf("  -l, -link     Link lux files so that they can be used in other "
-         "lux files\n");
+  printf("  -name <name>       Set the name of the build target\n");
+  printf("  -save              Save the outputed llvm file\n");
+  printf("  build <target>     Build the specified target\n");
+  printf("  clean              Clean the build artifacts\n");
+  printf("  -debug             builds a debug version and shows the allocators "
+         "trace\n");
+  printf("  -l, -link          Link lux files so that they can be used in "
+         "other lux files\n");
+  printf(
+      "  --no-sanitize      Disable memory safety checks during compilation\n");
   return 0;
 }
 
@@ -125,6 +127,9 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
     return false;
   }
 
+  // set check_mem to true by default
+  config->check_mem = true;
+
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
       return print_version(), false;
@@ -141,7 +146,10 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
           config->save = true;
         else if (strcmp(argv[j], "-clean") == 0)
           config->clean = true;
-        else if (strcmp(argv[j], "-debug") == 0) {
+        else if (strcmp(argv[j], "--no-sanitize") == 0 ||
+                 strcmp(argv[j], "-no-sanitize") == 0) {
+          config->check_mem = false;
+        } else if (strcmp(argv[j], "-debug") == 0) {
           // Placeholder for debug flag
         } else if (strcmp(argv[j], "-l") == 0 ||
                    strcmp(argv[j], "-link") == 0) {
@@ -437,7 +445,7 @@ void print_progress(int step, int total, const char *stage) {
   // clear out the rest of the line
   printf("\033[K");
   fflush(stdout);
-  
+
   // Always add newline after progress bar to prevent interference
   if (step == total) {
     printf("\n");

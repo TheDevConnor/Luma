@@ -6,6 +6,6 @@ pub const main = fn () int {
    *x = 20;
    output("x = ", *x, "\n");
 
-   free(x);
+   :: free(x);
    return 0; 
 }
