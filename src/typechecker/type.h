@@ -21,6 +21,11 @@
 // Data Structures
 // ============================================================================
 
+static Token *g_tokens = NULL;
+static int g_token_count = 0;
+static const char *g_file_path = NULL;
+static ArenaAllocator *g_arena = NULL;
+
 typedef struct {
     size_t line;
     size_t column;
@@ -154,6 +159,15 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
                            ArenaAllocator *arena);
 bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
                         Scope *global_scope, ArenaAllocator *arena);
+
+// ============================================================================
+// Error Management
+// ============================================================================
+
+void tc_error_init(Token *tokens, int token_count, const char *file_path, ArenaAllocator *arena);
+void tc_error(AstNode *node, const char *error_type, const char *format, ...);
+void tc_error_help(AstNode *node, const char *error_type, const char *help, const char *format, ...);
+void tc_error_id(AstNode *node, const char *identifier, const char *error_type, const char *format, ...);
 
 // ============================================================================
 // Type Utilities

@@ -22,50 +22,56 @@ bool contains_alloc_expression(AstNode *expr) {
 }
 
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
-  const char *name = node->stmt.var_decl.name;
-  AstNode *declared_type = node->stmt.var_decl.var_type;
-  AstNode *initializer = node->stmt.var_decl.initializer;
-  bool is_public = node->stmt.var_decl.is_public;
-  bool is_mutable = node->stmt.var_decl.is_mutable;
+    const char *name = node->stmt.var_decl.name;
+    AstNode *declared_type = node->stmt.var_decl.var_type;
+    AstNode *initializer = node->stmt.var_decl.initializer;
+    bool is_public = node->stmt.var_decl.is_public;
+    bool is_mutable = node->stmt.var_decl.is_mutable;
 
-  // Track memory allocation if initializer contains alloc()
-  if (initializer && contains_alloc_expression(initializer)) {
-    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
-    if (analyzer) {
-      static_memory_track_alloc(analyzer, node->line, node->column, name);
+    // Track memory allocation
+    if (initializer && contains_alloc_expression(initializer)) {
+        StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+        if (analyzer) {
+            static_memory_track_alloc(analyzer, node->line, node->column, name);
+        }
     }
-  }
 
-  // Type checking logic (same as before)
-  if (initializer) {
-    AstNode *init_type = typecheck_expression(initializer, scope, arena);
-    if (!init_type)
-      return false;
+    if (initializer) {
+        AstNode *init_type = typecheck_expression(initializer, scope, arena);
+        if (!init_type) {
+            tc_error(node, "Type Error", "Cannot determine type of initializer for variable '%s'", name);
+            return false;
+        }
 
-    if (declared_type) {
-      TypeMatchResult match = types_match(declared_type, init_type);
-      if (match == TYPE_MATCH_NONE) {
-        fprintf(
-            stderr,
-            "Error: Type mismatch in variable declaration '%s' at line %zu\n",
-            name, node->line);
+        if (declared_type) {
+            TypeMatchResult match = types_match(declared_type, init_type);
+            if (match == TYPE_MATCH_NONE) {
+                tc_error_help(node, "Type Mismatch", 
+                             "Check that the initializer type matches the declared type",
+                             "Cannot assign '%s' to variable '%s' of type '%s'",
+                             type_to_string(init_type, arena), name,
+                             type_to_string(declared_type, arena));
+                return false;
+            }
+        } else {
+            declared_type = init_type;
+        }
+    }
+
+    if (!declared_type) {
+        tc_error_help(node, "Missing Type", 
+                     "Provide either a type annotation or initializer",
+                     "Variable '%s' has no type information", name);
         return false;
-      }
-    } else {
-      declared_type = init_type;
     }
-  }
 
-  if (!declared_type) {
-    fprintf(stderr,
-            "Error: Variable '%s' has no type information at line %zu\n", name,
-            node->line);
-    return false;
-  }
+    if (!scope_add_symbol(scope, name, declared_type, is_public, is_mutable, arena)) {
+        tc_error_id(node, name, "Duplicate Symbol", 
+                   "Variable '%s' is already declared in this scope", name);
+        return false;
+    }
 
-  // Add variable with proper visibility
-  return scope_add_symbol(scope, name, declared_type, is_public, is_mutable,
-                          arena);
+    return true;
 }
 
 // Stub implementations for remaining functions
@@ -80,26 +86,25 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {
-    fprintf(stderr,
-            "Error: Function '%s' has invalid return type at line %zu\n", name,
-            node->line);
+    tc_error(node, "Function Error", "Function '%s' has invalid return type", name);
     return false;
   }
 
   // Main function validation
   if (strcmp(name, "main") == 0) {
     if (strcmp(return_type->type_data.basic.name, "int") != 0) {
-      fprintf(stderr, "Error: Function '%s' must return 'int' but got '%s'\n",
-              name, type_to_string(return_type, arena));
+      tc_error_help(node, "Main Return Type",
+        "The main function must return 'int'",
+        "Function '%s' must return 'int' but got '%s'",
+        name, type_to_string(return_type, arena));
       return false;
     }
 
     // Ensure main is public
     if (!is_public) {
-      fprintf(stderr,
-              "Warning: Function 'main' should be public; automatically making "
-              "it public at line %zu\n",
-              node->line);
+      tc_error_help(node, "Main Visibility",
+        "The main function should be public",
+        "Function 'main' should be public; automatically making it public");
       node->stmt.func_decl.is_public = true;
       is_public = true;
     }
@@ -109,9 +114,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < param_count; i++) {
     if (!param_names[i] || !param_types[i] ||
         param_types[i]->category != Node_Category_TYPE) {
-      fprintf(stderr,
-              "Error: Function '%s' has invalid parameter %zu at line %zu\n",
-              name, i, node->line);
+      tc_error(node, "Function Parameter Error",
+        "Function '%s' has invalid parameter %zu", name, i);
       return false;
     }
   }
@@ -122,6 +126,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   // Add function to current scope with proper visibility
   if (!scope_add_symbol(scope, name, func_type, is_public, false, arena)) {
+    tc_error_id(node, name, "Duplicate Symbol",
+      "Function '%s' is already declared in this scope", name);
     return false;
   }
 
@@ -134,9 +140,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < param_count; i++) {
     if (!scope_add_symbol(func_scope, param_names[i], param_types[i], false,
                           true, arena)) {
-      fprintf(stderr,
-              "Error: Could not add parameter '%s' to function '%s' scope\n",
-              param_names[i], name);
+      tc_error(node, "Function Parameter Error",
+        "Could not add parameter '%s' to function '%s' scope", param_names[i], name);
       return false;
     }
   }
@@ -144,7 +149,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   // Typecheck function body
   if (body) {
     if (!typecheck_statement(body, func_scope, arena)) {
-      fprintf(stderr, "Error: Function '%s' body failed typechecking\n", name);
+      tc_error(node, "Function Body Error",
+        "Function '%s' body failed typechecking", name);
       return false;
     }
   }
@@ -168,6 +174,8 @@ bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   // Add enum type with proper visibility
   AstNode *int_type = create_basic_type(arena, "int", node->line, node->column);
   if (!scope_add_symbol(scope, enum_name, int_type, is_public, false, arena)) {
+    tc_error_id(node, enum_name, "Duplicate Symbol",
+      "Enum '%s' is already declared in this scope", enum_name);
     return false;
   }
 
@@ -181,8 +189,8 @@ bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     // Enum members have same visibility as the enum itself
     if (!scope_add_symbol(scope, qualified_name, int_type, is_public, false,
                           arena)) {
-      fprintf(stderr, "Error: Could not add enum member '%s'\n",
-              qualified_name);
+      tc_error(node, "Enum Member Error",
+        "Could not add enum member '%s'", qualified_name);
       return false;
     }
   }
@@ -194,8 +202,7 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   // Find the enclosing function's return type
   AstNode *expected_return_type = get_enclosing_function_return_type(scope);
   if (!expected_return_type) {
-    fprintf(stderr, "Error: Return statement outside of function at line %zu\n",
-            node->line);
+    tc_error(node, "Return Error", "Return statement outside of function");
     return false;
   }
 
@@ -207,16 +214,13 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
        strcmp(expected_return_type->type_data.basic.name, "void") == 0);
 
   if (expects_void && return_value != NULL) {
-    fprintf(stderr, "Error: Void function cannot return a value at line %zu\n",
-            node->line);
+    tc_error(node, "Return Error", "Void function cannot return a value");
     return false;
   }
 
   if (!expects_void) {
     if (!return_value) {
-      fprintf(stderr,
-              "Error: Non-void function must return a value at line %zu\n",
-              node->line);
+      tc_error(node, "Return Error", "Non-void function must return a value");
       return false;
     }
 
@@ -229,7 +233,11 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     TypeMatchResult match =
         types_match(expected_return_type, actual_return_type);
     if (match == TYPE_MATCH_NONE) {
-      fprintf(stderr, "Error: Return type mismatch at line %zu\n", node->line);
+      tc_error_help(node, "Return Type Mismatch",
+        "Check that the returned value matches the function's return type",
+        "Return type mismatch: expected '%s', got '%s'",
+        type_to_string(expected_return_type, arena),
+        type_to_string(actual_return_type, arena));
       return false;
     }
   }
@@ -247,10 +255,10 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Type *user = typecheck_expression(node->stmt.if_stmt.condition, scope, arena);
   TypeMatchResult condition = types_match(expected, user);
   if (condition == TYPE_MATCH_NONE) {
-    fprintf(stderr,
-            "Error: If condition expected to be of type 'bool', but got '%s' "
-            "instead\n",
-            type_to_string(user, arena));
+    tc_error_help(node, "If Condition Error",
+      "The condition of an if statement must be of type 'bool'",
+      "If condition expected to be of type 'bool', but got '%s' instead",
+      type_to_string(user, arena));
     return false;
   }
 
@@ -274,7 +282,7 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
                            ArenaAllocator *arena) {
   if (node->type != AST_PREPROCESSOR_MODULE) {
-    fprintf(stderr, "Error: Expected module statement\n");
+    tc_error(node, "Module Error", "Expected module statement");
     return false;
   }
 
@@ -287,7 +295,7 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
   if (!module_scope) {
     module_scope = create_module_scope(global_scope, module_name, arena);
     if (!register_module(global_scope, module_name, module_scope, arena)) {
-      fprintf(stderr, "Error: Failed to register module '%s'\n", module_name);
+      tc_error(node, "Module Error", "Failed to register module '%s'", module_name);
       return false;
     }
   }
@@ -299,9 +307,8 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
 
     if (body[i]->type == AST_PREPROCESSOR_USE) {
       if (!typecheck_use_stmt(body[i], module_scope, global_scope, arena)) {
-        fprintf(stderr,
-                "Error: Failed to process use statement in module '%s'\n",
-                module_name);
+        tc_error(node, "Module Use Error",
+          "Failed to process use statement in module '%s'", module_name);
         return false;
       }
     }
@@ -314,8 +321,8 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
 
     if (body[i]->type != AST_PREPROCESSOR_USE) {
       if (!typecheck(body[i], module_scope, arena)) {
-        fprintf(stderr, "Error: Failed to typecheck statement in module '%s'\n",
-                module_name);
+        tc_error(node, "Module Error",
+          "Failed to typecheck statement in module '%s'", module_name);
         return false;
       }
     }
@@ -327,7 +334,7 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
 bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
                         Scope *global_scope, ArenaAllocator *arena) {
   if (node->type != AST_PREPROCESSOR_USE) {
-    fprintf(stderr, "Error: Expected use statement\n");
+    tc_error(node, "Use Error", "Expected use statement");
     return false;
   }
 
@@ -337,15 +344,14 @@ bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
   // Find the module scope
   Scope *module_scope = find_module_scope(global_scope, module_name);
   if (!module_scope) {
-    fprintf(stderr, "Error: Module '%s' not found\n", module_name);
+    tc_error(node, "Use Error", "Module '%s' not found", module_name);
     return false;
   }
 
   // Add the import to the current scope
   if (!add_module_import(current_scope, module_name, alias, module_scope,
                          arena)) {
-    fprintf(stderr, "Error: Failed to import module '%s' as '%s'\n",
-            module_name, alias);
+    tc_error(node, "Use Error", "Failed to import module '%s' as '%s'", module_name, alias);
     return false;
   }
 
@@ -357,14 +363,12 @@ bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
   Scope *loop_scope = create_child_scope(scope, "infinite_loop", arena);
 
   if (node->stmt.loop_stmt.body == NULL) {
-    fprintf(stderr, "Error: Loop body cannot be null at line %zu\n",
-            node->line);
+    tc_error(node, "Loop Error", "Loop body cannot be null");
     return false;
   }
 
   if (!typecheck_statement(node->stmt.loop_stmt.body, loop_scope, arena)) {
-    fprintf(stderr, "Error: Loop body failed typechecking at line %zu\n",
-            node->line);
+    tc_error(node, "Loop Error", "Loop body failed typechecking");
     return false;
   }
 
@@ -394,3 +398,4 @@ bool typecheck_loop_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 }
 
 // NOTE: I will be back in a bit going to go get dinner.
+

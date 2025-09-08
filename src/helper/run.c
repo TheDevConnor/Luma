@@ -353,7 +353,10 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
+  tc_error_init(config.tokens, config.token_count, config.filepath, allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
+  error_report();
+  
   // debug_print_scope(&root_scope, 0);
 
   if (tc) {

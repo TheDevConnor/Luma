@@ -59,7 +59,8 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     return true; // Nothing to typecheck
 
   default:
-    printf("Warning: Unhandled statement type %d\n", stmt->type);
+    tc_error(stmt, "Unsupported Statement", "Warning: Unhandled statement type %d", stmt->type);
+    tc_error(stmt, "Unsupported Statement", "Unsupported statement type %d", stmt->type);
     return true; // Don't fail on unimplemented statements yet
   }
 }
@@ -90,8 +91,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
   case AST_EXPR_IDENTIFIER: {
     Symbol *symbol = scope_lookup(scope, expr->expr.identifier.name);
     if (!symbol) {
-      fprintf(stderr, "Error: Undefined identifier '%s' at line %zu\n",
-              expr->expr.identifier.name, expr->line);
+      tc_error(expr, "Undefined Identifier", "Undefined identifier '%s' at line %zu",
+               expr->expr.identifier.name, expr->line);
       return NULL;
     }
     return symbol->type;
@@ -117,8 +118,7 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     // Check if target is assignable (not just type compatible)
     TypeMatchResult match = types_match(target_type, value_type);
     if (match == TYPE_MATCH_NONE) {
-      fprintf(stderr, "Error: Type mismatch in assignment at line %zu\n",
-              expr->line);
+      tc_error(expr, "Type Mismatch", "Type mismatch in assignment at line %zu", expr->line, expr->column);
       return NULL;
     }
 
@@ -153,7 +153,7 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_sizeof_expr(expr, scope, arena);
 
   default:
-    printf("Warning: Unhandled expression type %d\n", expr->type);
+    tc_error(expr, "Unsupported Expression", "Unsupported expression type %d", expr->type);
     return create_basic_type(arena, "unknown", expr->line, expr->column);
   }
 }

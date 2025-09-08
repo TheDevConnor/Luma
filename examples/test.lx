@@ -3,10 +3,9 @@
 pub const main = fn () int { 
    let x: *int = cast<*int>(alloc(sizeof<int>));
 
-   *x = 20;
+   x = 20;
    output("x = ", *x, "\n");
 
-   free(x);
    free(x);
    return 0; 
 }
