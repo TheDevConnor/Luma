@@ -47,6 +47,7 @@ typedef struct {
   const char *name;
   bool save;
   bool clean;
+  bool check_mem;
   GrowableArray files; // Change from char** to GrowableArray
   size_t file_count;   // Keep for convenience, or remove and use files.count
 } BuildConfig;
@@ -67,6 +68,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator);
 void print_token(const Token *t);
 
 void print_progress(int step, int total, const char *stage);
+void ensure_clean_line();
 
 bool link_with_ld(const char *obj_filename, const char *exe_filename);
 bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size);

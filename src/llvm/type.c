@@ -1,4 +1,5 @@
 #include "llvm.h"
+#include <llvm-c/Core.h>
 
 LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
   const char *type_name = node->type_data.basic.name;
@@ -14,6 +15,8 @@ LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
     return LLVMVoidTypeInContext(ctx->context);
   } else if (strcmp(type_name, "str") == 0) {
     return LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
+  } else if (strcmp(type_name, "char") == 0) {
+    return LLVMInt8TypeInContext(ctx->context);
   }
   return NULL;
 }

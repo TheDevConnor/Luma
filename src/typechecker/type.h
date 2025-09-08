@@ -1,12 +1,13 @@
 /**
  * @file type.h
- * @brief Type checking and symbol table management for AST nodes.
+ * @brief Type checking and symbol table management for AST nodes with memory tracking.
  *
  * Provides type checking for the Abstract Syntax Tree (AST), including:
  * - Scoped symbol table management
  * - Type compatibility and inference
  * - Function, struct, and enum validation
  * - Module imports and visibility rules
+ * - Memory allocation tracking for alloc/free operations
  * - Comprehensive error reporting
  */
 
@@ -18,6 +19,19 @@
 // ============================================================================
 // Data Structures
 // ============================================================================
+
+typedef struct {
+    size_t line;
+    size_t column;
+    const char *variable_name;  // Variable that holds the allocated pointer
+    bool has_matching_free;
+    int free_count;             // NEW: Track how many times freed
+} StaticAllocation;
+
+typedef struct {
+    GrowableArray allocations;  // Array of StaticAllocation
+    ArenaAllocator *arena;
+} StaticMemoryAnalyzer;
 
 /**
  * @brief Represents a symbol with associated type and metadata.
@@ -46,6 +60,9 @@ typedef struct Scope {
   bool is_module_scope;
   const char *module_name;
   GrowableArray imported_modules;
+  
+  // Memory tracking
+  StaticMemoryAnalyzer *memory_analyzer;
 } Scope;
 
 /**
@@ -75,6 +92,18 @@ typedef struct {
   size_t column;       /**< Column number */
   const char *context; /**< Additional context info */
 } TypeError;
+
+// ============================================================================
+// Memory Tracking
+// ============================================================================
+
+void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer, ArenaAllocator *arena);
+void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line, size_t column, const char *var_name);
+void static_memory_track_free(StaticMemoryAnalyzer *analyzer, const char *var_name);
+void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer);
+
+StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
+const char *extract_variable_name_from_free(AstNode *free_expr);
 
 // ============================================================================
 // Scope Management

@@ -1,39 +1,11 @@
 @module "main"
 
 pub const main = fn () int { 
-   :: Infinite Loop
-   :: let i: int = 0;
-   :: loop {
-   ::      defer ++i;
-   ::      if (i <= 10) { output("i = ", i, "\n"); }
-   ::      else { break; }
-   :: }
+   let x: *int = cast<*int>(alloc(sizeof<int>));
 
-   :: For Loop
-   loop [i: int = 0](i < 10) {
-        outputln("i = ", i);
-        ++i;
-   }
+   *x = 20;
+   output("x = ", *x, "\n");
 
-   :: For Loop with multiple variables + optional
-   :: loop [i: int = 0, j: int = 0](i < 10) : (++i) {
-   ::      outputln("i = ", i, " j = ", j);
-   ::      ++j;
-   :: }
-        
-   :: While Loop
-   :: let j: int = 0;
-   :: loop (j < 19) {
-   ::      outputln("j = ", j);
-   ::      ++j;
-   :: }
-
-   :: While Loop with optional 
-   :: let j: int = 0;
-   :: loop (j < 19) : (++j) {
-   ::      outputln("j = ", j);
-   ::      ++j;
-   :: }
-    
+   free(x);
    return 0; 
 }

@@ -298,7 +298,7 @@ AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator) {
 
 bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   bool success = false;
-  int total_stages = 9;
+  int total_stages = 10;
   int step = 0;
 
   GrowableArray modules;
@@ -343,10 +343,10 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  print_ast(combined_program, "", false, false);
+  // print_ast(combined_program, "", false, false);
 
   // Stage 4: Typechecking
-  print_progress(++step, total_stages, "Typechecker");
+  print_progress(++step, total_stages, "Typechecking");
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
@@ -354,14 +354,23 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // debug_print_scope(&root_scope, 0);
 
   if (tc) {
-    // Stage 5: LLVM IR (UPDATED - now uses module system)
+    // Stage 5: Memory Analysis - ensure clean line before output
+    print_progress(++step, total_stages, "Memory Analysis");
+    // ensure_clean_line(); // Force newline before memory analysis
+    
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
+    if (analyzer && analyzer->allocations.count > 0) {
+        static_memory_report_leaks(analyzer);
+    }
+
+    // Stage 6: LLVM IR (UPDATED - now uses module system)
     print_progress(++step, total_stages, "LLVM IR");
 
     success =
         generate_llvm_code_modules(combined_program, config, allocator, &step);
   }
 
-  // Stage 6: Finalizing
+  // Stage 7: Finalizing
   print_progress(++step, total_stages, "Finalizing");
   print_progress(++step, total_stages, "Completed");
   printf("Build succeeded! Written to '%s'\n",

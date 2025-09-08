@@ -437,7 +437,15 @@ void print_progress(int step, int total, const char *stage) {
   // clear out the rest of the line
   printf("\033[K");
   fflush(stdout);
+  
+  // Always add newline after progress bar to prevent interference
   if (step == total) {
     printf("\n");
   }
+}
+
+// Add a helper function to ensure clean output after progress bar
+void ensure_clean_line() {
+  printf("\n");
+  fflush(stdout);
 }

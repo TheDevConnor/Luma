@@ -3,12 +3,38 @@
 
 #include "type.h"
 
+bool contains_alloc_expression(AstNode *expr) {
+  if (!expr)
+    return false;
+
+  switch (expr->type) {
+  case AST_EXPR_ALLOC:
+    return true;
+  case AST_EXPR_CAST:
+    return contains_alloc_expression(expr->expr.cast.castee);
+  case AST_EXPR_BINARY:
+    return contains_alloc_expression(expr->expr.binary.left) ||
+           contains_alloc_expression(expr->expr.binary.right);
+  // Add other expression types as needed
+  default:
+    return false;
+  }
+}
+
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *name = node->stmt.var_decl.name;
   AstNode *declared_type = node->stmt.var_decl.var_type;
   AstNode *initializer = node->stmt.var_decl.initializer;
   bool is_public = node->stmt.var_decl.is_public;
   bool is_mutable = node->stmt.var_decl.is_mutable;
+
+  // Track memory allocation if initializer contains alloc()
+  if (initializer && contains_alloc_expression(initializer)) {
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+    if (analyzer) {
+      static_memory_track_alloc(analyzer, node->line, node->column, name);
+    }
+  }
 
   // Type checking logic (same as before)
   if (initializer) {

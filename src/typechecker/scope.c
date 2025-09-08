@@ -55,24 +55,28 @@ void init_scope(Scope *scope, Scope *parent, const char *name,
                 ArenaAllocator *arena) {
   // Set up parent-child relationship
   scope->parent = parent;
-
-  // Copy name into arena memory, defaulting to "unnamed" if NULL
   scope->scope_name = name ? arena_strdup(arena, name) : "unnamed";
-
-  // Calculate depth based on parent chain (root scope has depth 0)
   scope->depth = parent ? parent->depth + 1 : 0;
 
-  // Initialize scope type flags to default values
+  // Initialize scope type flags
   scope->is_function_scope = false;
-  scope->is_module_scope = false; // Initialize new module flag
+  scope->is_module_scope = false;
   scope->associated_node = NULL;
-  scope->module_name = NULL; // Initialize module name
+  scope->module_name = NULL;
 
-  // Initialize growable arrays with reasonable initial capacities
+  // Initialize memory tracker (only for global scope)
+  if (!parent) {
+    scope->memory_analyzer = arena_alloc(arena, sizeof(StaticMemoryAnalyzer),
+                                         alignof(StaticMemoryAnalyzer));
+    static_memory_analyzer_init(scope->memory_analyzer, arena);
+  } else {
+    scope->memory_analyzer = parent->memory_analyzer;
+  }
+
+  // Initialize growable arrays
   growable_array_init(&scope->symbols, arena, 16, sizeof(Symbol));
   growable_array_init(&scope->children, arena, 8, sizeof(Scope *));
-  growable_array_init(&scope->imported_modules, arena, 4,
-                      sizeof(ModuleImport)); // New array
+  growable_array_init(&scope->imported_modules, arena, 4, sizeof(ModuleImport));
 }
 /**
  * @brief Add a symbol to the specified scope with duplicate checking

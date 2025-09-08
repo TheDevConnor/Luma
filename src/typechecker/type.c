@@ -26,16 +26,49 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     
     // Basic type matching with string comparison
     if (type1->type == AST_TYPE_BASIC && type2->type == AST_TYPE_BASIC) {
-        if (strcmp(type1->type_data.basic.name, type2->type_data.basic.name) == 0) {
+        const char *name1 = type1->type_data.basic.name;
+        const char *name2 = type2->type_data.basic.name;
+        
+        if (strcmp(name1, name2) == 0) {
             return TYPE_MATCH_EXACT;
         }
         
         // Check for compatible numeric types (implicit conversions)
-        const char *name1 = type1->type_data.basic.name;
-        const char *name2 = type2->type_data.basic.name;
-        
         if ((strcmp(name1, "int") == 0 && strcmp(name2, "float") == 0) ||
             (strcmp(name1, "float") == 0 && strcmp(name2, "int") == 0)) {
+            return TYPE_MATCH_COMPATIBLE;
+        }
+        
+        // Handle string/char* compatibility - string is compatible with char*
+        if ((strcmp(name1, "string") == 0 && strcmp(name2, "char") == 0) ||
+            (strcmp(name1, "char") == 0 && strcmp(name2, "string") == 0)) {
+            return TYPE_MATCH_COMPATIBLE;
+        }
+    }
+    
+    // Handle string and char* pointer compatibility
+    if (type1->type == AST_TYPE_BASIC && type2->type == AST_TYPE_POINTER) {
+        const char *basic_name = type1->type_data.basic.name;
+        AstNode *pointee = type2->type_data.pointer.pointee_type;
+        
+        // string is compatible with char*
+        if (strcmp(basic_name, "string") == 0 && 
+            pointee && pointee->category == Node_Category_TYPE && 
+            pointee->type == AST_TYPE_BASIC &&
+            strcmp(pointee->type_data.basic.name, "char") == 0) {
+            return TYPE_MATCH_COMPATIBLE;
+        }
+    }
+    
+    if (type1->type == AST_TYPE_POINTER && type2->type == AST_TYPE_BASIC) {
+        AstNode *pointee = type1->type_data.pointer.pointee_type;
+        const char *basic_name = type2->type_data.basic.name;
+        
+        // char* is compatible with string
+        if (pointee && pointee->category == Node_Category_TYPE && 
+            pointee->type == AST_TYPE_BASIC &&
+            strcmp(pointee->type_data.basic.name, "char") == 0 &&
+            strcmp(basic_name, "string") == 0) {
             return TYPE_MATCH_COMPATIBLE;
         }
     }
@@ -49,6 +82,17 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     // Array type matching - recursively check element types
     if (type1->type == AST_TYPE_ARRAY && type2->type == AST_TYPE_ARRAY) {
         return types_match(type1->type_data.array.element_type,
+                          type2->type_data.array.element_type);
+    }
+    
+    // Handle array and pointer compatibility (arrays decay to pointers)
+    if (type1->type == AST_TYPE_ARRAY && type2->type == AST_TYPE_POINTER) {
+        return types_match(type1->type_data.array.element_type,
+                          type2->type_data.pointer.pointee_type);
+    }
+    
+    if (type1->type == AST_TYPE_POINTER && type2->type == AST_TYPE_ARRAY) {
+        return types_match(type1->type_data.pointer.pointee_type,
                           type2->type_data.array.element_type);
     }
     

@@ -272,7 +272,8 @@ AstNode *typecheck_alloc_expr(AstNode *expr, Scope *scope,
   }
 
   // alloc returns void* (generic pointer)
-  Type *void_type = create_basic_type(arena, "void", expr->line, expr->column);
+  AstNode *void_type =
+      create_basic_type(arena, "void", expr->line, expr->column);
   return create_pointer_type(arena, void_type, expr->line, expr->column);
 }
 
@@ -284,11 +285,21 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
             expr->line);
     return NULL;
   }
+
   if (ptr_type->type != AST_TYPE_POINTER) {
     fprintf(stderr, "Error: Cannot free non-pointer type at line %zu\n",
             expr->line);
     return NULL;
   }
+
+  // Track memory deallocation if tracker is available
+  StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+  if (analyzer) {
+      // Try to get the variable name from the free expression
+      const char *var_name = extract_variable_name_from_free(expr);
+      static_memory_track_free(analyzer, var_name);
+  }
+
   return create_basic_type(arena, "void", expr->line, expr->column);
 }
 
