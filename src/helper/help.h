@@ -50,6 +50,9 @@ typedef struct {
   bool check_mem;
   GrowableArray files; // Change from char** to GrowableArray
   size_t file_count;   // Keep for convenience, or remove and use files.count
+
+  Token *tokens;
+  size_t token_count;
 } BuildConfig;
 
 bool check_argc(int argc, int expected);

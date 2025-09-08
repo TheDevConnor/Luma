@@ -197,7 +197,7 @@ bool link_object_files_enhanced(const char *output_dir,
 
 // Helper function to parse a single file and extract its module
 Stmt *parse_file_to_module(const char *path, size_t position,
-                           ArenaAllocator *allocator) {
+                           ArenaAllocator *allocator, BuildConfig *config) {
   const char *source = read_file(path);
   if (!source) {
     fprintf(stderr, "Failed to read source file: %s\n", path);
@@ -229,6 +229,9 @@ Stmt *parse_file_to_module(const char *path, size_t position,
     free((void *)source);
     return NULL;
   }
+
+  config->tokens = tokens.data;
+  config->token_count = tokens.item_size;
 
   // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator);
@@ -312,7 +315,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // Parse additional files
   for (size_t i = 0; i < config.file_count; i++) {
     char **files_array = (char **)config.files.data;
-    Stmt *module = parse_file_to_module(files_array[i], i, allocator);
+    Stmt *module = parse_file_to_module(files_array[i], i, allocator, &config);
     if (!module || error_report())
       goto cleanup;
 
@@ -326,7 +329,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   print_progress(++step, total_stages, "Parsing");
 
   Stmt *main_module =
-      parse_file_to_module(config.filepath, config.file_count, allocator);
+      parse_file_to_module(config.filepath, config.file_count, allocator, &config);
   if (!main_module || error_report())
     goto cleanup;
 
@@ -357,13 +360,24 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
     if (config.check_mem) {
       // Stage 5: Memory Analysis - ensure clean line before output
       print_progress(++step, total_stages, "Memory Analysis");
-      // ensure_clean_line(); // Force newline before memory analysis
 
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
       if (analyzer && analyzer->allocations.count > 0) {
-        static_memory_report_leaks(analyzer);
+        // Use the error system instead of direct printing
+        int memory_issues =
+            static_memory_check_and_report(analyzer,
+                                           allocator,   // Your arena allocator
+                                           config.tokens,      // Your token array
+                                           config.token_count, // Number of tokens
+                                           config.filepath); // Source file path
+
+        // Optional: Print a brief summary after progress bar
+        if (memory_issues > 0) {
+          ensure_clean_line(); // Clean up progress bar
+          error_report();
+        }
       }
-    }else {
+    } else {
       ++step;
     }
 

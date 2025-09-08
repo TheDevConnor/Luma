@@ -106,7 +106,7 @@ const char *convert_line_to_string(int line) {
     
     // Then create a string of zeros with that width
     for (int i = 0; i < width; i++) {
-        buffer[i] = '0';
+        buffer[i] = ' ';
     }
     buffer[width] = '\0';
     

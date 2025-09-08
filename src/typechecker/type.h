@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include "../lexer/lexer.h"
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
 
@@ -100,8 +101,16 @@ typedef struct {
 void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer, ArenaAllocator *arena);
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line, size_t column, const char *var_name);
 void static_memory_track_free(StaticMemoryAnalyzer *analyzer, const char *var_name);
-void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer);
-
+void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer, 
+                               ArenaAllocator *arena,
+                               Token *tokens, 
+                               int token_count,
+                               const char *file_path);
+int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer, 
+                                   ArenaAllocator *arena,
+                                   Token *tokens, 
+                                   int token_count,
+                                   const char *file_path);
 StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
 const char *extract_variable_name_from_free(AstNode *free_expr);
 
