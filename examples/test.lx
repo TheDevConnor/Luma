@@ -1,7 +1,18 @@
 @module "main"
 
+const Person = struct {
+pub:
+   name: *char,
+   age: int,
+};
+
 pub const main = fn () int { 
-   let x: int = 20;
-   output("x = ", x, "\n");
+   let x: *Person = cast<*Person>(alloc(sizeof<Person>));
+
+   x.name = "Connor";
+   x.age = 20;
+   output("Name: ", x.name, " age: ", x.age, "\n");
+
+   free(x);
    return 0; 
 }

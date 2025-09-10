@@ -133,7 +133,7 @@ struct AstNode {
           AstNode **body;
           size_t body_count;
         } module;
-        
+
         // @use "module_name" as module;
         struct {
           const char *module_name;
@@ -400,6 +400,14 @@ struct AstNode {
           size_t param_count;
           AstNode *return_type; // Changed from Type* to AstNode*
         } function;
+
+        // AST_TYPE_STRUCT - ADD THIS STRUCT
+        struct {
+          const char *name;          // Name of the struct type
+          AstNode **member_types;    // Array of member types
+          const char **member_names; // Array of member names
+          size_t member_count;       // Number of members
+        } struct_type;
       };
     } type_data;
   };
@@ -412,7 +420,8 @@ typedef AstNode Stmt;
 typedef AstNode Type;
 
 AstNode *create_preprocessor_node(ArenaAllocator *arena, NodeType type,
-                         NodeCategory category, size_t line, size_t column);
+                                  NodeCategory category, size_t line,
+                                  size_t column);
 AstNode *create_expr_node(ArenaAllocator *arena, NodeType type, size_t line,
                           size_t column);
 AstNode *create_stmt_node(ArenaAllocator *arena, NodeType type, size_t line,
@@ -421,8 +430,9 @@ AstNode *create_type_node(ArenaAllocator *arena, NodeType type, size_t line,
                           size_t column);
 
 // Helper macros for creating nodes
-#define create_preprocessor(arena, type, line, column)                        \
-  create_preprocessor_node(arena, type, Node_Category_PREPROCESSOR, line, column) 
+#define create_preprocessor(arena, type, line, column)                         \
+  create_preprocessor_node(arena, type, Node_Category_PREPROCESSOR, line,      \
+                           column)
 #define create_expr(arena, type, line, column)                                 \
   create_expr_node(arena, type, line, column)
 #define create_stmt(arena, type, line, column)                                 \
@@ -436,10 +446,10 @@ AstNode *create_ast_node(ArenaAllocator *arena, NodeType type,
 
 // Preprocessor creation macros
 AstNode *create_module_node(ArenaAllocator *arena, const char *name,
-                             int potions, AstNode **body, size_t body_count,
-                             size_t line, size_t column);
+                            int potions, AstNode **body, size_t body_count,
+                            size_t line, size_t column);
 AstNode *create_use_node(ArenaAllocator *arena, const char *module_name,
-                         const char *alias, size_t line, size_t column);  
+                         const char *alias, size_t line, size_t column);
 
 // Expression creation macros
 AstNode *create_literal_expr(ArenaAllocator *arena, LiteralType lit_type,
@@ -477,8 +487,8 @@ AstNode *create_free_expr(ArenaAllocator *arena, Expr *ptr, size_t line,
                           size_t col);
 AstNode *create_cast_expr(ArenaAllocator *arena, Expr *type, Expr *castee,
                           size_t line, size_t col);
-AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type, size_t line,
-                            size_t col);
+AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type,
+                            size_t line, size_t col);
 
 // Statement creation macros
 AstNode *create_program_node(ArenaAllocator *arena, AstNode **statements,
@@ -530,7 +540,7 @@ AstNode *create_print_stmt(ArenaAllocator *arena, Expr **expressions,
 AstNode *create_break_continue_stmt(ArenaAllocator *arena, bool is_continue,
                                     size_t line, size_t column);
 AstNode *create_defer_stmt(ArenaAllocator *arena, AstNode *statement,
-                            size_t line, size_t column);  
+                           size_t line, size_t column);
 
 // Type creation macros
 AstNode *create_basic_type(ArenaAllocator *arena, const char *name, size_t line,

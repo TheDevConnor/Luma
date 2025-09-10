@@ -139,6 +139,7 @@ Scope *find_containing_module(Scope *scope);
 Scope *create_child_scope(Scope *parent, const char *name,
                           ArenaAllocator *arena);
 void debug_print_scope(Scope *scope, int indent_level);
+void debug_print_struct_type(AstNode *struct_type, int indent);
 
 // ============================================================================
 // Module Management
@@ -193,7 +194,15 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena);
 // Declarations
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
+
+AstNode *create_struct_type(ArenaAllocator *arena, const char *name, 
+                           AstNode **member_types, const char **member_names,
+                           size_t member_count, size_t line, size_t column);
+AstNode *get_struct_member_type(AstNode *struct_type, const char *member_name);
+bool struct_has_member(AstNode *struct_type, const char *member_name);
+
 bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
+
 bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);

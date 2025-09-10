@@ -23,6 +23,19 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     if (type1->category != Node_Category_TYPE || type2->category != Node_Category_TYPE) {
         return TYPE_MATCH_NONE;
     }
+
+    if (type1->type == AST_TYPE_STRUCT && type2->type == AST_TYPE_STRUCT) {
+        // Structs match if they have the same name
+        // (assuming nominal typing - structs with same structure but different names are different)
+        const char *name1 = type1->type_data.struct_type.name;
+        const char *name2 = type2->type_data.struct_type.name;
+        
+        if (strcmp(name1, name2) == 0) {
+            return TYPE_MATCH_EXACT;
+        }
+        
+        return TYPE_MATCH_NONE;
+    }
     
     // Basic type matching with string comparison
     if (type1->type == AST_TYPE_BASIC && type2->type == AST_TYPE_BASIC) {
@@ -36,12 +49,6 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
         // Check for compatible numeric types (implicit conversions)
         if ((strcmp(name1, "int") == 0 && strcmp(name2, "float") == 0) ||
             (strcmp(name1, "float") == 0 && strcmp(name2, "int") == 0)) {
-            return TYPE_MATCH_COMPATIBLE;
-        }
-        
-        // Handle string/char* compatibility - string is compatible with char*
-        if ((strcmp(name1, "string") == 0 && strcmp(name2, "char") == 0) ||
-            (strcmp(name1, "char") == 0 && strcmp(name2, "string") == 0)) {
             return TYPE_MATCH_COMPATIBLE;
         }
     }
@@ -122,36 +129,74 @@ bool is_array_type(AstNode *type) {
 
 const char *type_to_string(AstNode *type, ArenaAllocator *arena) {
     // Handle null or invalid type nodes
-    if (!type || type->category != Node_Category_TYPE) {
-        return arena_strdup(arena, "unknown");
+    if (!type) {
+        return arena_strdup(arena, "<null_type>");
+    }
+    
+    if (type->category != Node_Category_TYPE) {
+        return arena_strdup(arena, "<invalid_type>");
     }
     
     switch (type->type) {
-        case AST_TYPE_BASIC:
-            // Simple case - just return the basic type name
-            return arena_strdup(arena, type->type_data.basic.name);
+        case AST_TYPE_BASIC: {
+            const char *name = type->type_data.basic.name;
+            if (!name) {
+                return arena_strdup(arena, "<unnamed_basic_type>");
+            }
+            return arena_strdup(arena, name);
+        }
+        
+        case AST_TYPE_STRUCT: {
+            const char *struct_name = type->type_data.struct_type.name;
+            if (!struct_name) {
+                return arena_strdup(arena, "<unnamed_struct>");
+            }
+            size_t len = strlen("struct ") + strlen(struct_name) + 1;
+            char *result = arena_alloc(arena, len, len);
+            snprintf(result, len, "struct %s", struct_name);
+            return result;
+        }
         
         case AST_TYPE_POINTER: {
-            // Recursively get pointee type and append '*'
-            const char *pointee = type_to_string(type->type_data.pointer.pointee_type, arena);
-            size_t len = strlen(pointee) + 2;  // +1 for '*', +1 for null terminator
+            AstNode *pointee = type->type_data.pointer.pointee_type;
+            if (!pointee) {
+                return arena_strdup(arena, "<null>*");
+            }
+            const char *pointee_str = type_to_string(pointee, arena);
+            size_t len = strlen(pointee_str) + 2;  // +1 for '*', +1 for null terminator
             char *result = arena_alloc(arena, len, len);
-            snprintf(result, len, "%s*", pointee);
+            snprintf(result, len, "%s*", pointee_str);
             return result;
         }
         
         case AST_TYPE_ARRAY: {
-            // Recursively get element type and append '[]'
-            const char *element = type_to_string(type->type_data.array.element_type, arena);
-            size_t len = strlen(element) + 3; // +2 for "[]", +1 for null terminator
+            AstNode *element = type->type_data.array.element_type;
+            if (!element) {
+                return arena_strdup(arena, "<null>[]");
+            }
+            const char *element_str = type_to_string(element, arena);
+            size_t len = strlen(element_str) + 3; // +2 for "[]", +1 for null terminator
             char *result = arena_alloc(arena, len, len);
-            snprintf(result, len, "%s[]", element);
+            snprintf(result, len, "%s[]", element_str);
+            return result;
+        }
+        
+        case AST_TYPE_FUNCTION: {
+            // For function types, show return type and parameter count
+            AstNode *return_type = type->type_data.function.return_type;
+            size_t param_count = type->type_data.function.param_count;
+            
+            const char *return_str = return_type ? type_to_string(return_type, arena) : "<null>";
+            
+            size_t len = strlen("fn(") + strlen(return_str) + 20; // extra space for param count
+            char *result = arena_alloc(arena, len, len);
+            snprintf(result, len, "fn(%zu params) -> %s", param_count, return_str);
             return result;
         }
         
         default:
             // Fallback for unknown or unhandled type categories
-            return arena_strdup(arena, "unknown");
+            return arena_strdup(arena, "<unknown_type>");
     }
 }
 
@@ -163,6 +208,98 @@ AstNode *get_enclosing_function_return_type(Scope *scope) {
         scope = scope->parent;
     }
     return NULL;
+}
+
+AstNode *create_struct_type(ArenaAllocator *arena, const char *name, 
+                           AstNode **member_types, const char **member_names,
+                           size_t member_count, size_t line, size_t column) {
+    AstNode *struct_type = arena_alloc(arena, sizeof(AstNode), alignof(AstNode));
+    struct_type->type = AST_TYPE_STRUCT;
+    struct_type->category = Node_Category_TYPE;
+    struct_type->line = line;
+    struct_type->column = column;
+    
+    struct_type->type_data.struct_type.name = arena_strdup(arena, name);
+    struct_type->type_data.struct_type.member_count = member_count;
+    
+    // Allocate and copy member types
+    struct_type->type_data.struct_type.member_types = 
+        arena_alloc(arena, member_count * sizeof(AstNode*), alignof(AstNode*));
+    for (size_t i = 0; i < member_count; i++) {
+        struct_type->type_data.struct_type.member_types[i] = member_types[i];
+    }
+    
+    // Allocate and copy member names
+    struct_type->type_data.struct_type.member_names = 
+        arena_alloc(arena, member_count * sizeof(char*), alignof(char*));
+    for (size_t i = 0; i < member_count; i++) {
+        struct_type->type_data.struct_type.member_names[i] = arena_strdup(arena, member_names[i]);
+    }
+    
+    return struct_type;
+}
+
+AstNode *get_struct_member_type(AstNode *struct_type, const char *member_name) {
+    if (!struct_type || struct_type->type != AST_TYPE_STRUCT || !member_name) {
+        return NULL;
+    }
+    
+    for (size_t i = 0; i < struct_type->type_data.struct_type.member_count; i++) {
+        if (strcmp(struct_type->type_data.struct_type.member_names[i], member_name) == 0) {
+            return struct_type->type_data.struct_type.member_types[i];
+        }
+    }
+    
+    return NULL;
+}
+
+bool struct_has_member(AstNode *struct_type, const char *member_name) {
+    return get_struct_member_type(struct_type, member_name) != NULL;
+}
+
+void debug_print_struct_type(AstNode *struct_type, int indent) {
+    if (!struct_type || struct_type->type != AST_TYPE_STRUCT) {
+        printf("Not a struct type\n");
+        return;
+    }
+    
+    for (int i = 0; i < indent; i++) printf("  ");
+    printf("Struct '%s' (%zu members):\n", 
+           struct_type->type_data.struct_type.name,
+           struct_type->type_data.struct_type.member_count);
+    
+    for (size_t i = 0; i < struct_type->type_data.struct_type.member_count; i++) {
+        for (int j = 0; j < indent + 1; j++) printf("  ");
+        
+        AstNode *member_type = struct_type->type_data.struct_type.member_types[i];
+        const char *member_name = struct_type->type_data.struct_type.member_names[i];
+        
+        // Simple type name extraction without arena allocation
+        const char *type_name = "unknown";
+        if (member_type && member_type->category == Node_Category_TYPE) {
+            switch (member_type->type) {
+                case AST_TYPE_BASIC:
+                    if (member_type->type_data.basic.name) {
+                        type_name = member_type->type_data.basic.name;
+                    }
+                    break;
+                case AST_TYPE_POINTER:
+                    type_name = "pointer";
+                    break;
+                case AST_TYPE_FUNCTION:
+                    type_name = "function";
+                    break;
+                case AST_TYPE_STRUCT:
+                    type_name = "struct";
+                    break;
+                default:
+                    type_name = "complex_type";
+                    break;
+            }
+        }
+        
+        printf("- %s: %s\n", member_name, type_name);
+    }
 }
 
 void debug_print_scope(Scope *scope, int indent_level) {

@@ -488,7 +488,7 @@ Type *parse_type(Parser *parser) {
 
   // Optionally: handle identifiers like 'MyStruct' or user-defined types
   case TOK_IDENTIFIER:
-    return tled(parser, NULL, BP_NONE);
+    return create_basic_type(parser->arena, get_name(parser), parser->tks->line, parser->tks->col);
 
   default:
     fprintf(stderr, "[parse_type] Unexpected token for type: %d\n", tok);
