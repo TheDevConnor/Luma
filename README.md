@@ -52,12 +52,71 @@ You'll need the following tools installed:
 
 - **[Make](https://www.gnu.org/software/make/)** - Build automation
 - **[GCC](https://gcc.gnu.org/)** - GNU Compiler Collection
-- **[LLVM](https://releases.llvm.org/download.html)** - Compiler infrastructure
+- **[LLVM](https://releases.llvm.org/download.html)** - Compiler infrastructure (**Version 20.0+ required**)
 - **[Valgrind](https://valgrind.org/)** *(optional)* - Memory debugging
+
+### LLVM Version Requirements
+
+**Important:** Luma requires LLVM 20.0 or higher due to critical bug fixes in the constant generation system.
+
+**Known Issues:**
+- **LLVM 19.1.x**: Contains a regression that causes crashes during code generation (`illegal hardware instruction` errors)
+- **LLVM 18.x and older**: Not tested, may have compatibility issues
+
+If you encounter crashes during the "LLVM IR" compilation stage (typically at 60% progress), this is likely due to an incompatible LLVM version.
+
+#### Checking Your LLVM Version
+
+```bash
+llvm-config --version
+```
+
+#### Upgrading LLVM
+
+**Arch Linux:**
+```bash
+sudo pacman -S llvm
+# For development headers:
+sudo pacman -S llvm-libs
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf update llvm llvm-devel llvm-libs
+# Or install specific version:
+sudo dnf install llvm20-devel llvm20-libs
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install llvm-20-dev
+```
+
+**macOS (Homebrew):**
+```bash
+brew install llvm
+```
 
 ### Linux Installation
 
 ## Usage
+
+## Troubleshooting
+
+### Common Issues
+
+**"illegal hardware instruction" during compilation:**
+- This indicates an LLVM version incompatibility
+- Upgrade to LLVM 20.0+ to resolve this issue
+- See [LLVM Version Requirements](#llvm-version-requirements) above
+
+**Missing LLVM development headers:**
+```bash
+# Install development packages
+sudo dnf install llvm-devel        # Fedora/RHEL
+sudo apt install llvm-dev          # Ubuntu/Debian
+```
 
 ## Join Us
 

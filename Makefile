@@ -76,6 +76,7 @@ compile-native: output.ll
 
 clean:
 	$(call RMDIR,$(OBJ_DIR))
+	$(call RMDIR,"output")
 	$(call DEL,$(BIN))
 	@echo "Cleaning LLVM output files..."
 	$(call DEL,output.bc)

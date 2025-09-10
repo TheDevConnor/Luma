@@ -1,0 +1,56 @@
+{
+  "name": "language-support",
+  "displayName": "Lux Language Support",
+  "description": "Syntax highlighting and language support for Lux programming language",
+  "version": "0.1.0",
+  "publisher": "TheDevConnor",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lux",
+        "aliases": [
+          "Lux",
+          "lux"
+        ],
+        "extensions": [
+          ".lx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lux",
+        "scopeName": "source.lux",
+        "path": "./syntaxes/lux.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Lux Tokyo Night",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lux-tokyo-night.json"
+      },
+      {
+        "label": "Lux Horizon Reimagined",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lux-horizon-reimagined.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "typescript": "^4.0.0"
+  }
+}

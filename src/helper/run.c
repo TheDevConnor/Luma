@@ -6,6 +6,7 @@
 #include "help.h"
 
 #include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -17,6 +18,19 @@ bool create_directory(const char *path) {
 #else
   return mkdir(path, 0755) == 0 || errno == EEXIST;
 #endif
+}
+
+void handle_segfault(int sig) {
+  fprintf(stderr, "\nSegmentation fault caught during LLVM operations!\n");
+  fprintf(stderr, "This likely indicates a problem in LLVM IR generation.\n");
+  exit(1);
+}
+
+void handle_illegal_instruction(int sig) {
+  fprintf(stderr, "\nIllegal instruction caught!\n");
+  fprintf(stderr, "This suggests LLVM generated invalid machine code.\n");
+  fprintf(stderr, "Check your target architecture and LLVM version compatibility.\n");
+  exit(1);
 }
 
 void save_module_output_files(CodeGenContext *ctx, const char *output_dir) {
@@ -74,6 +88,9 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
     return false;
   }
 
+  signal(SIGSEGV, handle_segfault);
+  signal(SIGILL, handle_illegal_instruction);
+
   // Generate LLVM IR for all modules using the new multi-module system
   bool success = generate_program_modules(ctx, root, output_dir);
   if (!success) {
@@ -83,13 +100,6 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   }
 
   print_progress(++(*step), 9, "LLVM IR Generation");
-
-  // Validate the module system
-  // if (!validate_module_system(ctx)) {
-  //   fprintf(stderr, "Module system validation failed\n");
-  //   cleanup_codegen_context(ctx);
-  //   return false;
-  // }
 
   if (config.save) {
     // Save detailed output files for debugging

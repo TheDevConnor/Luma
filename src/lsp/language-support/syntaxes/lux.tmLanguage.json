@@ -1,0 +1,249 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Lux",
+  "scopeName": "source.lux",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-colon.lux",
+          "begin": "::",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.lux",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.lux",
+          "match": "(@)(module|use)\\s+(\"[^\"]*\")(\\s+as\\s+([a-zA-Z_][a-zA-Z0-9_]*))?",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.directive.lux"
+            },
+            "2": {
+              "name": "keyword.control.directive.lux"
+            },
+            "3": {
+              "name": "string.quoted.double.lux"
+            },
+            "4": {
+              "name": "keyword.control.as.lux"
+            },
+            "5": {
+              "name": "entity.name.namespace.lux"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lux",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lux",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.lux",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lux",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.lux",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.lux",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.lux",
+          "match": "\\b(if|elif|else|loop|break|continue|return|defer)\\b"
+        },
+        {
+          "name": "storage.type.lux",
+          "match": "\\b(const|let)\\b"
+        },
+        {
+          "name": "keyword.other.lux",
+          "match": "\\b(fn|struct|enum)\\b"
+        },
+        {
+          "name": "storage.modifier.lux",
+          "match": "\\b(pub|priv|public|private)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.lux",
+          "match": "\\b(int|uint|float|bool|str|void)\\b"
+        },
+        {
+          "name": "entity.name.type.lux",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "meta.function.definition.lux",
+          "begin": "\\b(const)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=)\\s*(fn)\\s*(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.lux"
+            },
+            "2": {
+              "name": "entity.name.function.lux"
+            },
+            "3": {
+              "name": "keyword.operator.assignment.lux"
+            },
+            "4": {
+              "name": "keyword.other.lux"
+            },
+            "5": {
+              "name": "punctuation.definition.parameters.begin.lux"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.parameters.end.lux"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#function-parameters"
+            }
+          ]
+        },
+        {
+          "name": "meta.function.call.lux",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.lux"
+            }
+          }
+        }
+      ]
+    },
+    "function-parameters": {
+      "patterns": [
+        {
+          "name": "variable.parameter.lux",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*:)"
+        },
+        {
+          "include": "#types"
+        },
+        {
+          "include": "#comments"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.lux",
+          "match": "\\+\\+|--|\\+|\\-|\\*|/|%"
+        },
+        {
+          "name": "keyword.operator.comparison.lux",
+          "match": "==|!=|<|>|<=|>="
+        },
+        {
+          "name": "keyword.operator.logical.lux",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.assignment.lux",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.bitwise.lux",
+          "match": "&|\\||\\^|~|<<|>>"
+        },
+        {
+          "name": "keyword.operator.pointer.lux",
+          "match": "\\*|&"
+        },
+        {
+          "name": "keyword.operator.member.lux",
+          "match": "\\."
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.lux",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

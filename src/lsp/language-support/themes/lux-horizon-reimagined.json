@@ -1,0 +1,101 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Lux Horizon Reimagined",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1C1E26",
+    "editor.foreground": "#E0DEF4",
+    "editorCursor.foreground": "#E95678",
+    "editor.lineHighlightBackground": "#2E303E",
+    "editorLineNumber.foreground": "#6C6F93",
+    "editor.selectionBackground": "#3E445E",
+    "editor.inactiveSelectionBackground": "#3E445E80",
+    "editorWhitespace.foreground": "#3E445E",
+    "activityBar.background": "#1C1E26",
+    "sideBar.background": "#1C1E26",
+    "statusBar.background": "#1C1E26",
+    "tab.activeBackground": "#2E303E",
+    "tab.inactiveBackground": "#1C1E26"
+  },
+  "tokenColors": [
+    {
+      "scope": [
+        "comment.line.double-colon.lux",
+        "comment.block.lux",
+        "punctuation.definition.comment"
+      ],
+      "settings": { "foreground": "#6C6F93", "fontStyle": "italic" }
+    },
+    {
+      "scope": [
+        "keyword.control.lux",
+        "keyword.other.lux", 
+        "storage.type.lux",
+        "storage.modifier.lux"
+      ],
+      "settings": { "foreground": "#FAB795", "fontStyle": "bold" }
+    },
+    {
+      "scope": [
+        "variable.other.lux",
+        "variable.parameter.lux",
+        "entity.name.variable"
+      ],
+      "settings": { "foreground": "#E0DEF4" }
+    },
+    {
+      "scope": [
+        "entity.name.function.lux",
+        "support.function"
+      ],
+      "settings": { "foreground": "#25B2BC" }
+    },
+    {
+      "scope": [
+        "string.quoted.double.lux",
+        "string.quoted.single.lux",
+        "constant.character.escape.lux"
+      ],
+      "settings": { "foreground": "#B877DB" }
+    },
+    {
+      "scope": [
+        "constant.numeric.integer.lux",
+        "constant.numeric.float.lux",
+        "constant.language"
+      ],
+      "settings": { "foreground": "#F09383" }
+    },
+    {
+      "scope": [
+        "entity.name.type.lux",
+        "support.type.primitive.lux"
+      ],
+      "settings": { "foreground": "#F6C177" }
+    },
+    {
+      "scope": [
+        "keyword.operator.arithmetic.lux",
+        "keyword.operator.comparison.lux",
+        "keyword.operator.logical.lux",
+        "keyword.operator.assignment.lux",
+        "keyword.operator.bitwise.lux",
+        "keyword.operator.pointer.lux",
+        "keyword.operator.member.lux"
+      ],
+      "settings": { "foreground": "#89ddff" }
+    },
+    {
+      "scope": [
+        "meta.preprocessor.lux",
+        "punctuation.definition.directive.lux",
+        "keyword.control.directive.lux"
+      ],
+      "settings": { "foreground": "#bb9af7" }
+    },
+    {
+      "scope": "entity.name.namespace.lux",
+      "settings": { "foreground": "#73daca" }
+    }
+  ]
+}
