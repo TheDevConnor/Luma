@@ -73,7 +73,6 @@ void generate_external_declarations(CodeGenContext *ctx,
   }
 }
 
-// Generate object file for a specific module
 bool generate_module_object_file(ModuleCompilationUnit *module,
                                  const char *output_path) {
   char *error = NULL;
@@ -92,13 +91,29 @@ bool generate_module_object_file(ModuleCompilationUnit *module,
     return false;
   }
 
-  // Create target machine with PIE-compatible settings
+  // Get host CPU name and features for maximum compatibility
+  char *host_cpu = LLVMGetHostCPUName();
+  char *host_features = LLVMGetHostCPUFeatures();
+  
+  // For debugging - you can comment these out later
+  printf("Target triple: %s\n", target_triple);
+  printf("Host CPU: %s\n", host_cpu);
+  printf("Host features: %s\n", host_features);
+
+  // Create target machine with host-specific settings for compatibility
   LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-      target, target_triple, "", "", LLVMCodeGenLevelDefault,
-      LLVMRelocPIC,      // Changed from LLVMRelocDefault to LLVMRelocPIC
-      LLVMCodeModelSmall // Changed from LLVMCodeModelDefault to
-                         // LLVMCodeModelSmall
+      target, 
+      target_triple, 
+      host_cpu,           // Use host CPU instead of empty string
+      host_features,      // Use host features instead of empty string
+      LLVMCodeGenLevelDefault,
+      LLVMRelocPIC,       // Keep PIE-compatible
+      LLVMCodeModelSmall  // Keep small code model
   );
+
+  // Clean up CPU and features strings
+  LLVMDisposeMessage(host_cpu);
+  LLVMDisposeMessage(host_features);
 
   if (!target_machine) {
     fprintf(stderr, "Failed to create target machine for module %s\n",

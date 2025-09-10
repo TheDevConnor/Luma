@@ -96,10 +96,10 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
     save_module_output_files(ctx, output_dir);
 
     // Print module information for debugging
-    // print_module_info(ctx);
+    print_module_info(ctx);
 
     // Debug object files
-    // debug_object_files(output_dir);
+    debug_object_files(output_dir);
   }
 
   // Link all object files together to create final executable
