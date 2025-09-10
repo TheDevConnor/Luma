@@ -1,11 +1,7 @@
 @module "main"
 
 pub const main = fn () int { 
-   let x: *int = cast<*int>(alloc(sizeof<int>));
-
-   x = 20;
-   output("x = ", *x, "\n");
-
-   free(x);
+   let x: int = 20;
+   output("x = ", x, "\n");
    return 0; 
 }

@@ -94,7 +94,7 @@ bool generate_module_object_file(ModuleCompilationUnit *module,
 
   // Create target machine with PIE-compatible settings
   LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-      target, target_triple, "generic", "", LLVMCodeGenLevelDefault,
+      target, target_triple, "", "", LLVMCodeGenLevelDefault,
       LLVMRelocPIC,      // Changed from LLVMRelocDefault to LLVMRelocPIC
       LLVMCodeModelSmall // Changed from LLVMCodeModelDefault to
                          // LLVMCodeModelSmall
@@ -350,8 +350,9 @@ bool generate_assembly_file(CodeGenContext *ctx, const char *asm_filename) {
   }
 
   LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-      target, target_triple, "generic", "", LLVMCodeGenLevelDefault,
-      LLVMRelocDefault, LLVMCodeModelDefault);
+      target, target_triple, "", "", LLVMCodeGenLevelNone,
+      LLVMRelocDefault, LLVMCodeModelDefault
+  );
 
   if (!target_machine) {
     fprintf(stderr, "Failed to create target machine\n");
