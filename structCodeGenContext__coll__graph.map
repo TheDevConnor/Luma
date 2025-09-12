@@ -1,0 +1,20 @@
+<map id="CodeGenContext" name="CodeGenContext">
+<area shape="rect" id="Node000001" title=" " alt="" coords="270,347,402,372"/>
+<area shape="rect" id="Node000002" href="$structModuleCompilationUnit.html" title=" " alt="" coords="5,244,181,269"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="127,273,225,320,295,344,294,349,223,325,125,278"/>
+<area shape="poly" id="edge4_Node000002_Node000002" title=" " alt="" coords="196,248,208,256,200,265,182,268,181,263,198,260,203,257,193,252"/>
+<area shape="rect" id="Node000003" href="$structLLVM__Symbol.html" title=" " alt="" coords="37,73,149,99"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="96,113,96,244,91,244,91,113"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="121,65,140,61,158,63,171,72,176,86,169,102,152,110,131,109,109,101,110,96,132,104,151,105,165,99,171,86,167,75,156,68,141,67,122,70"/>
+<area shape="rect" id="Node000004" href="$structDeferredStatement.html" title=" " alt="" coords="263,244,409,269"/>
+<area shape="poly" id="edge5_Node000001_Node000004" title=" " alt="" coords="339,283,339,347,333,347,333,283"/>
+<area shape="poly" id="edge8_Node000004_Node000004" title=" " alt="" coords="424,247,436,256,428,265,410,268,409,263,425,260,431,257,421,252"/>
+<area shape="rect" id="Node000005" href="$structAstNode.html" title=" " alt="" coords="297,73,375,99"/>
+<area shape="poly" id="edge6_Node000004_Node000005" title=" " alt="" coords="339,113,339,244,333,244,333,113"/>
+<area shape="poly" id="edge7_Node000005_Node000005" title=" " alt="" coords="361,64,375,61,388,64,398,72,401,86,396,102,383,110,365,109,348,101,350,97,366,104,381,105,392,99,396,86,393,75,386,69,375,67,362,69"/>
+<area shape="rect" id="Node000006" href="$structArenaAllocator.html" title="Arena allocator structure." alt="" coords="491,244,610,269"/>
+<area shape="poly" id="edge9_Node000001_Node000006" title=" " alt="" coords="535,282,512,305,484,325,444,342,403,352,402,347,442,337,481,320,509,301,531,278"/>
+<area shape="rect" id="Node000007" href="$structBuffer.html" title="Represents a memory buffer in the arena." alt="" coords="520,73,581,99"/>
+<area shape="poly" id="edge10_Node000006_Node000007" title=" " alt="" coords="553,113,553,244,548,244,548,113"/>
+<area shape="poly" id="edge11_Node000007_Node000007" title=" " alt="" coords="573,63,586,61,597,64,605,73,608,86,603,102,591,110,576,109,561,101,563,97,577,104,590,105,599,99,603,86,600,75,594,69,585,67,574,69"/>
+</map>

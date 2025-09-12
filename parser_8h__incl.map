@@ -1,0 +1,22 @@
+<map id="src/parser/parser.h" name="src/parser/parser.h">
+<area shape="rect" id="Node000001" title="Recursive descent and Pratt parser for the Zura language." alt="" coords="77,5,219,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,225,80,251"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="114,33,79,52,64,64,52,80,39,113,34,149,35,183,40,212,34,213,30,184,29,149,34,112,47,77,60,61,76,47,111,28"/>
+<area shape="rect" id="Node000003" href="$ast_8h.html" title=" " alt="" coords="61,79,152,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="143,32,123,68,118,65,139,30"/>
+<area shape="rect" id="Node000005" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="143,152,342,177"/>
+<area shape="poly" id="edge9_Node000001_Node000005" title=" " alt="" coords="158,30,230,139,225,142,154,33"/>
+<area shape="rect" id="Node000007" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="227,79,341,104"/>
+<area shape="poly" id="edge10_Node000001_Node000007" title=" " alt="" coords="171,28,251,70,249,75,169,33"/>
+<area shape="poly" id="edge4_Node000003_Node000002" title=" " alt="" coords="104,106,56,214,51,212,99,103"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="104,225,187,251"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="112,104,141,211,136,213,107,105"/>
+<area shape="poly" id="edge5_Node000003_Node000005" title=" " alt="" coords="130,102,210,143,207,148,127,106"/>
+<area shape="poly" id="edge8_Node000005_Node000002" title=" " alt="" coords="211,180,89,223,88,218,210,175"/>
+<area shape="poly" id="edge7_Node000005_Node000004" title=" " alt="" coords="229,180,174,219,171,215,225,175"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="211,225,298,251"/>
+<area shape="poly" id="edge6_Node000005_Node000006" title=" " alt="" coords="247,177,253,211,248,212,242,178"/>
+<area shape="poly" id="edge11_Node000007_Node000005" title=" " alt="" coords="279,106,259,141,254,139,275,103"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="366,152,437,177"/>
+<area shape="poly" id="edge12_Node000007_Node000008" title=" " alt="" coords="304,102,372,142,369,147,301,106"/>
+</map>

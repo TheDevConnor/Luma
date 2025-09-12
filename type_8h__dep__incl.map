@@ -1,0 +1,23 @@
+<map id="src/typechecker/type.h" name="src/typechecker/type.h">
+<area shape="rect" id="Node000001" title="Type checking and symbol table management for AST nodes with memory tracking." alt="" coords="855,5,1025,31"/>
+<area shape="rect" id="Node000002" href="$run_8c.html" title=" " alt="" coords="5,86,128,111"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="841,24,703,29,528,39,334,56,140,81,107,89,105,83,140,76,333,50,527,33,702,23,841,18"/>
+<area shape="rect" id="Node000003" href="$typechecker_2error_8c.html" title=" " alt="" coords="153,86,322,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="842,29,610,49,334,81,291,89,291,83,333,76,609,43,842,23"/>
+<area shape="rect" id="Node000004" href="$typechecker_2expr_8c.html" title=" " alt="" coords="346,86,513,111"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="842,35,524,81,485,89,484,83,524,76,841,29"/>
+<area shape="rect" id="Node000005" href="$typechecker_2lookup_8c.html" title=" " alt="" coords="537,86,719,111"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="882,37,674,89,673,83,881,31"/>
+<area shape="rect" id="Node000006" href="$module_8c.html" title=" " alt="" coords="743,86,931,111"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="915,41,854,88,851,84,912,37"/>
+<area shape="rect" id="Node000007" href="$scope_8c.html" title="Implementation of scope and symbol table management functions." alt="" coords="955,86,1133,111"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="968,37,1030,84,1027,88,964,41"/>
+<area shape="rect" id="Node000008" href="$static__mem__tracker_8c.html" title=" " alt="" coords="1157,79,1321,119"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="997,31,1168,76,1166,81,996,37"/>
+<area shape="rect" id="Node000009" href="$typechecker_2stmt_8c.html" title=" " alt="" coords="1345,86,1514,111"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="1036,30,1334,76,1374,83,1373,89,1333,81,1035,35"/>
+<area shape="rect" id="Node000010" href="$tc_8c.html" title=" " alt="" coords="1538,86,1689,111"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="1039,23,1263,43,1395,58,1527,76,1565,83,1564,89,1526,81,1394,63,1262,48,1038,29"/>
+<area shape="rect" id="Node000011" href="$typechecker_2type_8c.html" title="Implementation of type checking and symbol table management functions." alt="" coords="1713,86,1881,111"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="1039,21,1336,39,1519,55,1702,76,1745,83,1744,89,1701,81,1518,60,1335,44,1038,26"/>
+</map>

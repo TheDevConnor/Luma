@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['identifier_0',['identifier',['../structAstNode.html#a72b3de2c66375026ef565f03844e517e',1,'AstNode']]],
+  ['if_5fstmt_1',['if_stmt',['../structAstNode.html#a38a2183d4c4b2fbe15d329da8f0ffd76',1,'AstNode']]],
+  ['imported_5fmodules_2',['imported_modules',['../structScope.html#a07e4d1efeeb4bc7aa3d4abd3e8fc1250',1,'Scope']]],
+  ['index_3',['index',['../structAstNode.html#a719cd65c6c80a62a253aa09315c6092f',1,'AstNode::index'],['../structAstNode.html#a91fd07d9eeaea38dcb14c1e837ac4f7c',1,'AstNode::index']]],
+  ['init_5fcount_4',['init_count',['../structAstNode.html#a6a976bac4607506d3b6001764d36f685',1,'AstNode']]],
+  ['initializer_5',['initializer',['../structAstNode.html#ad25770963e7bc12691787bd59fc7fb84',1,'AstNode::initializer'],['../structAstNode.html#af9d3c6fe16e650baa3159e19439dbbb3',1,'AstNode::initializer']]],
+  ['int_5fval_6',['int_val',['../structAstNode.html#a89cc8900c4efb1c997f902dcf68622c5',1,'AstNode']]],
+  ['is_5fcontinue_7',['is_continue',['../structAstNode.html#a6a4b5c20696d1532b32f048775a7c15a',1,'AstNode']]],
+  ['is_5ffunction_8',['is_function',['../structLLVM__Symbol.html#a0d75701d21a8a92bd141476aa0a6d235',1,'LLVM_Symbol']]],
+  ['is_5ffunction_5fscope_9',['is_function_scope',['../structScope.html#afb8e1118246074c80b7a2c77c6d7674d',1,'Scope']]],
+  ['is_5fmain_5fmodule_10',['is_main_module',['../structModuleCompilationUnit.html#a241b38632cf5d42c1a585985f0cec23a',1,'ModuleCompilationUnit']]],
+  ['is_5fmodule_5fscope_11',['is_module_scope',['../structScope.html#a97aede7a5a13f0d21e83999e7008208c',1,'Scope']]],
+  ['is_5fmutable_12',['is_mutable',['../structAstNode.html#a282d5cd9e3d6af53e11c5f1bcfdec226',1,'AstNode::is_mutable'],['../structSymbol.html#a5334dae4aa73c33e0ccf675da67d22c9',1,'Symbol::is_mutable']]],
+  ['is_5fpublic_13',['is_public',['../structAstNode.html#afba7feda394bab058c1947a6ae14a677',1,'AstNode::is_public'],['../structSymbol.html#a109791f1eab626e64fe6c3e455558399',1,'Symbol::is_public']]],
+  ['is_5ftype_14',['is_type',['../structAstNode.html#a2a51bc33a0217bf90b0267c65fad6619',1,'AstNode']]],
+  ['item_5fsize_15',['item_size',['../structGrowableArray.html#a95d11f2d7b0ef80bfd6636350a5427f7',1,'GrowableArray']]]
+];

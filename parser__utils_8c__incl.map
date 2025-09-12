@@ -1,0 +1,28 @@
+<map id="src/parser/parser_utils.c" name="src/parser/parser_utils.c">
+<area shape="rect" id="Node000001" title="Utility functions for the parser module." alt="" coords="43,5,221,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,79,72,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="119,33,66,72,63,68,115,29"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="97,79,167,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="135,31,135,65,129,65,129,31"/>
+<area shape="rect" id="Node000004" href="$parser_8h.html" title="Recursive descent and Pratt parser for the Zura language." alt="" coords="192,79,267,104"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="149,29,204,68,201,72,146,33"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="87,299,161,324"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="195,106,161,125,145,138,133,153,120,186,116,222,117,256,121,285,116,286,112,257,110,222,115,185,128,151,141,134,158,121,193,102"/>
+<area shape="rect" id="Node000006" href="$ast_8h.html" title=" " alt="" coords="143,152,233,177"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="225,106,204,141,199,139,220,103"/>
+<area shape="rect" id="Node000008" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="225,225,423,251"/>
+<area shape="poly" id="edge12_Node000004_Node000008" title=" " alt="" coords="239,103,311,212,307,215,235,106"/>
+<area shape="rect" id="Node000010" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="309,152,422,177"/>
+<area shape="poly" id="edge13_Node000004_Node000010" title=" " alt="" coords="252,102,332,143,330,148,250,106"/>
+<area shape="poly" id="edge7_Node000006_Node000005" title=" " alt="" coords="185,179,137,287,132,285,180,177"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="185,299,268,324"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="194,177,223,285,217,286,189,178"/>
+<area shape="poly" id="edge8_Node000006_Node000008" title=" " alt="" coords="211,175,291,217,289,221,209,180"/>
+<area shape="poly" id="edge11_Node000008_Node000005" title=" " alt="" coords="293,253,171,296,169,291,291,248"/>
+<area shape="poly" id="edge10_Node000008_Node000007" title=" " alt="" coords="310,253,255,292,252,288,307,249"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="293,299,379,324"/>
+<area shape="poly" id="edge9_Node000008_Node000009" title=" " alt="" coords="329,251,334,285,329,286,323,251"/>
+<area shape="poly" id="edge14_Node000010_Node000008" title=" " alt="" coords="361,179,340,215,335,212,356,176"/>
+<area shape="rect" id="Node000011" title=" " alt="" coords="447,225,518,251"/>
+<area shape="poly" id="edge15_Node000010_Node000011" title=" " alt="" coords="386,175,453,216,450,220,383,180"/>
+</map>

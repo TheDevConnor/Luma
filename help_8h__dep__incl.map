@@ -1,0 +1,9 @@
+<map id="src/helper/help.h" name="src/helper/help.h">
+<area shape="rect" id="Node000001" title="Declarations for command&#45;line parsing, file reading, and build configuration." alt="" coords="155,5,286,31"/>
+<area shape="rect" id="Node000002" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="5,79,135,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="185,39,96,81,94,76,183,34"/>
+<area shape="rect" id="Node000003" href="$run_8c.html" title=" " alt="" coords="159,79,282,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="223,44,223,79,218,79,218,44"/>
+<area shape="rect" id="Node000004" href="$main_8c.html" title="Entry point for the Lux compiler/interpreter build process." alt="" coords="307,79,396,104"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="255,35,331,76,329,81,253,40"/>
+</map>

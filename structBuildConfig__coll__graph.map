@@ -1,0 +1,12 @@
+<map id="BuildConfig" name="BuildConfig">
+<area shape="rect" id="Node000001" title="Configuration structure to hold build options parsed from CLI." alt="" coords="97,284,193,309"/>
+<area shape="rect" id="Node000002" href="$structGrowableArray.html" title="Growable array backed by an arena allocator." alt="" coords="5,196,124,221"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="87,230,135,282,132,285,83,233"/>
+<area shape="rect" id="Node000003" href="$structArenaAllocator.html" title="Arena allocator structure." alt="" coords="5,108,124,133"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="67,147,67,195,62,195,62,147"/>
+<area shape="rect" id="Node000004" href="$structBuffer.html" title="Represents a memory buffer in the arena." alt="" coords="34,5,95,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="67,45,67,108,62,108,62,45"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="110,7,118,11,122,18,113,28,96,30,95,25,111,23,117,18,115,15,108,12"/>
+<area shape="rect" id="Node000005" href="$structToken.html" title="Represents a single token extracted by the lexer." alt="" coords="147,196,206,221"/>
+<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="170,235,152,284,147,283,165,233"/>
+</map>

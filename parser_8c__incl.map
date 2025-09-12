@@ -1,0 +1,34 @@
+<map id="src/parser/parser.c" name="src/parser/parser.c">
+<area shape="rect" id="Node000001" title="Implementation of the parser module for the programming language compiler." alt="" coords="157,5,298,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,299,92,324"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="157,33,113,50,93,63,76,80,61,104,51,131,41,188,41,242,46,285,41,285,36,242,36,187,46,130,56,102,72,77,89,59,110,45,155,28"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="86,79,153,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="211,33,150,73,147,69,209,28"/>
+<area shape="rect" id="Node000004" href="$ast_8h.html" title=" " alt="" coords="159,152,250,177"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="227,32,218,79,210,139,205,138,213,78,222,31"/>
+<area shape="rect" id="Node000007" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="241,225,440,251"/>
+<area shape="poly" id="edge16_Node000001_Node000007" title=" " alt="" coords="256,28,288,48,316,77,332,111,341,148,345,212,340,212,336,149,327,113,312,80,285,52,253,33"/>
+<area shape="rect" id="Node000008" href="$error_8h.html" title="Error reporting utilities for lexer and parser diagnostics." alt="" coords="419,79,571,104"/>
+<area shape="poly" id="edge10_Node000001_Node000008" title=" " alt="" coords="271,28,440,73,438,78,270,33"/>
+<area shape="rect" id="Node000011" href="$parser_8h.html" title="Recursive descent and Pratt parser for the Zura language." alt="" coords="227,79,302,104"/>
+<area shape="poly" id="edge17_Node000001_Node000011" title=" " alt="" coords="236,30,255,65,250,68,231,32"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="299,299,382,324"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="208,177,214,212,221,231,232,249,260,274,293,291,290,296,257,278,228,252,217,234,209,213,203,178"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="117,299,191,324"/>
+<area shape="poly" id="edge5_Node000004_Node000006" title=" " alt="" coords="203,179,165,287,160,285,198,177"/>
+<area shape="poly" id="edge6_Node000004_Node000007" title=" " alt="" coords="228,175,308,217,305,221,225,180"/>
+<area shape="poly" id="edge7_Node000007_Node000002" title=" " alt="" coords="294,253,106,299,104,294,293,248"/>
+<area shape="poly" id="edge8_Node000007_Node000005" title=" " alt="" coords="343,251,343,285,338,285,338,251"/>
+<area shape="poly" id="edge9_Node000007_Node000006" title=" " alt="" coords="312,253,198,296,196,291,310,248"/>
+<area shape="poly" id="edge11_Node000008_Node000005" title=" " alt="" coords="508,103,529,131,551,169,558,190,562,212,559,233,549,252,525,270,486,284,396,304,395,299,484,279,522,265,545,249,554,231,556,212,553,192,546,171,525,134,504,106"/>
+<area shape="poly" id="edge15_Node000008_Node000007" title=" " alt="" coords="506,103,521,138,523,159,516,179,488,206,452,223,450,219,485,202,512,176,518,159,516,140,501,105"/>
+<area shape="rect" id="Node000009" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="377,152,502,177"/>
+<area shape="poly" id="edge12_Node000008_Node000009" title=" " alt="" coords="488,106,459,143,455,140,484,103"/>
+<area shape="poly" id="edge13_Node000009_Node000007" title=" " alt="" coords="425,180,369,219,366,215,422,175"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="464,225,535,251"/>
+<area shape="poly" id="edge14_Node000009_Node000010" title=" " alt="" coords="451,176,483,213,479,217,447,179"/>
+<area shape="poly" id="edge19_Node000011_Node000004" title=" " alt="" coords="257,106,225,143,221,140,253,103"/>
+<area shape="poly" id="edge18_Node000011_Node000006" title=" " alt="" coords="228,103,185,121,165,135,150,153,137,186,135,222,140,256,148,285,143,287,135,257,130,222,132,185,145,151,161,131,182,117,226,98"/>
+<area shape="poly" id="edge20_Node000011_Node000007" title=" " alt="" coords="273,103,331,212,326,215,269,106"/>
+<area shape="poly" id="edge21_Node000011_Node000009" title=" " alt="" coords="294,102,399,144,397,149,292,106"/>
+</map>

@@ -1,0 +1,21 @@
+<map id="src/typechecker/type.h" name="src/typechecker/type.h">
+<area shape="rect" id="Node000001" title="Type checking and symbol table management for AST nodes with memory tracking." alt="" coords="135,5,305,31"/>
+<area shape="rect" id="Node000002" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="258,79,371,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="237,29,290,68,287,72,234,33"/>
+<area shape="rect" id="Node000003" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="134,152,333,177"/>
+<area shape="poly" id="edge11_Node000001_Node000003" title=" " alt="" coords="224,31,234,138,228,139,218,31"/>
+<area shape="rect" id="Node000008" href="$ast_8h.html" title=" " alt="" coords="79,79,169,104"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="206,33,152,72,149,68,203,29"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="303,106,259,145,255,141,300,102"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="357,152,427,177"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="329,102,371,141,367,144,325,106"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="211,225,298,251"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="239,177,250,211,245,213,234,178"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="5,225,88,251"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="204,180,91,223,89,218,202,175"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="112,225,187,251"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="222,179,175,218,172,214,218,175"/>
+<area shape="poly" id="edge10_Node000008_Node000003" title=" " alt="" coords="143,102,205,142,202,147,140,106"/>
+<area shape="poly" id="edge8_Node000008_Node000005" title=" " alt="" coords="120,106,62,215,57,212,115,103"/>
+<area shape="poly" id="edge9_Node000008_Node000006" title=" " alt="" coords="125,105,122,137,125,177,138,212,133,214,120,178,117,137,120,104"/>
+</map>

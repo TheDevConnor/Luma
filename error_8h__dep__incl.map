@@ -1,0 +1,15 @@
+<map id="src/c_libs/error/error.h" name="src/c_libs/error/error.h">
+<area shape="rect" id="Node000001" title="Error reporting utilities for lexer and parser diagnostics." alt="" coords="396,5,559,31"/>
+<area shape="rect" id="Node000002" href="$c__libs_2error_2error_8c.html" title="Implementation of error reporting and diagnostics functions." alt="" coords="5,86,168,111"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="408,36,181,81,144,89,143,83,179,76,407,31"/>
+<area shape="rect" id="Node000003" href="$run_8c.html" title=" " alt="" coords="192,86,315,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="433,38,287,88,285,83,431,33"/>
+<area shape="rect" id="Node000004" href="$lexer_8c.html" title="Implements the lexical analysis functions for tokenizing source code." alt="" coords="339,86,461,111"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="458,42,413,88,410,84,454,39"/>
+<area shape="rect" id="Node000005" href="$parser_8c.html" title="Implementation of the parser module for the programming language compiler." alt="" coords="485,86,627,111"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="501,39,546,84,542,88,497,42"/>
+<area shape="rect" id="Node000006" href="$typechecker_2error_8c.html" title=" " alt="" coords="651,86,821,111"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="529,32,699,83,698,89,528,37"/>
+<area shape="rect" id="Node000007" href="$static__mem__tracker_8c.html" title=" " alt="" coords="845,79,1009,119"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="564,30,834,76,845,78,844,83,833,81,563,35"/>
+</map>
