@@ -237,38 +237,104 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   if (!condition)
     return NULL;
 
+  // Create all blocks we'll need
   LLVMBasicBlockRef then_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "then");
-  LLVMBasicBlockRef else_block =
-      node->stmt.if_stmt.else_stmt
-          ? LLVMAppendBasicBlockInContext(ctx->context, ctx->current_function,
-                                          "else")
-          : NULL;
   LLVMBasicBlockRef merge_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "merge");
 
-  LLVMBuildCondBr(ctx->builder, condition, then_block,
-                  else_block ? else_block : merge_block);
+  // Create blocks for elif conditions and bodies
+  LLVMBasicBlockRef *elif_cond_blocks = NULL;
+  LLVMBasicBlockRef *elif_body_blocks = NULL;
+  if (node->stmt.if_stmt.elif_count > 0) {
+    elif_cond_blocks = malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
+    elif_body_blocks = malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
+    
+    for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
+      char block_name[64];
+      snprintf(block_name, sizeof(block_name), "elif_cond_%d", i);
+      elif_cond_blocks[i] = LLVMAppendBasicBlockInContext(
+          ctx->context, ctx->current_function, block_name);
+      
+      snprintf(block_name, sizeof(block_name), "elif_body_%d", i);
+      elif_body_blocks[i] = LLVMAppendBasicBlockInContext(
+          ctx->context, ctx->current_function, block_name);
+    }
+  }
+
+  // Create else block if needed
+  LLVMBasicBlockRef else_block = NULL;
+  if (node->stmt.if_stmt.else_stmt) {
+    else_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "else");
+  }
+
+  // Determine where to jump if initial condition is false
+  LLVMBasicBlockRef false_target;
+  if (node->stmt.if_stmt.elif_count > 0) {
+    false_target = elif_cond_blocks[0];
+  } else if (else_block) {
+    false_target = else_block;
+  } else {
+    false_target = merge_block;
+  }
+
+  // Build initial if condition branch
+  LLVMBuildCondBr(ctx->builder, condition, then_block, false_target);
 
   // Generate then block
   LLVMPositionBuilderAtEnd(ctx->builder, then_block);
   codegen_stmt(ctx, node->stmt.if_stmt.then_stmt);
-
-  // Only add branch if block isn't already terminated
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
     LLVMBuildBr(ctx->builder, merge_block);
+  }
+
+  // Generate elif chains
+  for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
+    // Generate condition check
+    LLVMPositionBuilderAtEnd(ctx->builder, elif_cond_blocks[i]);
+    
+    // Generate elif condition - adjust this based on your AST structure
+    LLVMValueRef elif_condition = codegen_expr(ctx, node->stmt.if_stmt.elif_stmts[i]->stmt.if_stmt.condition);
+    if (!elif_condition) {
+      if (elif_cond_blocks) free(elif_cond_blocks);
+      if (elif_body_blocks) free(elif_body_blocks);
+      return NULL;
+    }
+
+    // Determine where to jump if this elif condition is false
+    LLVMBasicBlockRef elif_false_target;
+    if (i + 1 < node->stmt.if_stmt.elif_count) {
+      elif_false_target = elif_cond_blocks[i + 1];
+    } else if (else_block) {
+      elif_false_target = else_block;
+    } else {
+      elif_false_target = merge_block;
+    }
+
+    // Build conditional branch for this elif
+    LLVMBuildCondBr(ctx->builder, elif_condition, elif_body_blocks[i], elif_false_target);
+
+    // Generate elif body
+    LLVMPositionBuilderAtEnd(ctx->builder, elif_body_blocks[i]);
+    codegen_stmt(ctx, node->stmt.if_stmt.elif_stmts[i]->stmt.if_stmt.then_stmt);
+    if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+      LLVMBuildBr(ctx->builder, merge_block);
+    }
   }
 
   // Generate else block if it exists
   if (else_block) {
     LLVMPositionBuilderAtEnd(ctx->builder, else_block);
     codegen_stmt(ctx, node->stmt.if_stmt.else_stmt);
-
-    // Only add branch if block isn't already terminated
     if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
       LLVMBuildBr(ctx->builder, merge_block);
     }
   }
+
+  // Clean up
+  if (elif_cond_blocks) free(elif_cond_blocks);
+  if (elif_body_blocks) free(elif_body_blocks);
 
   // Continue with merge block
   LLVMPositionBuilderAtEnd(ctx->builder, merge_block);
@@ -369,6 +435,7 @@ LLVMValueRef codegen_stmt_break_continue(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
+// loop { ... }
 LLVMValueRef codegen_infinite_loop(CodeGenContext *ctx, AstNode *node) {
   LLVMBasicBlockRef loop_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "infinite_loop");
@@ -407,8 +474,133 @@ LLVMValueRef codegen_infinite_loop(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
-LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) { return NULL; }
-LLVMValueRef codegen_for_loop(CodeGenContext *ctx, AstNode *node) { return NULL; }
+// loop (i < 10) { ... }
+// loop (i < 10) : (i++) { ... }
+LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
+  // Create basic blocks for the loop structure
+  LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "while_cond");
+  LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "while_body");
+  LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "while_end");
+
+  // Jump to condition check
+  LLVMBuildBr(ctx->builder, cond_block);
+
+  // Generate condition block
+  LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
+  if (node->stmt.loop_stmt.condition) {
+    LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
+    if (!cond) {
+      fprintf(stderr, "Error: Failed to generate condition for while loop at line %zu\n",
+              node->line);
+      return NULL;
+    }
+    LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
+  } else {
+    // Infinite loop if no condition
+    LLVMBuildBr(ctx->builder, body_block);
+  }
+
+  // Generate loop body
+  LLVMPositionBuilderAtEnd(ctx->builder, body_block);
+  codegen_stmt(ctx, node->stmt.loop_stmt.body);
+
+  // Generate increment expressions if they exist
+  if (node->stmt.loop_stmt.optional) {
+      codegen_expr(ctx, node->stmt.loop_stmt.optional);
+  }
+
+  // If body doesn't have a terminator, jump back to condition check
+  if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+      LLVMBuildBr(ctx->builder, cond_block);  // Jump back to condition, not after_block
+  }
+
+  // Continue with after loop block
+  LLVMPositionBuilderAtEnd(ctx->builder, after_block);
+  return NULL;
+}
+
+// loop [i: int = 0](i < 10) { ... }
+// loop [i: int = 0](i < 10) : (i++) { ... }
+// loop [i: int = 0, j: int = 0](i < 10 && j < 20) { ... }
+LLVMValueRef codegen_for_loop(CodeGenContext *ctx, AstNode *node) {
+    // Create basic blocks for the loop structure
+    LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "for_cond");
+    LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "for_body");
+    LLVMBasicBlockRef increment_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "for_inc");
+    LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "for_end");
+
+    // Store old loop blocks for nested loop support
+    LLVMBasicBlockRef old_continue = ctx->loop_continue_block;
+    LLVMBasicBlockRef old_break = ctx->loop_break_block;
+    ctx->loop_continue_block = increment_block;
+    ctx->loop_break_block = after_block;
+
+    // Generate initializers in current block
+    for (int i = 0; i < node->stmt.loop_stmt.init_count; i++) {
+        if (!codegen_stmt(ctx, node->stmt.loop_stmt.initializer[i])) {
+            fprintf(stderr, "Error: Failed to generate initializer for for loop at line %zu\n",
+                    node->line);
+            // Restore old blocks
+            ctx->loop_continue_block = old_continue;
+            ctx->loop_break_block = old_break;
+            return NULL;
+        }
+    }
+
+    // Jump to condition check
+    LLVMBuildBr(ctx->builder, cond_block);
+
+    // Generate condition block
+    LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
+    if (node->stmt.loop_stmt.condition) {
+        LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
+        if (!cond) {
+            // Restore old blocks
+            ctx->loop_continue_block = old_continue;
+            ctx->loop_break_block = old_break;
+            return NULL;
+        }
+        LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
+    } else {
+        // Infinite loop if no condition
+        LLVMBuildBr(ctx->builder, body_block);
+    }
+
+    // Generate loop body
+    LLVMPositionBuilderAtEnd(ctx->builder, body_block);
+    codegen_stmt(ctx, node->stmt.loop_stmt.body);
+
+    // If body doesn't have a terminator, jump to increment
+    if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+        LLVMBuildBr(ctx->builder, increment_block);
+    }
+
+    // Generate increment block
+    LLVMPositionBuilderAtEnd(ctx->builder, increment_block);
+    
+    // Generate increment expressions if they exist
+    if (node->stmt.loop_stmt.optional) {
+        codegen_expr(ctx, node->stmt.loop_stmt.optional);
+    }
+    
+    // Jump back to condition check
+    LLVMBuildBr(ctx->builder, cond_block);
+
+    // Restore old loop blocks
+    ctx->loop_continue_block = old_continue;
+    ctx->loop_break_block = old_break;
+
+    // Continue with after loop block
+    LLVMPositionBuilderAtEnd(ctx->builder, after_block);
+    return NULL;
+}
 
 LLVMValueRef codegen_loop(CodeGenContext *ctx, AstNode *node) {
   if (node->stmt.loop_stmt.condition == NULL && node->stmt.loop_stmt.initializer == NULL)

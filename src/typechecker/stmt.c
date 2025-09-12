@@ -535,12 +535,14 @@ bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
   Scope *loop_scope = create_child_scope(scope, "infinite_loop", arena);
 
   if (node->stmt.loop_stmt.body == NULL) {
-    tc_error(node, "Loop Error", "Loop body cannot be null");
+    fprintf(stderr, "Error: Loop body cannot be null at line %zu\n",
+            node->line);
     return false;
   }
 
   if (!typecheck_statement(node->stmt.loop_stmt.body, loop_scope, arena)) {
-    tc_error(node, "Loop Error", "Loop body failed typechecking");
+    fprintf(stderr, "Error: Loop body failed typechecking at line %zu\n",
+            node->line);
     return false;
   }
 
@@ -549,11 +551,73 @@ bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
 bool typecheck_while_loop_decl(AstNode *node, Scope *scope,
                                ArenaAllocator *arena) {
   Scope *while_loop = create_child_scope(scope, "while_loop", arena);
+
+  if (!typecheck_expression(node->stmt.loop_stmt.condition, while_loop,
+                            arena)) {
+    fprintf(stderr,
+            "Error: While loop condition failed typechecking at line %zu\n",
+            node->line);
+    return false;
+  }
+
+  if (!typecheck_statement(node->stmt.loop_stmt.body, while_loop, arena)) {
+    fprintf(stderr, "Error: While loop body failed typechecking at line %zu\n",
+            node->line);
+    return false;
+  }
+
+  if (node->stmt.loop_stmt.optional) {
+    if (!typecheck_expression(node->stmt.loop_stmt.optional, while_loop,
+                              arena)) {
+      fprintf(stderr,
+              "Error: While loop optional failed typechecking at line %zu\n",
+              node->line);
+      return false;
+    }
+  }
+
   return true;
 }
 bool typecheck_for_loop_decl(AstNode *node, Scope *scope,
                              ArenaAllocator *arena) {
   Scope *lookup_scope = create_child_scope(scope, "for_loop", arena);
+
+  // Define the initializer
+  for (int i = 0; i < node->stmt.loop_stmt.init_count; i++) {
+    if (!typecheck_statement(node->stmt.loop_stmt.initializer[i], lookup_scope,
+                             arena)) {
+      fprintf(stderr,
+              "Error: Loop initializer failed typechecking at line %zu\n",
+              node->line);
+      return false;
+    }
+  }
+
+  // Define the condition
+  if (!typecheck_expression(node->stmt.loop_stmt.condition, lookup_scope,
+                            arena)) {
+    fprintf(stderr, "Error: Loop condition failed typechecking at line %zu\n",
+            node->line);
+    return false;
+  }
+
+  // Define the body
+  if (!typecheck_statement(node->stmt.loop_stmt.body, lookup_scope, arena)) {
+    fprintf(stderr, "Error: Loop body failed typechecking at line %zu\n",
+            node->line);
+    return false;
+  }
+
+  // define the optional if it is defined
+  if (node->stmt.loop_stmt.optional) {
+    if (!typecheck_expression(node->stmt.loop_stmt.optional, lookup_scope,
+                              arena)) {
+      fprintf(stderr, "Error: Loop optional failed typechecking at line %zu\n",
+              node->line);
+      return false;
+    }
+  }
+
   return true;
 }
 

@@ -1,18 +1,22 @@
 @module "main"
 
-const Person = struct {
-pub:
-   name: *char,
-   age: int,
-};
-
 pub const main = fn () int { 
-   let x: *Person = cast<*Person>(alloc(sizeof<Person>));
+   let x: int = 5;
+   let row: int = 0;
 
-   x.name = "Connor";
-   x.age = 20;
-   output("Name: ", x.name, " age: ", x.age, "\n");
+   loop [i: int = 0, j: int = 0](i <= x) {
+      if (j > 10) {
+         j = 0;
+         i++;
+      } elif (row == 3) {
+          row = 0;
+          output("\n");
+      } else {   
+         output(i, "*", j, "=", i * j, " ");
+         row++;
+         j++;
+      }
+   }
 
-   free(x);
    return 0; 
 }
