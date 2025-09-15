@@ -119,6 +119,33 @@ int print_license() {
  * otherwise.
  */
 // Updated BuildConfig structure
+
+
+#if defined (__MINGW32__) || defined (_WIN32_)	
+	#include <windows.h> 
+	bool PathExist(const char* p){
+    	DWORD attr = GetFileAttributes(p);
+    	if (attr == INVALID_FILE_ATTRIBUTES) return false;
+		return true;
+	};
+	bool PathIsDir(const char* p){
+		DWORD attr = GetFileAttributes(p);
+		return attr & FILE_ATTRIBUTE_DIRECTORY;
+	};
+
+#elif __linux__ 
+	#include <sys/stat.h>
+	bool PathExist(const char* p){
+		struct stat FileAttrstat;
+		if(stat(p, &FileAttrstat) != 0) return false;
+		return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
+	};
+	bool PathIsDir(const char* p){
+		struct stat FileAttrstat;
+		if(stat(p, &FileAttrstat) != 0) return false;
+		return S_ISDIR(FileAttrstat.st_mode);
+	};
+#endif
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena) {
   // Initialize the files array

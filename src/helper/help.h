@@ -65,6 +65,8 @@ int print_license();
 AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
                             BuildConfig *config);
 
+bool PathExist(const char* p);
+bool PathIsDir(const char* p);
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena);
 bool run_build(BuildConfig config, ArenaAllocator *allocator);
