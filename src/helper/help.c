@@ -156,7 +156,7 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
   // set check_mem to true by default
   config->check_mem = true;
 	config->filepath = false;
-  for (int i = 0; i < argc; i++) {
+  for (int i = 1; i < argc; i++) {
 		if(!PathExist(argv[i]) || argv[i][0] == '-'){
 			if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
 	      return print_version(), false;
@@ -203,7 +203,7 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
 			fprintf(stderr, "%s: Is a directory\n", argv[i]);
 			return false;
 		}else{
-	    config->filepath = argv[i];
+			config->filepath = argv[i];
 		}
   }
   return true;
