@@ -1,22 +1,16 @@
 @module "main"
 
-pub const main = fn () int { 
-   let x: int = 5;
-   let row: int = 0;
-
-   loop [i: int = 0, j: int = 0](i <= x) {
-      if (j > 10) {
-         j = 0;
-         i++;
-      } elif (row == 3) {
-          row = 0;
-          output("\n");
-      } else {   
-         output(i, "*", j, "=", i * j, " ");
-         row++;
-         j++;
-      }
-   }
-
-   return 0; 
+const main = fn () int {
+    :: Allocate memory for an integer
+    let ptr1: *int = cast<*int>(alloc(sizeof<int>));
+    let ptr2: *int = ptr1;
+    defer { free(ptr2); }
+    
+    :: Use the memory
+    *ptr2 = 42;
+    outputln("Value: ", *ptr2);
+    
+    :: Clean up
+    :: free(ptr);
+    return 0;
 }

@@ -43,13 +43,77 @@ These AST node types are fully implemented in code generation:
 
 ---
 
+## 🧠 Static Memory Analysis
+
+### ✅ Currently Implemented
+- [x] Basic allocation/free tracking by variable name
+- [x] Memory leak detection (allocated but never freed)
+- [x] Double-free detection with count tracking
+- [x] Integration with `defer` statements
+- [x] Detailed error reporting with source locations
+- [x] Anonymous allocation filtering
+
+### 🔧 Memory Analysis Improvements Needed
+
+#### High Priority
+- [ ] **Pointer aliasing detection**
+- [ ] Track when `ptr2 = ptr1` creates aliases
+- [ ] Warn when analyzer can't track aliased pointers
+- [ ] Consider ownership transfer semantics
+
+#### Control Flow Analysis  
+- [ ] **Conditional path tracking**
+- [ ] Detect leaks in conditional branches (`if/else` without free in all paths)
+- [ ] Handle early returns and breaks
+- [ ] Track memory across loop iterations
+
+#### Function Call Analysis
+- [ ] **Cross-function tracking**
+- [ ] Track pointers passed to functions as parameters
+- [ ] Handle functions that free parameters
+- [ ] Return value allocation tracking
+- [ ] Support for ownership transfer through function calls
+
+#### Advanced Pointer Operations
+- [ ] **Complex pointer arithmetic**
+- [ ] Handle `ptr + offset` operations
+- [ ] Track array element allocations
+- [ ] Detect out-of-bounds access potential
+
+#### Memory Operation Extensions
+- [ ] **Additional memory functions**
+- [ ] Track `realloc()` operations
+- [ ] Handle `calloc()` and `malloc()` variants
+- [ ] Monitor `memcpy()` for potential use-after-free
+
+#### Data Structure Tracking
+- [ ] **Struct/array memory management**
+- [ ] Track allocations within struct members
+- [ ] Handle nested pointer structures
+- [ ] Monitor array of pointers
+
+#### Use-After-Free Detection
+- [ ] **Access after free tracking**
+- [ ] Detect reads/writes to freed pointers
+- [ ] Track freed pointer usage across scopes
+- [ ] Integration with dereference operations
+
+#### Scope and Lifetime Analysis
+- [ ] **Advanced scope tracking**
+- [ ] Detect pointers escaping local scope
+- [ ] Handle static/global pointer lifetimes
+- [ ] Stack vs heap allocation analysis
+
+---
+
 ## 📝 Next Steps
 
 ### Parsing
 - [ ] Add parsing for templates (`fn[T]`, `struct[T]`)  
 - [ ] Add parsing for type aliases using `type` keyword  
 - [ ] Add parsing for modules and imports refinements  
-- [ ] Design and implement **union syntax**  
+- [ ] Design and implement **union syntax**
+- [ ] Consider Go/Odin-style loop syntax improvements
 
 ### Semantic Analysis
 - [ ] Type inference for generics  
@@ -71,7 +135,8 @@ These AST node types are fully implemented in code generation:
 
 ---
 
-## 🚀 Future Features
+## 🚀 Future Features Ideas (Maybe)
 - [ ] Investigate pattern matching  
-- [ ] Build minimal standard library  
-
+- [ ] Build minimal standard library
+- [ ] Consider ownership/borrowing system for advanced memory safety
+- [ ] Explore compile-time memory layout optimization
