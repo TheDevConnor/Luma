@@ -1,5 +1,70 @@
 #include "llvm.h"
 
+// Add these utility functions to help with consistent range creation and type
+// management You can put these in expr.c or create a new ranges.c file
+
+LLVMTypeRef get_range_struct_type(CodeGenContext *ctx,
+                                  LLVMTypeRef element_type) {
+  // Create or reuse a range struct type for the given element type
+  // This ensures all ranges with the same element type use the same struct
+  // layout
+  LLVMTypeRef field_types[] = {element_type, element_type};
+  return LLVMStructTypeInContext(ctx->context, field_types, 2, false);
+}
+
+LLVMValueRef create_range_struct(CodeGenContext *ctx, LLVMValueRef start,
+                                 LLVMValueRef end) {
+  // Helper function to create a range struct consistently
+  // This can be used in your BINOP_RANGE case and elsewhere
+
+  LLVMTypeRef element_type =
+      LLVMTypeOf(start); // Assume both operands have same type
+  LLVMTypeRef range_struct_type = get_range_struct_type(ctx, element_type);
+
+  // Allocate space for the range struct
+  LLVMValueRef range_alloca =
+      LLVMBuildAlloca(ctx->builder, range_struct_type, "range");
+
+  // Store the start value
+  LLVMValueRef start_ptr = LLVMBuildStructGEP2(ctx->builder, range_struct_type,
+                                               range_alloca, 0, "start_ptr");
+  LLVMBuildStore(ctx->builder, start, start_ptr);
+
+  // Store the end value
+  LLVMValueRef end_ptr = LLVMBuildStructGEP2(ctx->builder, range_struct_type,
+                                             range_alloca, 1, "end_ptr");
+  LLVMBuildStore(ctx->builder, end, end_ptr);
+
+  // Return the struct value
+  return LLVMBuildLoad2(ctx->builder, range_struct_type, range_alloca,
+                        "range_val");
+}
+
+// Optional: Add these functions for future range operations
+LLVMValueRef range_contains(CodeGenContext *ctx, LLVMValueRef range_struct,
+                            LLVMValueRef value) {
+  LLVMValueRef start = get_range_start_value(ctx, range_struct);
+  LLVMValueRef end = get_range_end_value(ctx, range_struct);
+
+  // Check if value >= start && value <= end
+  LLVMValueRef ge_start =
+      LLVMBuildICmp(ctx->builder, LLVMIntSGE, value, start, "ge_start");
+  LLVMValueRef le_end =
+      LLVMBuildICmp(ctx->builder, LLVMIntSLE, value, end, "le_end");
+
+  return LLVMBuildAnd(ctx->builder, ge_start, le_end, "in_range");
+}
+
+LLVMValueRef range_length(CodeGenContext *ctx, LLVMValueRef range_struct) {
+  LLVMValueRef start = get_range_start_value(ctx, range_struct);
+  LLVMValueRef end = get_range_end_value(ctx, range_struct);
+
+  // Calculate end - start + 1 (inclusive range length)
+  LLVMValueRef diff = LLVMBuildSub(ctx->builder, end, start, "diff");
+  LLVMValueRef one = LLVMConstInt(LLVMTypeOf(diff), 1, false);
+  return LLVMBuildAdd(ctx->builder, diff, one, "range_length");
+}
+
 LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   switch (node->expr.literal.lit_type) {
   case LITERAL_INT:
@@ -71,6 +136,8 @@ LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node) {
     return LLVMBuildAnd(ctx->builder, left, right, "and");
   case BINOP_OR:
     return LLVMBuildOr(ctx->builder, left, right, "or");
+  case BINOP_RANGE:
+    return create_range_struct(ctx, left, right);
   default:
     return NULL;
   }

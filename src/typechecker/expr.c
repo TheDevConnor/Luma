@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../ast/ast_utils.h"
 #include "type.h"
 
 AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
@@ -63,6 +64,38 @@ AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
   // Logical operators
   if (op == BINOP_AND || op == BINOP_OR) {
     return create_basic_type(arena, "bool", expr->line, expr->column);
+  }
+
+  // Range operators
+  // In expr.c, update the range operator section:
+  if (op == BINOP_RANGE) {
+    // confirm that the left and right are of value int
+    Type *elem_type = create_basic_type(arena, "int", 0, 0);
+    if (types_match(left_type, elem_type) == TYPE_MATCH_NONE ||
+        types_match(right_type, elem_type) == TYPE_MATCH_NONE) {
+      tc_error_help(
+          expr, "Type Error", "Range operator must take a type of int.",
+          "Cannot create a range operation with two different types.");
+    }
+
+    int left = expr->expr.binary.left->expr.literal.value.int_val;
+    int right = expr->expr.binary.right->expr.literal.value.int_val;
+
+    long long size_val = 0;
+    if (left < right) {
+      size_val = right - left +
+                 1; // FIXED: inclusive range (0..5 = 6 elements: 0,1,2,3,4,5)
+    } else if (left > right) {
+      size_val = left - right + 1; // FIXED: inclusive descending range
+    } else {
+      size_val = 1; // FIXED: single element (e.g., 5..5 = 1 element: 5)
+    }
+
+    Expr *size = create_literal_expr(arena, LITERAL_INT, &size_val, expr->line,
+                                     expr->column);
+    Type *array =
+        create_array_type(arena, elem_type, size, expr->line, expr->column);
+    return array;
   }
 
   tc_error(expr, "Unsupported Operation", "Unsupported binary operation");

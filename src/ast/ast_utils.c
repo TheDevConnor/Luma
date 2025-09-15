@@ -139,6 +139,8 @@ const char *binop_to_string(BinaryOp op) {
     return "<<";
   case BINOP_SHR:
     return ">>";
+  case BINOP_RANGE:
+    return "..";
   default:
     return "??";
   }

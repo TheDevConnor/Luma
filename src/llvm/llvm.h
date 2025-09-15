@@ -234,6 +234,28 @@ void generate_cleanup_blocks(CodeGenContext *ctx);
 void clear_defer_stack(CodeGenContext *ctx);
 
 // =============================================================================
+// RANGE SUPPORT FUNCTIONS - Add this new section
+// =============================================================================
+
+// Range type checking and manipulation
+bool is_range_type(LLVMTypeRef type);
+LLVMValueRef get_range_start_value(CodeGenContext *ctx,
+                                   LLVMValueRef range_struct);
+LLVMValueRef get_range_end_value(CodeGenContext *ctx,
+                                 LLVMValueRef range_struct);
+
+// Range creation helper (optional - for consistent range creation)
+LLVMValueRef create_range_struct(CodeGenContext *ctx, LLVMValueRef start,
+                                 LLVMValueRef end);
+LLVMTypeRef get_range_struct_type(CodeGenContext *ctx,
+                                  LLVMTypeRef element_type);
+
+// Range operations (add these if you need them later)
+LLVMValueRef range_contains(CodeGenContext *ctx, LLVMValueRef range_struct,
+                            LLVMValueRef value);
+LLVMValueRef range_length(CodeGenContext *ctx, LLVMValueRef range_struct);
+
+// =============================================================================
 // AST NODE HANDLERS - TYPE SYSTEM
 // =============================================================================
 

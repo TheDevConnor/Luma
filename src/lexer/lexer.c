@@ -28,18 +28,19 @@
 
 /** @internal Symbol to token type mapping */
 static const SymbolEntry symbols[] = {
-    {"(", TOK_LPAREN},      {")", TOK_RPAREN},       {"{", TOK_LBRACE},
-    {"}", TOK_RBRACE},      {"[", TOK_LBRACKET},     {"]", TOK_RBRACKET},
-    {";", TOK_SEMICOLON},   {",", TOK_COMMA},        {".", TOK_DOT},
-    {"==", TOK_EQEQ},       {"!=", TOK_NEQ},         {"<=", TOK_LE},
-    {">=", TOK_GE},         {"&&", TOK_AND},         {"||", TOK_OR},
-    {"=", TOK_EQUAL},       {"+", TOK_PLUS},         {"-", TOK_MINUS},
-    {"*", TOK_STAR},        {"/", TOK_SLASH},        {"<", TOK_LT},
-    {">", TOK_GT},          {"&", TOK_AMP},          {"|", TOK_PIPE},
-    {"^", TOK_CARET},       {"~", TOK_TILDE},        {"!", TOK_BANG},
-    {"?", TOK_QUESTION},    {"::", TOK_RESOLVE},     {":", TOK_COLON},
-    {"_", TOK_SYMBOL},      {"++", TOK_PLUSPLUS},    {"--", TOK_MINUSMINUS},
-    {"<<", TOK_SHIFT_LEFT}, {">>", TOK_SHIFT_RIGHT}, {"@", TOK_AT},
+    {"(", TOK_LPAREN},      {")", TOK_RPAREN},      {"{", TOK_LBRACE},
+    {"}", TOK_RBRACE},      {"[", TOK_LBRACKET},    {"]", TOK_RBRACKET},
+    {"..", TOK_RANGE},      {";", TOK_SEMICOLON},   {",", TOK_COMMA},
+    {".", TOK_DOT},         {"==", TOK_EQEQ},       {"!=", TOK_NEQ},
+    {"<=", TOK_LE},         {">=", TOK_GE},         {"&&", TOK_AND},
+    {"||", TOK_OR},         {"=", TOK_EQUAL},       {"+", TOK_PLUS},
+    {"-", TOK_MINUS},       {"*", TOK_STAR},        {"/", TOK_SLASH},
+    {"<", TOK_LT},          {">", TOK_GT},          {"&", TOK_AMP},
+    {"|", TOK_PIPE},        {"^", TOK_CARET},       {"~", TOK_TILDE},
+    {"!", TOK_BANG},        {"?", TOK_QUESTION},    {"::", TOK_RESOLVE},
+    {":", TOK_COLON},       {"_", TOK_SYMBOL},      {"++", TOK_PLUSPLUS},
+    {"--", TOK_MINUSMINUS}, {"<<", TOK_SHIFT_LEFT}, {">>", TOK_SHIFT_RIGHT},
+    {"@", TOK_AT},
 };
 
 /** @internal Keyword text to token type mapping */
@@ -78,6 +79,7 @@ static const KeywordEntry keywords[] = {
     {"sizeof", TOK_SIZE_OF},
     {"as", TOK_AS},
     {"defer", TOK_DEFER},
+    {"in", TOK_IN},
 };
 
 static const KeywordEntry preprocessor_directives[] = {

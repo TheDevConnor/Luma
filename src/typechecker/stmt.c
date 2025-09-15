@@ -22,56 +22,111 @@ bool contains_alloc_expression(AstNode *expr) {
 }
 
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
-    const char *name = node->stmt.var_decl.name;
-    AstNode *declared_type = node->stmt.var_decl.var_type;
-    AstNode *initializer = node->stmt.var_decl.initializer;
-    bool is_public = node->stmt.var_decl.is_public;
-    bool is_mutable = node->stmt.var_decl.is_mutable;
+  const char *name = node->stmt.var_decl.name;
+  AstNode *declared_type = node->stmt.var_decl.var_type;
+  AstNode *initializer = node->stmt.var_decl.initializer;
+  bool is_public = node->stmt.var_decl.is_public;
+  bool is_mutable = node->stmt.var_decl.is_mutable;
 
-    // Track memory allocation
-    if (initializer && contains_alloc_expression(initializer)) {
-        StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
-        if (analyzer) {
-            static_memory_track_alloc(analyzer, node->line, node->column, name);
-        }
+  // Track memory allocation
+  if (initializer && contains_alloc_expression(initializer)) {
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+    if (analyzer) {
+      static_memory_track_alloc(analyzer, node->line, node->column, name);
+    }
+  }
+
+  if (initializer) {
+    AstNode *init_type = typecheck_expression(initializer, scope, arena);
+    if (!init_type) {
+      tc_error(node, "Type Error",
+               "Cannot determine type of initializer for variable '%s'", name);
+      return false;
     }
 
-    if (initializer) {
-        AstNode *init_type = typecheck_expression(initializer, scope, arena);
-        if (!init_type) {
-            tc_error(node, "Type Error", "Cannot determine type of initializer for variable '%s'", name);
-            return false;
-        }
+    if (declared_type) {
+      TypeMatchResult match = types_match(declared_type, init_type);
+      if (match == TYPE_MATCH_NONE) {
+        // Provide specific error messages based on type categories
+        if (declared_type->type == AST_TYPE_ARRAY &&
+            init_type->type == AST_TYPE_ARRAY) {
+          // Special handling for array type mismatches
+          TypeMatchResult element_match =
+              types_match(declared_type->type_data.array.element_type,
+                          init_type->type_data.array.element_type);
 
-        if (declared_type) {
-            TypeMatchResult match = types_match(declared_type, init_type);
-            if (match == TYPE_MATCH_NONE) {
-                tc_error_help(node, "Type Mismatch", 
-                             "Check that the initializer type matches the declared type",
-                             "Cannot assign '%s' to variable '%s' of type '%s'",
-                             type_to_string(init_type, arena), name,
-                             type_to_string(declared_type, arena));
-                return false;
+          if (element_match != TYPE_MATCH_NONE) {
+            // Element types match, so it's a size mismatch
+            AstNode *declared_size = declared_type->type_data.array.size;
+            AstNode *init_size = init_type->type_data.array.size;
+
+            if (declared_size && init_size &&
+                declared_size->type == AST_EXPR_LITERAL &&
+                init_size->type == AST_EXPR_LITERAL &&
+                declared_size->expr.literal.lit_type == LITERAL_INT &&
+                init_size->expr.literal.lit_type == LITERAL_INT) {
+
+              long long declared_val =
+                  declared_size->expr.literal.value.int_val;
+              long long init_val = init_size->expr.literal.value.int_val;
+
+              tc_error_help(node, "Array Size Mismatch",
+                            "Ensure the array size matches the number of "
+                            "elements in the initializer",
+                            "Cannot assign array of size %lld to variable '%s' "
+                            "declared as array of size %lld",
+                            init_val, name, declared_val);
+            } else {
+              tc_error_help(
+                  node, "Array Size Mismatch",
+                  "Array sizes must match between declaration and initializer",
+                  "Variable '%s' declared and initialized with incompatible "
+                  "array sizes",
+                  name);
             }
+          } else {
+            // Element types don't match
+            tc_error_help(
+                node, "Array Element Type Mismatch",
+                "Array element types must be compatible",
+                "Cannot assign array of '%s' elements to variable '%s' "
+                "declared as array of '%s' elements",
+                type_to_string(init_type->type_data.array.element_type, arena),
+                name,
+                type_to_string(declared_type->type_data.array.element_type,
+                               arena));
+          }
         } else {
-            declared_type = init_type;
+          // General type mismatch
+          tc_error_help(
+              node, "Type Mismatch",
+              "Check that the initializer type matches the declared type",
+              "Cannot assign '%s' to variable '%s' of type '%s'",
+              type_to_string(init_type, arena), name,
+              type_to_string(declared_type, arena));
         }
-    }
-
-    if (!declared_type) {
-        tc_error_help(node, "Missing Type", 
-                     "Provide either a type annotation or initializer",
-                     "Variable '%s' has no type information", name);
         return false;
+      }
+    } else {
+      declared_type = init_type;
     }
+  }
 
-    if (!scope_add_symbol(scope, name, declared_type, is_public, is_mutable, arena)) {
-        tc_error_id(node, name, "Duplicate Symbol", 
-                   "Variable '%s' is already declared in this scope", name);
-        return false;
-    }
+  if (!declared_type) {
+    tc_error_help(node, "Missing Type",
+                  "Provide either a type annotation or initializer",
+                  "Variable '%s' has no type information", name);
+    return false;
+  }
 
-    return true;
+  if (!scope_add_symbol(scope, name, declared_type, is_public, is_mutable,
+                        arena)) {
+    tc_error_id(node, name, "Duplicate Symbol",
+                "Variable '%s' is already declared in this scope", name);
+    return false;
+  }
+
+  return true;
 }
 
 // Stub implementations for remaining functions
@@ -86,7 +141,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {
-    tc_error(node, "Function Error", "Function '%s' has invalid return type", name);
+    tc_error(node, "Function Error", "Function '%s' has invalid return type",
+             name);
     return false;
   }
 
@@ -94,17 +150,17 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   if (strcmp(name, "main") == 0) {
     if (strcmp(return_type->type_data.basic.name, "int") != 0) {
       tc_error_help(node, "Main Return Type",
-        "The main function must return 'int'",
-        "Function '%s' must return 'int' but got '%s'",
-        name, type_to_string(return_type, arena));
+                    "The main function must return 'int'",
+                    "Function '%s' must return 'int' but got '%s'", name,
+                    type_to_string(return_type, arena));
       return false;
     }
 
     // Ensure main is public
     if (!is_public) {
-      tc_error_help(node, "Main Visibility",
-        "The main function should be public",
-        "Function 'main' should be public; automatically making it public");
+      tc_error_help(
+          node, "Main Visibility", "The main function should be public",
+          "Function 'main' should be public; automatically making it public");
       node->stmt.func_decl.is_public = true;
       is_public = true;
     }
@@ -115,7 +171,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     if (!param_names[i] || !param_types[i] ||
         param_types[i]->category != Node_Category_TYPE) {
       tc_error(node, "Function Parameter Error",
-        "Function '%s' has invalid parameter %zu", name, i);
+               "Function '%s' has invalid parameter %zu", name, i);
       return false;
     }
   }
@@ -127,7 +183,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   // Add function to current scope with proper visibility
   if (!scope_add_symbol(scope, name, func_type, is_public, false, arena)) {
     tc_error_id(node, name, "Duplicate Symbol",
-      "Function '%s' is already declared in this scope", name);
+                "Function '%s' is already declared in this scope", name);
     return false;
   }
 
@@ -141,7 +197,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     if (!scope_add_symbol(func_scope, param_names[i], param_types[i], false,
                           true, arena)) {
       tc_error(node, "Function Parameter Error",
-        "Could not add parameter '%s' to function '%s' scope", param_names[i], name);
+               "Could not add parameter '%s' to function '%s' scope",
+               param_names[i], name);
       return false;
     }
   }
@@ -150,7 +207,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   if (body) {
     if (!typecheck_statement(body, func_scope, arena)) {
       tc_error(node, "Function Body Error",
-        "Function '%s' body failed typechecking", name);
+               "Function '%s' body failed typechecking", name);
       return false;
     }
   }
@@ -159,182 +216,205 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 }
 
 bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
-    if (node->type != AST_STMT_STRUCT) {
-        tc_error(node, "Internal Error", "Expected struct declaration node");
-        return false;
-    }
-    
-    const char *struct_name = node->stmt.struct_decl.name;
-    AstNode **public_members = node->stmt.struct_decl.public_members;
-    size_t public_count = node->stmt.struct_decl.public_count;
-    AstNode **private_members = node->stmt.struct_decl.private_members;
-    size_t private_count = node->stmt.struct_decl.private_count;
-    bool is_public = node->stmt.struct_decl.is_public;
-    
-    printf("DEBUG: Processing struct '%s' with %zu public members, %zu private members\n", 
-           struct_name, public_count, private_count);
-    
-    // Validate struct name
-    if (!struct_name) {
-        tc_error(node, "Struct Error", "Struct declaration missing name");
-        return false;
-    }
-    
-    // Check for duplicate struct declaration
-    Symbol *existing = scope_lookup_current_only(scope, struct_name);
-    if (existing) {
-        tc_error_id(node, struct_name, "Duplicate Symbol",
-                   "Struct '%s' is already declared in this scope", struct_name);
-        return false;
-    }
-    
-    // Collect all member info for struct type creation
-    size_t total_members = public_count + private_count;
-    AstNode **all_member_types = arena_alloc(arena, total_members * sizeof(AstNode*), alignof(AstNode*));
-    const char **all_member_names = arena_alloc(arena, total_members * sizeof(char*), alignof(char*));
-    size_t member_index = 0;
-    
-    // Track member names to check for duplicates
-    GrowableArray seen_names;
-    growable_array_init(&seen_names, arena, total_members, sizeof(char*));
-    
-    // Process public members
-    for (size_t i = 0; i < public_count; i++) {
-        AstNode *member = public_members[i];
-        printf("DEBUG: Processing public member %zu: %p\n", i, (void*)member);
-        
-        if (!member) {
-            tc_error(node, "Struct Error", "Public member %zu is NULL in struct '%s'", i, struct_name);
-            return false;
-        }
-        
-        printf("DEBUG: Member type: %d (expected AST_STMT_FIELD_DECL)\n", member->type);
-        
-        if (member->type != AST_STMT_FIELD_DECL) {
-            tc_error(node, "Struct Error", "Invalid public member %zu in struct '%s' (type=%d)", i, struct_name, member->type);
-            return false;
-        }
-        
-        const char *field_name = member->stmt.field_decl.name;
-        AstNode *field_type = member->stmt.field_decl.type;
-        AstNode *field_function = member->stmt.field_decl.function;
-        
-        printf("DEBUG: Field name: '%s', type: %p, function: %p\n", 
-               field_name ? field_name : "NULL", (void*)field_type, (void*)field_function);
-        
-        // Additional debugging for the type
-        if (field_type) {
-            printf("DEBUG: Field type category: %d, type: %d\n", field_type->category, field_type->type);
-            if (field_type->type == AST_TYPE_BASIC) {
-                printf("DEBUG: Basic type name: '%s'\n", field_type->type_data.basic.name);
-            }
-        }
-        
-        // Validate field name
-        if (!field_name) {
-            tc_error(node, "Struct Field Error", "Field %zu in struct '%s' has no name", i, struct_name);
-            return false;
-        }
-        
-        // Check for duplicate member names
-        for (size_t j = 0; j < seen_names.count; j++) {
-            char **existing_name = (char**)((char*)seen_names.data + j * sizeof(char*));
-            if (strcmp(*existing_name, field_name) == 0) {
-                tc_error_id(node, field_name, "Duplicate Member",
-                           "Struct member '%s' is already declared in struct '%s'", field_name, struct_name);
-                return false;
-            }
-        }
-        
-        // Add to seen names
-        char **name_slot = (char**)growable_array_push(&seen_names);
-        *name_slot = (char*)field_name;
-        
-        // Handle method vs data field
-        if (field_function) {
-            printf("DEBUG: Processing method '%s'\n", field_name);
-            // This is a method - validate the function
-            if (!typecheck_statement(field_function, scope, arena)) {
-                tc_error(node, "Struct Method Error",
-                        "Method '%s' in struct '%s' failed type checking", field_name, struct_name);
-                return false;
-            }
-            
-            // Get the function's type from the symbol table
-            Symbol *method_symbol = scope_lookup_current_only(scope, field_name);
-            if (method_symbol && method_symbol->type) {
-                all_member_types[member_index] = method_symbol->type;
-                printf("DEBUG: Method type found: %p\n", (void*)method_symbol->type);
-            } else {
-                tc_error(node, "Struct Method Error",
-                        "Could not find type for method '%s' in struct '%s'", field_name, struct_name);
-                return false;
-            }
-        } else if (field_type) {
-            printf("DEBUG: Processing data field '%s'\n", field_name);
-            // This is a data field - validate the type
-            if (field_type->category != Node_Category_TYPE) {
-                tc_error(node, "Struct Field Error",
-                        "Field '%s' in struct '%s' has invalid type category (%d, expected %d)", 
-                        field_name, struct_name, field_type->category, Node_Category_TYPE);
-                return false;
-            }
-            all_member_types[member_index] = field_type;
-            printf("DEBUG: Data field type assigned: %p\n", (void*)field_type);
-        } else {
-            tc_error(node, "Struct Field Error",
-                    "Field '%s' in struct '%s' has neither type nor function", field_name, struct_name);
-            return false;
-        }
-        
-        // Validate that we actually got a valid type
-        if (!all_member_types[member_index]) {
-            tc_error(node, "Struct Field Error",
-                    "Failed to determine type for field '%s' in struct '%s'", field_name, struct_name);
-            return false;
-        }
-        
-        printf("DEBUG: Final type for member %zu ('%s'): %p\n", member_index, field_name, (void*)all_member_types[member_index]);
-        
-        all_member_names[member_index] = field_name;
-        member_index++;
-    }
-    
-    // Process private members (similar logic, but abbreviated for brevity)
-    for (size_t i = 0; i < private_count; i++) {
-        AstNode *member = private_members[i];
-        // ... similar processing with debug prints ...
-        // (You can add the same debug logic here)
-    }
-    
-    printf("DEBUG: Creating struct type with %zu members\n", total_members);
-    for (size_t i = 0; i < total_members; i++) {
-        printf("DEBUG: Member %zu: '%s' -> type %p\n", i, all_member_names[i], (void*)all_member_types[i]);
-    }
-    
-    // Create struct type
-    AstNode *struct_type = create_struct_type(arena, struct_name, 
-                                             all_member_types, all_member_names,
-                                             total_members, node->line, node->column);
-    
-    if (!struct_type) {
-        tc_error(node, "Struct Creation Error", "Failed to create struct type for '%s'", struct_name);
-        return false;
-    }
-    
-    printf("DEBUG: Struct type created: %p\n", (void*)struct_type);
-    
-    // Add struct type to scope
-    if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false, arena)) {
-        tc_error_id(node, struct_name, "Symbol Error",
-                   "Failed to add struct '%s' to scope", struct_name);
-        return false;
-    }
-    
-    printf("DEBUG: About to print struct type:\n");
-    debug_print_struct_type(struct_type, 0);
+  if (node->type != AST_STMT_STRUCT) {
+    tc_error(node, "Internal Error", "Expected struct declaration node");
+    return false;
+  }
 
-    return true;
+  const char *struct_name = node->stmt.struct_decl.name;
+  AstNode **public_members = node->stmt.struct_decl.public_members;
+  size_t public_count = node->stmt.struct_decl.public_count;
+  AstNode **private_members = node->stmt.struct_decl.private_members;
+  size_t private_count = node->stmt.struct_decl.private_count;
+  bool is_public = node->stmt.struct_decl.is_public;
+
+  printf("DEBUG: Processing struct '%s' with %zu public members, %zu private "
+         "members\n",
+         struct_name, public_count, private_count);
+
+  // Validate struct name
+  if (!struct_name) {
+    tc_error(node, "Struct Error", "Struct declaration missing name");
+    return false;
+  }
+
+  // Check for duplicate struct declaration
+  Symbol *existing = scope_lookup_current_only(scope, struct_name);
+  if (existing) {
+    tc_error_id(node, struct_name, "Duplicate Symbol",
+                "Struct '%s' is already declared in this scope", struct_name);
+    return false;
+  }
+
+  // Collect all member info for struct type creation
+  size_t total_members = public_count + private_count;
+  AstNode **all_member_types =
+      arena_alloc(arena, total_members * sizeof(AstNode *), alignof(AstNode *));
+  const char **all_member_names =
+      arena_alloc(arena, total_members * sizeof(char *), alignof(char *));
+  size_t member_index = 0;
+
+  // Track member names to check for duplicates
+  GrowableArray seen_names;
+  growable_array_init(&seen_names, arena, total_members, sizeof(char *));
+
+  // Process public members
+  for (size_t i = 0; i < public_count; i++) {
+    AstNode *member = public_members[i];
+    printf("DEBUG: Processing public member %zu: %p\n", i, (void *)member);
+
+    if (!member) {
+      tc_error(node, "Struct Error", "Public member %zu is NULL in struct '%s'",
+               i, struct_name);
+      return false;
+    }
+
+    printf("DEBUG: Member type: %d (expected AST_STMT_FIELD_DECL)\n",
+           member->type);
+
+    if (member->type != AST_STMT_FIELD_DECL) {
+      tc_error(node, "Struct Error",
+               "Invalid public member %zu in struct '%s' (type=%d)", i,
+               struct_name, member->type);
+      return false;
+    }
+
+    const char *field_name = member->stmt.field_decl.name;
+    AstNode *field_type = member->stmt.field_decl.type;
+    AstNode *field_function = member->stmt.field_decl.function;
+
+    printf("DEBUG: Field name: '%s', type: %p, function: %p\n",
+           field_name ? field_name : "NULL", (void *)field_type,
+           (void *)field_function);
+
+    // Additional debugging for the type
+    if (field_type) {
+      printf("DEBUG: Field type category: %d, type: %d\n", field_type->category,
+             field_type->type);
+      if (field_type->type == AST_TYPE_BASIC) {
+        printf("DEBUG: Basic type name: '%s'\n",
+               field_type->type_data.basic.name);
+      }
+    }
+
+    // Validate field name
+    if (!field_name) {
+      tc_error(node, "Struct Field Error",
+               "Field %zu in struct '%s' has no name", i, struct_name);
+      return false;
+    }
+
+    // Check for duplicate member names
+    for (size_t j = 0; j < seen_names.count; j++) {
+      char **existing_name =
+          (char **)((char *)seen_names.data + j * sizeof(char *));
+      if (strcmp(*existing_name, field_name) == 0) {
+        tc_error_id(node, field_name, "Duplicate Member",
+                    "Struct member '%s' is already declared in struct '%s'",
+                    field_name, struct_name);
+        return false;
+      }
+    }
+
+    // Add to seen names
+    char **name_slot = (char **)growable_array_push(&seen_names);
+    *name_slot = (char *)field_name;
+
+    // Handle method vs data field
+    if (field_function) {
+      printf("DEBUG: Processing method '%s'\n", field_name);
+      // This is a method - validate the function
+      if (!typecheck_statement(field_function, scope, arena)) {
+        tc_error(node, "Struct Method Error",
+                 "Method '%s' in struct '%s' failed type checking", field_name,
+                 struct_name);
+        return false;
+      }
+
+      // Get the function's type from the symbol table
+      Symbol *method_symbol = scope_lookup_current_only(scope, field_name);
+      if (method_symbol && method_symbol->type) {
+        all_member_types[member_index] = method_symbol->type;
+        printf("DEBUG: Method type found: %p\n", (void *)method_symbol->type);
+      } else {
+        tc_error(node, "Struct Method Error",
+                 "Could not find type for method '%s' in struct '%s'",
+                 field_name, struct_name);
+        return false;
+      }
+    } else if (field_type) {
+      printf("DEBUG: Processing data field '%s'\n", field_name);
+      // This is a data field - validate the type
+      if (field_type->category != Node_Category_TYPE) {
+        tc_error(node, "Struct Field Error",
+                 "Field '%s' in struct '%s' has invalid type category (%d, "
+                 "expected %d)",
+                 field_name, struct_name, field_type->category,
+                 Node_Category_TYPE);
+        return false;
+      }
+      all_member_types[member_index] = field_type;
+      printf("DEBUG: Data field type assigned: %p\n", (void *)field_type);
+    } else {
+      tc_error(node, "Struct Field Error",
+               "Field '%s' in struct '%s' has neither type nor function",
+               field_name, struct_name);
+      return false;
+    }
+
+    // Validate that we actually got a valid type
+    if (!all_member_types[member_index]) {
+      tc_error(node, "Struct Field Error",
+               "Failed to determine type for field '%s' in struct '%s'",
+               field_name, struct_name);
+      return false;
+    }
+
+    printf("DEBUG: Final type for member %zu ('%s'): %p\n", member_index,
+           field_name, (void *)all_member_types[member_index]);
+
+    all_member_names[member_index] = field_name;
+    member_index++;
+  }
+
+  // Process private members (similar logic, but abbreviated for brevity)
+  for (size_t i = 0; i < private_count; i++) {
+    AstNode *member = private_members[i];
+    // ... similar processing with debug prints ...
+    // (You can add the same debug logic here)
+  }
+
+  printf("DEBUG: Creating struct type with %zu members\n", total_members);
+  for (size_t i = 0; i < total_members; i++) {
+    printf("DEBUG: Member %zu: '%s' -> type %p\n", i, all_member_names[i],
+           (void *)all_member_types[i]);
+  }
+
+  // Create struct type
+  AstNode *struct_type =
+      create_struct_type(arena, struct_name, all_member_types, all_member_names,
+                         total_members, node->line, node->column);
+
+  if (!struct_type) {
+    tc_error(node, "Struct Creation Error",
+             "Failed to create struct type for '%s'", struct_name);
+    return false;
+  }
+
+  printf("DEBUG: Struct type created: %p\n", (void *)struct_type);
+
+  // Add struct type to scope
+  if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false,
+                        arena)) {
+    tc_error_id(node, struct_name, "Symbol Error",
+                "Failed to add struct '%s' to scope", struct_name);
+    return false;
+  }
+
+  printf("DEBUG: About to print struct type:\n");
+  debug_print_struct_type(struct_type, 0);
+
+  return true;
 }
 
 bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
@@ -347,7 +427,7 @@ bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   AstNode *int_type = create_basic_type(arena, "int", node->line, node->column);
   if (!scope_add_symbol(scope, enum_name, int_type, is_public, false, arena)) {
     tc_error_id(node, enum_name, "Duplicate Symbol",
-      "Enum '%s' is already declared in this scope", enum_name);
+                "Enum '%s' is already declared in this scope", enum_name);
     return false;
   }
 
@@ -361,8 +441,8 @@ bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     // Enum members have same visibility as the enum itself
     if (!scope_add_symbol(scope, qualified_name, int_type, is_public, false,
                           arena)) {
-      tc_error(node, "Enum Member Error",
-        "Could not add enum member '%s'", qualified_name);
+      tc_error(node, "Enum Member Error", "Could not add enum member '%s'",
+               qualified_name);
       return false;
     }
   }
@@ -405,11 +485,12 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     TypeMatchResult match =
         types_match(expected_return_type, actual_return_type);
     if (match == TYPE_MATCH_NONE) {
-      tc_error_help(node, "Return Type Mismatch",
-        "Check that the returned value matches the function's return type",
-        "Return type mismatch: expected '%s', got '%s'",
-        type_to_string(expected_return_type, arena),
-        type_to_string(actual_return_type, arena));
+      tc_error_help(
+          node, "Return Type Mismatch",
+          "Check that the returned value matches the function's return type",
+          "Return type mismatch: expected '%s', got '%s'",
+          type_to_string(expected_return_type, arena),
+          type_to_string(actual_return_type, arena));
       return false;
     }
   }
@@ -427,10 +508,11 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Type *user = typecheck_expression(node->stmt.if_stmt.condition, scope, arena);
   TypeMatchResult condition = types_match(expected, user);
   if (condition == TYPE_MATCH_NONE) {
-    tc_error_help(node, "If Condition Error",
-      "The condition of an if statement must be of type 'bool'",
-      "If condition expected to be of type 'bool', but got '%s' instead",
-      type_to_string(user, arena));
+    tc_error_help(
+        node, "If Condition Error",
+        "The condition of an if statement must be of type 'bool'",
+        "If condition expected to be of type 'bool', but got '%s' instead",
+        type_to_string(user, arena));
     return false;
   }
 
@@ -467,7 +549,8 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
   if (!module_scope) {
     module_scope = create_module_scope(global_scope, module_name, arena);
     if (!register_module(global_scope, module_name, module_scope, arena)) {
-      tc_error(node, "Module Error", "Failed to register module '%s'", module_name);
+      tc_error(node, "Module Error", "Failed to register module '%s'",
+               module_name);
       return false;
     }
   }
@@ -480,7 +563,7 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
     if (body[i]->type == AST_PREPROCESSOR_USE) {
       if (!typecheck_use_stmt(body[i], module_scope, global_scope, arena)) {
         tc_error(node, "Module Use Error",
-          "Failed to process use statement in module '%s'", module_name);
+                 "Failed to process use statement in module '%s'", module_name);
         return false;
       }
     }
@@ -494,7 +577,7 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
     if (body[i]->type != AST_PREPROCESSOR_USE) {
       if (!typecheck(body[i], module_scope, arena)) {
         tc_error(node, "Module Error",
-          "Failed to typecheck statement in module '%s'", module_name);
+                 "Failed to typecheck statement in module '%s'", module_name);
         return false;
       }
     }
@@ -523,7 +606,8 @@ bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
   // Add the import to the current scope
   if (!add_module_import(current_scope, module_name, alias, module_scope,
                          arena)) {
-    tc_error(node, "Use Error", "Failed to import module '%s' as '%s'", module_name, alias);
+    tc_error(node, "Use Error", "Failed to import module '%s' as '%s'",
+             module_name, alias);
     return false;
   }
 

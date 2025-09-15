@@ -62,6 +62,7 @@ typedef enum {
   BP_BITWISE_AND, /**< Bitwise AND operator (&) */
   BP_EQUALITY,    /**< Equality operators (==, !=) */
   BP_RELATIONAL,  /**< Relational operators (<, >, <=, >=) */
+  BP_RANGE,       /**< Range operations (..) */
   BP_SHIFT,       /**< Shift operators (<<, >>) */
   BP_SUM,         /**< Addition and subtraction (+, -) */
   BP_PRODUCT,     /**< Multiplication, division, modulo (*, /, %) */
@@ -94,7 +95,7 @@ static const BinaryOp TOKEN_TO_BINOP_MAP[] = {
     [TOK_GT] = BINOP_GT,         [TOK_GE] = BINOP_GE,
     [TOK_AND] = BINOP_AND,       [TOK_OR] = BINOP_OR,
     [TOK_AMP] = BINOP_BIT_AND,   [TOK_PIPE] = BINOP_BIT_OR,
-    [TOK_CARET] = BINOP_BIT_XOR,
+    [TOK_CARET] = BINOP_BIT_XOR, [TOK_RANGE] = BINOP_RANGE,
 };
 
 /**

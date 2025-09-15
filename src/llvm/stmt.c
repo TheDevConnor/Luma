@@ -341,6 +341,60 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
+bool is_range_type(LLVMTypeRef type) {
+    // Check if this is a struct with exactly 2 fields of the same integer type
+    if (LLVMGetTypeKind(type) != LLVMStructTypeKind) {
+        return false;
+    }
+    
+    unsigned field_count = LLVMCountStructElementTypes(type);
+    if (field_count != 2) {
+        return false;
+    }
+    
+    // Get field types
+    LLVMTypeRef field_types[2];
+    LLVMGetStructElementTypes(type, field_types);
+    
+    // Check if both fields are the same integer type
+    return (field_types[0] == field_types[1] && 
+            LLVMGetTypeKind(field_types[0]) == LLVMIntegerTypeKind);
+}
+
+LLVMValueRef get_range_start_value(CodeGenContext *ctx, LLVMValueRef range_struct) {
+    LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
+    
+    // Create a temporary alloca to store the struct
+    LLVMValueRef temp_alloca = LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
+    LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
+    
+    // Get pointer to first field (start)
+    LLVMValueRef start_ptr = LLVMBuildStructGEP2(ctx->builder, struct_type, temp_alloca, 0, "start_ptr");
+    
+    // Get field type for load
+    LLVMTypeRef field_types[2];
+    LLVMGetStructElementTypes(struct_type, field_types);
+    
+    return LLVMBuildLoad2(ctx->builder, field_types[0], start_ptr, "range_start");
+}
+
+LLVMValueRef get_range_end_value(CodeGenContext *ctx, LLVMValueRef range_struct) {
+    LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
+    
+    // Create a temporary alloca to store the struct
+    LLVMValueRef temp_alloca = LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
+    LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
+    
+    // Get pointer to second field (end)
+    LLVMValueRef end_ptr = LLVMBuildStructGEP2(ctx->builder, struct_type, temp_alloca, 1, "end_ptr");
+    
+    // Get field type for load  
+    LLVMTypeRef field_types[2];
+    LLVMGetStructElementTypes(struct_type, field_types);
+    
+    return LLVMBuildLoad2(ctx->builder, field_types[1], end_ptr, "range_end");
+}
+
 LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
   // Use current module instead of legacy ctx->module
   LLVMModuleRef current_llvm_module =
@@ -369,46 +423,70 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
 
     if (expr->type == AST_EXPR_LITERAL &&
         expr->expr.literal.lit_type == LITERAL_STRING) {
-
-      // Process escape sequences in the string literal
-      char *processed_str =
-          process_escape_sequences(expr->expr.literal.value.string_val);
-
-      // Create the string value directly (not using %s format)
-      value = LLVMBuildGlobalStringPtr(ctx->builder, processed_str, "str");
-      format_str = "%s";
-
-      free(processed_str);
+        // Handle string literals as before
+        char *processed_str =
+            process_escape_sequences(expr->expr.literal.value.string_val);
+        value = LLVMBuildGlobalStringPtr(ctx->builder, processed_str, "str");
+        format_str = "%s";
+        free(processed_str);
     } else {
-      // Handle non-string expressions as before
-      value = codegen_expr(ctx, expr);
-      if (!value)
-        return NULL;
+        // Generate the expression value
+        value = codegen_expr(ctx, expr);
+        if (!value)
+            return NULL;
 
-      LLVMTypeRef value_type = LLVMTypeOf(value);
-      if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
-        unsigned int bits = LLVMGetIntTypeWidth(value_type);
-        if (bits == 8 || bits == 16 || bits == 32) {
-          format_str = "%d";
-        } else if (bits == 64) {
-          format_str = "%lld";
-        } else {
-          format_str = "%d";
+        LLVMTypeRef value_type = LLVMTypeOf(value);
+        
+        // Check if this is a range type
+        if (is_range_type(value_type)) {
+            // Handle range printing: format as "start..end"
+            LLVMValueRef start_val = get_range_start_value(ctx, value);
+            LLVMValueRef end_val = get_range_end_value(ctx, value);
+            
+            // Create format string for range: "%lld..%lld" or "%d..%d" depending on type
+            LLVMTypeRef field_types[2];
+            LLVMGetStructElementTypes(value_type, field_types);
+            unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
+            
+            const char *int_format = (bits == 64) ? "%lld" : "%d";
+            char range_format[32];
+            snprintf(range_format, sizeof(range_format), "%s..%s", int_format, int_format);
+            
+            // Create format string value
+            LLVMValueRef range_format_str = LLVMBuildGlobalStringPtr(ctx->builder, range_format, "range_fmt");
+            
+            // Call printf with start and end values
+            LLVMValueRef range_args[] = {range_format_str, start_val, end_val};
+            LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3, "");
+            
+            continue; // Skip the regular printing logic
         }
-      } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
-        format_str = "%f";
-      } else {
-        format_str = "%p";
-      }
+        
+        // Handle non-range expressions as before
+        if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
+            unsigned int bits = LLVMGetIntTypeWidth(value_type);
+            if (bits == 8 || bits == 16 || bits == 32) {
+                format_str = "%d";
+            } else if (bits == 64) {
+                format_str = "%lld";
+            } else {
+                format_str = "%d";
+            }
+        } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
+            format_str = "%f";
+        } else {
+            format_str = "%p";
+        }
     }
 
-    // Create format string and call printf
-    LLVMValueRef format_str_val =
-        LLVMBuildGlobalStringPtr(ctx->builder, format_str, "fmt");
-    LLVMValueRef args[] = {format_str_val, value};
-    LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 2, "");
+    // Create format string and call printf (for non-range values)
+    if (format_str) {
+        LLVMValueRef format_str_val =
+            LLVMBuildGlobalStringPtr(ctx->builder, format_str, "fmt");
+        LLVMValueRef args[] = {format_str_val, value};
+        LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 2, "");
+    }
   }
-
   return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
 }
 

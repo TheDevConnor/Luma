@@ -358,7 +358,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  // print_ast(combined_program, "", false, false);
+  print_ast(combined_program, "", false, false);
 
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");
@@ -367,6 +367,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   init_scope(&root_scope, NULL, "global", allocator);
   tc_error_init(config.tokens, config.token_count, config.filepath, allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
+  error_report();
   // debug_print_scope(&root_scope, 0);
 
   if (tc) {

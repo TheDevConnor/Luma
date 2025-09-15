@@ -25,6 +25,7 @@ typedef enum {
   AST_EXPR_MEMBER,     // Member access (obj.field)
   AST_EXPR_INDEX,      // Array/object indexing (obj[index])
   AST_EXPR_GROUPING,   // Parenthesized expressions
+  AST_EXPR_RANGE,      // range expressions '..'
   AST_EXPR_ARRAY,      // [ ... ] array expressions
   AST_EXPR_DEREF,      // *object
   AST_EXPR_ADDR,       // &object
@@ -93,6 +94,7 @@ typedef enum {
   BINOP_BIT_XOR, // ^
   BINOP_SHL,     // <<
   BINOP_SHR,     // >>
+  BINOP_RANGE,   // ..
 } BinaryOp;
 
 // Unary operators

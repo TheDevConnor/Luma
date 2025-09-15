@@ -1,16 +1,7 @@
 @module "main"
 
 const main = fn () int {
-    :: Allocate memory for an integer
-    let ptr1: *int = cast<*int>(alloc(sizeof<int>));
-    let ptr2: *int = ptr1;
-    defer { free(ptr2); }
-    
-    :: Use the memory
-    *ptr2 = 42;
-    output("Value: ", *ptr2, "\n");
-    
-    :: Clean up
-    :: free(ptr);
+    :: let x: [int; 6] = 0..5;
+    output(0..5, "\n");
     return 0;
 }

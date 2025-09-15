@@ -230,6 +230,9 @@ BindingPower get_bp(TokenType kind) {
   case TOK_DOT:
     return BP_CALL;
 
+  case TOK_RANGE:
+    return BP_RANGE;
+
   default:
     return BP_NONE;
   }
@@ -334,6 +337,7 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_CARET:
   case TOK_AND: // Add logical AND
   case TOK_OR:  // Add logical OR
+  case TOK_RANGE:
     return binary(parser, left, bp);
   case TOK_LPAREN:
     return call_expr(parser, left, bp);

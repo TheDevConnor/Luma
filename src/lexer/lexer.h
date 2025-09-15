@@ -64,6 +64,7 @@ typedef enum {
   TOK_MEMCPY,   /**< memcpy(void *to, void *from, int size) */
   TOK_AS,       /**< as keyword (for use in modules) */
   TOK_DEFER,    /**< defer keyword */
+  TOK_IN,       /**< in keyword */
 
   // prepocessor directives
   TOK_MODULE, /**< @module */
@@ -106,6 +107,7 @@ typedef enum {
   TOK_MINUSMINUS,  /**< -- */
   TOK_SHIFT_LEFT,  /**< << */
   TOK_SHIFT_RIGHT, /**< >> */
+  TOK_RANGE,       /**< .. */
   TOK_WHITESPACE,  /**< whitespace */
   TOK_COMMENT      /**< comment */
 } TokenType;
