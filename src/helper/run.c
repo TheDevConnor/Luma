@@ -29,7 +29,8 @@ void handle_segfault(int sig) {
 void handle_illegal_instruction(int sig) {
   fprintf(stderr, "\nIllegal instruction caught!\n");
   fprintf(stderr, "This suggests LLVM generated invalid machine code.\n");
-  fprintf(stderr, "Check your target architecture and LLVM version compatibility.\n");
+  fprintf(stderr,
+          "Check your target architecture and LLVM version compatibility.\n");
   exit(1);
 }
 
@@ -338,8 +339,8 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // Stage 2: Parsing
   print_progress(++step, total_stages, "Parsing");
 
-  Stmt *main_module =
-      parse_file_to_module(config.filepath, config.file_count, allocator, &config);
+  Stmt *main_module = parse_file_to_module(config.filepath, config.file_count,
+                                           allocator, &config);
   if (!main_module || error_report())
     goto cleanup;
 
@@ -365,8 +366,6 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   init_scope(&root_scope, NULL, "global", allocator);
   tc_error_init(config.tokens, config.token_count, config.filepath, allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
-  error_report();
-  
   // debug_print_scope(&root_scope, 0);
 
   if (tc) {
@@ -377,16 +376,18 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
       if (analyzer && analyzer->allocations.count > 0) {
         // Use the error system instead of direct printing
-        int memory_issues =
-            static_memory_check_and_report(analyzer,
-                                           allocator,   // Your arena allocator
-                                           config.tokens,      // Your token array
-                                           config.token_count, // Number of tokens
-                                           config.filepath); // Source file path
+        int memory_issues = static_memory_check_and_report(
+            analyzer,
+            allocator,          // Your arena allocator
+            config.tokens,      // Your token array
+            config.token_count, // Number of tokens
+            config.filepath);   // Source file path
 
         // Optional: Print a brief summary after progress bar
         if (memory_issues > 0) {
           ensure_clean_line(); // Clean up progress bar
+          error_report();
+        } else {
           error_report();
         }
       }

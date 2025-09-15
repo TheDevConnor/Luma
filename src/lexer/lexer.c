@@ -301,26 +301,37 @@ int skip_multiline_comment(Lexer *lx) {
  * @return Total count of skipped characters
  */
 int skip_whitespace(Lexer *lx) {
-  int count = 0;
+  int whitespace_count = 0;
+
   while (!is_at_end(lx)) {
     char c = peek(lx, 0);
-    if (isspace(c)) {
+
+    if (c == ' ' || c == '\t') {
+      // Count spaces and tabs as whitespace
       advance(lx);
-      count++;
+      whitespace_count++;
+    } else if (c == '\n' || c == '\r') {
+      // Newline resets whitespace count - we only want leading whitespace on
+      // the current line
+      advance(lx);
+      whitespace_count = 0; // Reset because we're on a new line
     } else if (c == ':' && peek(lx, 1) == ':') {
       // Skip single-line comment
       while (!is_at_end(lx) && peek(lx, 0) != '\n') {
         advance(lx);
-        count++;
       }
+      // Don't count comment characters as whitespace
     } else if (c == '/' && peek(lx, 1) == '*') {
-      count = skip_multiline_comment(lx);
+      // Skip multiline comment
+      skip_multiline_comment(lx);
+      // Don't count comment characters as whitespace
     } else {
+      // Not whitespace or comment, stop skipping
       break;
     }
   }
 
-  return count;
+  return whitespace_count;
 }
 
 /**

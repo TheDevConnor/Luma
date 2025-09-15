@@ -1,6 +1,7 @@
 /**
  * @file type.h
- * @brief Type checking and symbol table management for AST nodes with memory tracking.
+ * @brief Type checking and symbol table management for AST nodes with memory
+ * tracking.
  *
  * Provides type checking for the Abstract Syntax Tree (AST), including:
  * - Scoped symbol table management
@@ -13,9 +14,9 @@
 
 #pragma once
 
-#include "../lexer/lexer.h"
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
+#include "../lexer/lexer.h"
 
 // ============================================================================
 // Data Structures
@@ -27,16 +28,16 @@ static const char *g_file_path = NULL;
 static ArenaAllocator *g_arena = NULL;
 
 typedef struct {
-    size_t line;
-    size_t column;
-    const char *variable_name;  // Variable that holds the allocated pointer
-    bool has_matching_free;
-    int free_count;             // NEW: Track how many times freed
+  size_t line;
+  size_t column;
+  const char *variable_name; // Variable that holds the allocated pointer
+  bool has_matching_free;
+  int free_count; // NEW: Track how many times freed
 } StaticAllocation;
 
 typedef struct {
-    GrowableArray allocations;  // Array of StaticAllocation
-    ArenaAllocator *arena;
+  GrowableArray allocations; // Array of StaticAllocation
+  ArenaAllocator *arena;
 } StaticMemoryAnalyzer;
 
 /**
@@ -66,7 +67,7 @@ typedef struct Scope {
   bool is_module_scope;
   const char *module_name;
   GrowableArray imported_modules;
-  
+
   // Memory tracking
   StaticMemoryAnalyzer *memory_analyzer;
 } Scope;
@@ -103,19 +104,18 @@ typedef struct {
 // Memory Tracking
 // ============================================================================
 
-void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer, ArenaAllocator *arena);
-void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line, size_t column, const char *var_name);
-void static_memory_track_free(StaticMemoryAnalyzer *analyzer, const char *var_name);
-void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer, 
-                               ArenaAllocator *arena,
-                               Token *tokens, 
-                               int token_count,
-                               const char *file_path);
-int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer, 
-                                   ArenaAllocator *arena,
-                                   Token *tokens, 
-                                   int token_count,
-                                   const char *file_path);
+void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
+                                 ArenaAllocator *arena);
+void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
+                               size_t column, const char *var_name);
+void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
+                              const char *var_name);
+void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
+                                ArenaAllocator *arena, Token *tokens,
+                                int token_count, const char *file_path);
+int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
+                                   ArenaAllocator *arena, Token *tokens,
+                                   int token_count, const char *file_path);
 StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
 const char *extract_variable_name_from_free(AstNode *free_expr);
 
@@ -165,10 +165,13 @@ bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
 // Error Management
 // ============================================================================
 
-void tc_error_init(Token *tokens, int token_count, const char *file_path, ArenaAllocator *arena);
+void tc_error_init(Token *tokens, int token_count, const char *file_path,
+                   ArenaAllocator *arena);
 void tc_error(AstNode *node, const char *error_type, const char *format, ...);
-void tc_error_help(AstNode *node, const char *error_type, const char *help, const char *format, ...);
-void tc_error_id(AstNode *node, const char *identifier, const char *error_type, const char *format, ...);
+void tc_error_help(AstNode *node, const char *error_type, const char *help,
+                   const char *format, ...);
+void tc_error_id(AstNode *node, const char *identifier, const char *error_type,
+                 const char *format, ...);
 
 // ============================================================================
 // Type Utilities
@@ -195,9 +198,9 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena);
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 
-AstNode *create_struct_type(ArenaAllocator *arena, const char *name, 
-                           AstNode **member_types, const char **member_names,
-                           size_t member_count, size_t line, size_t column);
+AstNode *create_struct_type(ArenaAllocator *arena, const char *name,
+                            AstNode **member_types, const char **member_names,
+                            size_t member_count, size_t line, size_t column);
 AstNode *get_struct_member_type(AstNode *struct_type, const char *member_name);
 bool struct_has_member(AstNode *struct_type, const char *member_name);
 
