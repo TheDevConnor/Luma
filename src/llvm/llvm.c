@@ -94,21 +94,20 @@ bool generate_module_object_file(ModuleCompilationUnit *module,
   // Get host CPU name and features for maximum compatibility
   char *host_cpu = LLVMGetHostCPUName();
   char *host_features = LLVMGetHostCPUFeatures();
-  
+
   // For debugging - you can comment these out later
-  printf("Target triple: %s\n", target_triple);
-  printf("Host CPU: %s\n", host_cpu);
-  printf("Host features: %s\n", host_features);
+  // printf("Target triple: %s\n", target_triple);
+  // printf("Host CPU: %s\n", host_cpu);
+  // printf("Host features: %s\n", host_features);
 
   // Create target machine with host-specific settings for compatibility
   LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-      target, 
-      target_triple, 
-      host_cpu,           // Use host CPU instead of empty string
-      host_features,      // Use host features instead of empty string
+      target, target_triple,
+      host_cpu,      // Use host CPU instead of empty string
+      host_features, // Use host features instead of empty string
       LLVMCodeGenLevelDefault,
-      LLVMRelocPIC,       // Keep PIE-compatible
-      LLVMCodeModelSmall  // Keep small code model
+      LLVMRelocPIC,      // Keep PIE-compatible
+      LLVMCodeModelSmall // Keep small code model
   );
 
   // Clean up CPU and features strings
@@ -188,7 +187,8 @@ bool compile_modules_to_objects(CodeGenContext *ctx, const char *output_dir) {
     snprintf(output_path, sizeof(output_path), "%s/%s.o", output_dir,
              unit->module_name);
 
-    // printf("Compiling module '%s' to '%s'\n", unit->module_name, output_path);
+    // printf("Compiling module '%s' to '%s'\n", unit->module_name,
+    // output_path);
 
     // Generate object file for this module
     if (!generate_module_object_file(unit, output_path)) {
@@ -365,9 +365,8 @@ bool generate_assembly_file(CodeGenContext *ctx, const char *asm_filename) {
   }
 
   LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
-      target, target_triple, "", "", LLVMCodeGenLevelNone,
-      LLVMRelocDefault, LLVMCodeModelDefault
-  );
+      target, target_triple, "", "", LLVMCodeGenLevelNone, LLVMRelocDefault,
+      LLVMCodeModelDefault);
 
   if (!target_machine) {
     fprintf(stderr, "Failed to create target machine\n");

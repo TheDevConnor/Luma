@@ -8,7 +8,7 @@ const main = fn () int {
     
     :: Use the memory
     *ptr2 = 42;
-    outputln("Value: ", *ptr2);
+    output("Value: ", *ptr2, "\n");
     
     :: Clean up
     :: free(ptr);

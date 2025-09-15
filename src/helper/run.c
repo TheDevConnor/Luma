@@ -245,7 +245,7 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   config->token_count = tokens.item_size;
 
   // Parse and extract the module from the program
-  AstNode *program_root = parse(&tokens, allocator);
+  AstNode *program_root = parse(&tokens, allocator, config);
   free((void *)source);
 
   if (!program_root) {
@@ -271,7 +271,8 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   return NULL;
 }
 
-AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator) {
+AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
+                            BuildConfig *config) {
   const char *source = read_file(path);
   if (!source) {
     fprintf(stderr, "Failed to read source file: %s\n", path);
@@ -304,7 +305,7 @@ AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator) {
     return NULL;
   }
 
-  AstNode *root = parse(&tokens, allocator);
+  AstNode *root = parse(&tokens, allocator, config);
 
   free((void *)source);
   return root;
@@ -357,7 +358,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  print_ast(combined_program, "", false, false);
+  // print_ast(combined_program, "", false, false);
 
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");

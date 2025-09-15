@@ -236,13 +236,13 @@ bool error_report(void) {
   if (error_count == 0)
     return false;
 
-  printf("%s: %d\n", BOLD_WHITE("Total errors"), error_count);
+  printf("\n%s: %d\n", BOLD_WHITE("Total Errors/Warnings"), error_count);
 
   for (int i = 0; i < error_count; i++) {
     ErrorInformation *e = &error_list[i];
     printf(RED("%s: "), e->error_type);
     printf(BOLD_WHITE("%s\n"), e->message);
-    printf("  -->");
+    printf("  --> ");
     printf(BOLD_YELLOW("%s"), e->file_path);
     printf(":%d::%d\n", e->line, e->col);
 

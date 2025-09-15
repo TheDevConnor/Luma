@@ -62,7 +62,8 @@ int print_help();
 int print_version();
 int print_license();
 
-AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator);
+AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
+                            BuildConfig *config);
 
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena);

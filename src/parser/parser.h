@@ -22,6 +22,7 @@
 
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
+#include "../helper/help.h"
 #include "../lexer/lexer.h"
 
 /**
@@ -110,6 +111,7 @@ static const UnaryOp TOKEN_TO_UNOP_MAP[] = {
  * @brief Parser state holding token stream and current position.
  */
 typedef struct {
+  const char *file_path;
   ArenaAllocator *arena; /**< Memory arena for AST node allocations */
   Token *tks;            /**< Array of tokens to parse */
   size_t tk_count;       /**< Number of tokens in the array */
@@ -145,7 +147,7 @@ char *get_name(Parser *psr);
  * @param arena Memory arena for allocations.
  * @return Pointer to the root AST statement node (program).
  */
-Stmt *parse(GrowableArray *tks, ArenaAllocator *arena);
+Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config);
 Expr *parse_expr(Parser *parser, BindingPower bp);
 Stmt *parse_stmt(Parser *parser);
 Type *parse_type(Parser *parser);
