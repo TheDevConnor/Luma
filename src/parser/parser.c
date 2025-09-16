@@ -173,9 +173,9 @@ Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config) {
  *       - BP_TERNARY: Ternary conditional operator
  *       - BP_ASSIGN: Assignment operators
  *
- * @see BindingPower, TokenType
+ * @see BindingPower, LumaTokenType
  */
-BindingPower get_bp(TokenType kind) {
+BindingPower get_bp(LumaTokenType kind) {
   switch (kind) {
   // Assignment
   case TOK_EQUAL:
@@ -469,10 +469,10 @@ Stmt *parse_stmt(Parser *parser) {
  *
  * @warning Prints error message to stderr for unexpected tokens
  *
- * @see tnud(), tled(), TokenType
+ * @see tnud(), tled(), LumaTokenType
  */
 Type *parse_type(Parser *parser) {
-  TokenType tok = p_current(parser).type_;
+  LumaTokenType tok = p_current(parser).type_;
 
   switch (tok) {
   case TOK_INT:

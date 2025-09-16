@@ -1,7 +1,7 @@
 // Enhanced llvm.c - Module system implementation
 #include "llvm.h"
 #include <llvm-c/TargetMachine.h>
-#include <stdlib.h>
+#include <stdlib.h>`
 #include <sys/stat.h>
 
 // =============================================================================
@@ -169,10 +169,17 @@ bool compile_modules_to_objects(CodeGenContext *ctx, const char *output_dir) {
   // Create output directory if it doesn't exist
   struct stat st = {0};
   if (stat(output_dir, &st) == -1) {
+  #ifdef _WIN32
+    if (mkdir(output_dir) != 0) {
+      fprintf(stderr, "Failed to create output directory: %s\n", output_dir);
+      return false;
+    }
+  #else
     if (mkdir(output_dir, 0755) != 0) {
       fprintf(stderr, "Failed to create output directory: %s\n", output_dir);
       return false;
     }
+  #endif 
   }
 
   bool success = true;

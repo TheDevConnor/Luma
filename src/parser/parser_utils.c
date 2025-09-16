@@ -152,9 +152,9 @@ Token p_advance(Parser *psr) {
  * @warning Always check the return value's type if you need to handle parsing
  * errors
  *
- * @see p_current(), p_advance(), parser_error(), TokenType
+ * @see p_current(), p_advance(), parser_error(), LumaTokenType
  */
-Token p_consume(Parser *psr, TokenType type, const char *error_msg) {
+Token p_consume(Parser *psr, LumaTokenType type, const char *error_msg) {
   int line = p_current(psr).line;
   int col = p_current(psr).col;
 

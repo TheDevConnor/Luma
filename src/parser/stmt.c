@@ -320,7 +320,7 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
   bool public_member = true; // default: everything is public
 
   while (p_has_tokens(parser) && p_current(parser).type_ != TOK_RBRACE) {
-    TokenType tok = p_current(parser).type_;
+    LumaTokenType tok = p_current(parser).type_;
 
     // Handle visibility modifiers
     if (tok == TOK_PUBLIC || tok == TOK_PRIVATE) {

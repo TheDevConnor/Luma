@@ -193,13 +193,22 @@ const char *literal_type_to_string(LiteralType type) {
 }
 
 void print_prefix(const char *prefix, bool is_last) {
+#ifdef _WIN32
+  // Use ASCII characters on Windows for better compatibility
+  if (is_last) {
+    printf("%s+-- ", prefix);  // or "`-- "
+  } else {
+    printf("%s|-- ", prefix);
+  }
+#else
+  // Use Unicode box drawing on Unix/Linux
   if (is_last) {
     printf("%s└── ", prefix);
   } else {
     printf("%s├── ", prefix);
   }
+#endif
 }
-
 void print_ast(const AstNode *node, const char *prefix, bool is_last,
                bool is_root) {
   if (!node) {
@@ -214,8 +223,13 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
   printf(BOLD_MAGENTA("%s\n"), node_type_to_string(node->type));
 
   char next_prefix[512];
-  snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
-           is_last ? "    " : "│   ");
+  #ifdef _WIN32
+    snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
+            is_last ? "    " : "|   ");
+  #else
+    snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
+            is_last ? "    " : "│   ");
+  #endif
 
   if (node->line > 0 || node->column > 0) {
     print_prefix(next_prefix, true);

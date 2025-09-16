@@ -156,9 +156,9 @@ const char *get_line_text_from_source(const char *source, int target_line) {
  *
  * @param str Pointer to string to match
  * @param length Length of the string
- * @return TokenType keyword token if found, else TOK_IDENTIFIER
+ * @return LumaTokenType keyword token if found, else TOK_IDENTIFIER
  */
-static TokenType lookup_keyword(const char *str, int length) {
+static LumaTokenType lookup_keyword(const char *str, int length) {
   for (int i = 0; i < (int)(sizeof(keywords) / sizeof(*keywords)); ++i) {
     if (STR_EQUALS_LEN(str, keywords[i].text, length)) {
       return keywords[i].type;
@@ -173,9 +173,9 @@ static TokenType lookup_keyword(const char *str, int length) {
  *
  * @param str Pointer to string to match
  * @param length Length of the string
- * @return TokenType preprocessor token if found, else TOK_SYMBOL
+ * @return LumaTokenType preprocessor token if found, else TOK_SYMBOL
  */
-static TokenType lookup_preprocessor(const char *str, int length) {
+static LumaTokenType lookup_preprocessor(const char *str, int length) {
   for (int i = 0; i < (int)(sizeof(preprocessor_directives) /
                             sizeof(*preprocessor_directives));
        ++i) {
@@ -192,9 +192,9 @@ static TokenType lookup_preprocessor(const char *str, int length) {
  *
  * @param str Pointer to string to match
  * @param length Length of the string
- * @return TokenType symbol token if found, else TOK_SYMBOL
+ * @return LumaTokenType symbol token if found, else TOK_SYMBOL
  */
-static TokenType lookup_symbol(const char *str, int length) {
+static LumaTokenType lookup_symbol(const char *str, int length) {
   for (int i = 0; i < (int)(sizeof(symbols) / sizeof(*symbols)); ++i) {
     if (STR_EQUALS_LEN(str, symbols[i].text, length)) {
       return symbols[i].type;
@@ -267,7 +267,7 @@ char advance(Lexer *lx) {
  * @param whitespace_len Length of leading whitespace
  * @return Token struct initialized with given values
  */
-Token make_token(TokenType type, const char *start, int line, int col,
+Token make_token(LumaTokenType type, const char *start, int line, int col,
                  int length, int whitespace_len) {
   return (Token){type, start, line, col, length, whitespace_len};
 }
@@ -359,7 +359,7 @@ Token next_token(Lexer *lx) {
         advance(lx);
       }
       int len = (int)(lx->current - start);
-      TokenType type = lookup_preprocessor(start, len);
+      LumaTokenType type = lookup_preprocessor(start, len);
       if (type != TOK_SYMBOL) {
         return MAKE_TOKEN(type, start, lx, len, wh_count);
       }
@@ -373,7 +373,7 @@ Token next_token(Lexer *lx) {
       return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
     }
     // Just @ by itself - treat as symbol
-    TokenType single_type = lookup_symbol(start, 1);
+    LumaTokenType single_type = lookup_symbol(start, 1);
     return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
   }
 
@@ -383,7 +383,7 @@ Token next_token(Lexer *lx) {
       advance(lx);
     }
     int len = (int)(lx->current - start);
-    TokenType type = lookup_keyword(start, len);
+    LumaTokenType type = lookup_keyword(start, len);
     return MAKE_TOKEN(type, start, lx, len, wh_count);
   }
 
@@ -428,7 +428,7 @@ Token next_token(Lexer *lx) {
   // Try to match two-character symbol
   if (!is_at_end(lx)) {
     char two[3] = {start[0], peek(lx, 0), '\0'};
-    TokenType ttype = lookup_symbol(two, 2);
+    LumaTokenType ttype = lookup_symbol(two, 2);
     if (ttype != TOK_SYMBOL) {
       advance(lx);
       return MAKE_TOKEN(ttype, start, lx, 2, wh_count);
@@ -436,7 +436,7 @@ Token next_token(Lexer *lx) {
   }
 
   // Single-character symbol fallback
-  TokenType single_type = lookup_symbol(start, 1);
+  LumaTokenType single_type = lookup_symbol(start, 1);
   if (single_type != TOK_SYMBOL)
     return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
 

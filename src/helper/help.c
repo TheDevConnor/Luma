@@ -6,8 +6,16 @@
  */
 
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
+
+// Platform-specific includes
+#if defined(__MINGW32__) || defined(_WIN32)
+    #include <windows.h>
+    #include <process.h>  // For _spawnvp on Windows
+#else
+    #include <sys/wait.h>
+    #include <unistd.h>
+    #include <sys/stat.h>
+#endif
 
 #include "../c_libs/color/color.h"
 #include "help.h"
@@ -38,7 +46,7 @@ bool check_argc(int argc, int expected) {
  * @return Pointer to null-terminated file content, or NULL on failure.
  */
 const char *read_file(const char *filename) {
-  FILE *file = fopen(filename, "r");
+  FILE *file = fopen(filename, "rb");  // Use "rb" instead of "r"
   if (!file) {
     perror("Failed to open file");
     return NULL;
@@ -55,8 +63,8 @@ const char *read_file(const char *filename) {
     return NULL;
   }
 
-  fread(buffer, 1, size, file);
-  buffer[size] = '\0';
+  size_t bytes_read = fread(buffer, 1, size, file);
+  buffer[bytes_read] = '\0';  // Use bytes_read instead of size
 
   fclose(file);
   return buffer;
@@ -107,6 +115,30 @@ int print_license() {
   return 0;
 }
 
+// Platform-specific file system functions
+#if defined(__MINGW32__) || defined(_WIN32)
+    bool PathExist(const char* p){
+        DWORD attr = GetFileAttributes(p);
+        if (attr == INVALID_FILE_ATTRIBUTES) return false;
+        return true;
+    };
+    bool PathIsDir(const char* p){
+        DWORD attr = GetFileAttributes(p);
+        return attr & FILE_ATTRIBUTE_DIRECTORY;
+    };
+#else
+    bool PathExist(const char* p){
+        struct stat FileAttrstat;
+        if(stat(p, &FileAttrstat) != 0) return false;
+        return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
+    };
+    bool PathIsDir(const char* p){
+        struct stat FileAttrstat;
+        if(stat(p, &FileAttrstat) != 0) return false;
+        return S_ISDIR(FileAttrstat.st_mode);
+    };
+#endif
+
 /**
  * @brief Parses command-line arguments and configures the build.
  *
@@ -118,34 +150,6 @@ int print_license() {
  * @return false if help/version/license was printed or error occurred, true
  * otherwise.
  */
-// Updated BuildConfig structure
-
-
-#if defined (__MINGW32__) || defined (_WIN32_)	
-	#include <windows.h> 
-	bool PathExist(const char* p){
-    	DWORD attr = GetFileAttributes(p);
-    	if (attr == INVALID_FILE_ATTRIBUTES) return false;
-		return true;
-	};
-	bool PathIsDir(const char* p){
-		DWORD attr = GetFileAttributes(p);
-		return attr & FILE_ATTRIBUTE_DIRECTORY;
-	};
-
-#elif __linux__ 
-	#include <sys/stat.h>
-	bool PathExist(const char* p){
-		struct stat FileAttrstat;
-		if(stat(p, &FileAttrstat) != 0) return false;
-		return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
-	};
-	bool PathIsDir(const char* p){
-		struct stat FileAttrstat;
-		if(stat(p, &FileAttrstat) != 0) return false;
-		return S_ISDIR(FileAttrstat.st_mode);
-	};
-#endif
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena) {
   if (!growable_array_init(&config->files, arena, 4, sizeof(char *))) {
@@ -155,56 +159,56 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
 
   // set check_mem to true by default
   config->check_mem = true;
-	config->filepath = false;
+  config->filepath = false;
   for (int i = 1; i < argc; i++) {
-		if(!PathExist(argv[i]) || argv[i][0] == '-'){
-			if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
-	      return print_version(), false;
-	    else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
-	      return print_help(), false;
-	    else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
-	      return print_license(), false;
-	    else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
-	      config->name = argv[++i];
-	    else if (strcmp(argv[i], "-save") == 0)
-	      config->save = true;
-	    else if (strcmp(argv[i], "-clean") == 0)
-	      config->clean = true;
-	    else if (strcmp(argv[i], "--no-sanitize") == 0 ||
-	      			strcmp(argv[i], "-no-sanitize") == 0) {
-	      config->check_mem = false;
-	    } else if (strcmp(argv[i], "-debug") == 0) {
-	          // Placeholder for debug flag
-	    } else if (strcmp(argv[i], "-l") == 0 ||
-	              strcmp(argv[i], "-link") == 0) {
-	          // Collect files until next flag or end of args
-	      int start = i + 1;
-	      while (start < argc && argv[start][0] != '-') {
-	        char **slot = (char **)growable_array_push(&config->files);
-	        if (!slot) {
-	          fprintf(stderr, "Failed to add file to array\n");
-	          return false;
-					}
-	        *slot = argv[start];
-	        config->file_count++;
-	        start++;
-	    	}
-	      i = start - 1;
-	    } else {
-					if(argv[i][0] == '-'){
-	        	fprintf(stderr, "Unknown build option: %s\n", argv[i]);
-	        	return false;
-					}else{
-						fprintf(stderr, "%s: No such file or directory\n", argv[i]);
-        		return false;
-					}
-	    }  
-		}else if (PathIsDir(argv[i])) {
-			fprintf(stderr, "%s: Is a directory\n", argv[i]);
-			return false;
-		}else{
-			config->filepath = argv[i];
-		}
+    if(!PathExist(argv[i]) || argv[i][0] == '-'){
+      if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
+        return print_version(), false;
+      else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        return print_help(), false;
+      else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
+        return print_license(), false;
+      else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
+        config->name = argv[++i];
+      else if (strcmp(argv[i], "-save") == 0)
+        config->save = true;
+      else if (strcmp(argv[i], "-clean") == 0)
+        config->clean = true;
+      else if (strcmp(argv[i], "--no-sanitize") == 0 ||
+               strcmp(argv[i], "-no-sanitize") == 0) {
+        config->check_mem = false;
+      } else if (strcmp(argv[i], "-debug") == 0) {
+            // Placeholder for debug flag
+      } else if (strcmp(argv[i], "-l") == 0 ||
+                strcmp(argv[i], "-link") == 0) {
+            // Collect files until next flag or end of args
+        int start = i + 1;
+        while (start < argc && argv[start][0] != '-') {
+          char **slot = (char **)growable_array_push(&config->files);
+          if (!slot) {
+            fprintf(stderr, "Failed to add file to array\n");
+            return false;
+          }
+          *slot = argv[start];
+          config->file_count++;
+          start++;
+        }
+        i = start - 1;
+      } else {
+        if(argv[i][0] == '-'){
+          fprintf(stderr, "Unknown build option: %s\n", argv[i]);
+          return false;
+        }else{
+          fprintf(stderr, "%s: No such file or directory\n", argv[i]);
+          return false;
+        }
+      }  
+    }else if (PathIsDir(argv[i])) {
+      fprintf(stderr, "%s: Is a directory\n", argv[i]);
+      return false;
+    }else{
+      config->filepath = argv[i];
+    }
   }
   return true;
 }
@@ -237,8 +241,62 @@ void print_token(const Token *t) {
   printf("\n");
 }
 
+#if defined(__MINGW32__) || defined(_WIN32)
 /**
- * @brief Links object file using ld to create an executable
+ * @brief Links object file using system() on Windows
+ *
+ * @param obj_filename Path to the object file
+ * @param exe_filename Path for the output executable
+ * @return true if linking succeeded, false otherwise
+ */
+bool link_with_ld(const char *obj_filename, const char *exe_filename) {
+  char command[1024];
+  
+  // On Windows, we'll use gcc for linking as it's simpler and more reliable
+  snprintf(command, sizeof(command), "gcc \"%s\" -o \"%s\"", obj_filename, exe_filename);
+  
+  printf("Linking with: %s\n", command);
+  return system(command) == 0;
+}
+
+bool link_with_ld_simple(const char *obj_filename, const char *exe_filename) {
+  // On Windows, just use the same approach as link_with_ld
+  return link_with_ld(obj_filename, exe_filename);
+}
+
+bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size) {
+  char command[256];
+  snprintf(command, sizeof(command), "gcc -print-file-name=%s", filename);
+
+  FILE *fp = _popen(command, "r");  // Use _popen on Windows
+  if (!fp)
+    return false;
+
+  if (fgets(buffer, buffer_size, fp) != NULL) {
+    // Remove trailing newline
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len - 1] == '\n') {
+      buffer[len - 1] = '\0';
+    }
+    _pclose(fp);  // Use _pclose on Windows
+
+    // Check if gcc actually found the file
+    return strcmp(buffer, filename) != 0;
+  }
+
+  _pclose(fp);
+  return false;
+}
+
+bool get_lib_paths(char *buffer, size_t buffer_size) {
+  // This is more complex on Windows, for now just return false
+  // You might want to implement Windows-specific library path discovery
+  return false;
+}
+
+#else
+/**
+ * @brief Links object file using ld to create an executable (Unix/Linux)
  *
  * @param obj_filename Path to the object file
  * @param exe_filename Path for the output executable
@@ -432,15 +490,6 @@ bool link_with_ld_simple(const char *obj_filename, const char *exe_filename) {
     return system(command) == 0;
   }
 
-  // printf("Found startup files:\n");
-  // printf("  crt1.o: %s\n", crt1_path);
-  // printf("  crti.o: %s\n", crti_path);
-  // printf("  crtn.o: %s\n", crtn_path);
-  // if (found_crtbegin)
-  //   printf("  crtbegin.o: %s\n", crtbegin_path);
-  // if (found_crtend)
-  //   printf("  crtend.o: %s\n", crtend_path);
-
   // Build the ld command
   if (found_crtbegin && found_crtend) {
     snprintf(command, sizeof(command),
@@ -456,9 +505,9 @@ bool link_with_ld_simple(const char *obj_filename, const char *exe_filename) {
              crt1_path, crti_path, obj_filename, crtn_path, exe_filename);
   }
 
-  // printf("Executing: %s\n", command);
   return system(command) == 0;
 }
+#endif
 
 void print_progress(int step, int total, const char *stage) {
   float ratio = (float)step / total;

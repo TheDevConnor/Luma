@@ -1,17 +1,21 @@
 # config.mk
 
-CC       = gcc
-CFLAGS   = -Wall -Wextra -std=c17 -O2
-LDFLAGS  =
+CC       = g++
+CFLAGS   = -Wall -Wextra -std=c17 -Wno-unused-variable -O2 -x c  # -x c tells g++ to treat files as C code
+LDFLAGS  = 
 INCLUDES = -Isrc
 
-# LLVM configuration
+# LLVM configuration - request all necessary components
 LLVM_CFLAGS := $(shell llvm-config --cflags)
-LLVM_LDFLAGS := $(shell llvm-config --ldflags --system-libs --libs core analysis bitwriter target)
+LLVM_LDFLAGS := $(shell llvm-config --ldflags)
+LLVM_LIBS := $(shell llvm-config --libs --system-libs all)
 
-# Add LLVM flags to existing flags
+# Alternative: specify exactly what you need
+# LLVM_LIBS := $(shell llvm-config --libs --system-libs core analysis bitwriter target irreader asmparser mcparser mc bitreader support demangle)
+
+# Add LLVM flags to existing flags  
 override CFLAGS += $(LLVM_CFLAGS)
-override LDFLAGS += $(LLVM_LDFLAGS)
+override LDFLAGS += $(LLVM_LDFLAGS) $(LLVM_LIBS)
 
 SRC_DIR  = src
 OBJ_DIR  = build

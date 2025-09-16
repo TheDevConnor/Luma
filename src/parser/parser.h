@@ -138,7 +138,7 @@ bool p_has_tokens(Parser *psr);
 Token p_peek(Parser *psr, size_t offset);
 Token p_current(Parser *psr);
 Token p_advance(Parser *psr);
-Token p_consume(Parser *psr, TokenType type, const char *error_msg);
+Token p_consume(Parser *psr, LumaTokenType type, const char *error_msg);
 char *get_name(Parser *psr);
 
 /**
@@ -169,7 +169,7 @@ Expr *nud(Parser *parser);
  * @return Parsed expression node.
  */
 Expr *led(Parser *parser, Expr *left, BindingPower bp);
-BindingPower get_bp(TokenType kind);
+BindingPower get_bp(LumaTokenType kind);
 
 Expr *primary(Parser *parser);
 Expr *unary(Parser *parser);
@@ -190,7 +190,7 @@ Expr *sizeof_expr(Parser *parser);
 
 Type *tnud(Parser *parser);
 Type *tled(Parser *parser, Type *left, BindingPower bp);
-BindingPower tget_bp(Parser *parser, TokenType kind);
+BindingPower tget_bp(Parser *parser, LumaTokenType kind);
 
 Type *pointer(Parser *parser);
 Type *array_type(Parser *parser);

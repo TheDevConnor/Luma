@@ -1,12 +1,15 @@
+# include config.mk
+
+# # LLVM configuration
+# LLVM_CFLAGS := $(shell llvm-config --cflags)
+# LLVM_LDFLAGS := $(shell llvm-config --ldflags --system-libs --libs core analysis bitwriter target)
+
+# # Add LLVM flags to existing flags
+# override CFLAGS += $(LLVM_CFLAGS)
+# override LDFLAGS += $(LLVM_LDFLAGS)
+
+# # Detect platform and define commands
 include config.mk
-
-# LLVM configuration
-LLVM_CFLAGS := $(shell llvm-config --cflags)
-LLVM_LDFLAGS := $(shell llvm-config --ldflags --system-libs --libs core analysis bitwriter target)
-
-# Add LLVM flags to existing flags
-override CFLAGS += $(LLVM_CFLAGS)
-override LDFLAGS += $(LLVM_LDFLAGS)
 
 # Detect platform and define commands
 ifeq ($(OS),Windows_NT)
@@ -33,7 +36,7 @@ all: $(BIN)
 
 $(BIN): $(OBJ_FILES)
 	$(call MKDIR,$(@D))
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(call MKDIR,$(dir $@))

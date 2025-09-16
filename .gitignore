@@ -1,12 +1,14 @@
 build
 obj
 lux
-*.exe
 
 # Linux executables (files without extensions)
 *
 !*/
 !*.*
+
+# Ignore Windows executables
+*.exe
 
 # Ignore Doxygen output
 docs/doxygen/

@@ -71,7 +71,7 @@ If you encounter crashes during the "LLVM IR" compilation stage (typically at 60
 llvm-config --version
 ```
 
-#### Upgrading LLVM
+#### Linux Install
 
 **Arch Linux:**
 ```bash
@@ -98,12 +98,6 @@ sudo apt install llvm-20-dev
 brew install llvm
 ```
 
-### Linux Installation
-
-## Usage
-
-## Troubleshooting
-
 ### Common Issues
 
 **"illegal hardware instruction" during compilation:**
@@ -116,6 +110,73 @@ brew install llvm
 # Install development packages
 sudo dnf install llvm-devel        # Fedora/RHEL
 sudo apt install llvm-dev          # Ubuntu/Debian
+```
+
+# Building LLVM on Windows
+
+## Prerequisites
+
+Install the required tools using Scoop:
+
+```bash
+# Install Scoop package manager first if you haven't: https://scoop.sh/
+scoop install python ninja cmake mingw
+```
+
+## Build Steps
+
+1. Clone the LLVM repository:
+```bash
+git clone https://github.com/llvm/llvm-project.git
+cd llvm-project
+```
+
+2. Configure the build:
+```bash
+cmake -S llvm -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang;lld" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_ASM_COMPILER=gcc
+```
+
+3. Build LLVM (adjust `-j8` based on your CPU cores):
+```bash
+ninja -C build -j8
+```
+
+## Notes
+
+- Build time: 30 minutes to several hours depending on hardware
+- Disk space required: ~15-20 GB for full build
+- RAM usage: Can use 8+ GB during compilation
+- If you encounter memory issues, reduce parallelism: `ninja -C build -j4` or `ninja -C build -j1`
+
+## After Build
+
+The compiled binaries will be located in `build/bin/`
+
+### Add to PATH (Optional but Recommended)
+
+To use `clang`, `lld`, and other LLVM tools from anywhere, add the build directory to your PATH:
+
+**Option 1: Temporary (current session only)**
+```cmd
+set PATH=%PATH%;C:\path\to\your\llvm-project\build\bin
+```
+
+**Option 2: Permanent**
+1. Open System Properties → Advanced → Environment Variables
+2. Edit the `PATH` variable for your user or system
+3. Add the full path to your `build\bin` directory (e.g., `C:\Users\yourname\Desktop\llvm-project\build\bin`)
+
+**Option 3: Using PowerShell (permanent)**
+```powershell
+[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";C:\path\to\your\llvm-project\build\bin", "User")
+```
+
+### Verify Installation
+After adding to PATH, open a new command prompt and test:
+```bash
+clang --version
+lld --version
+llvm-config --version
 ```
 
 ## Join Us

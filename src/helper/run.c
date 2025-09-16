@@ -14,7 +14,7 @@
 // Helper function to create directory if it doesn't exist
 bool create_directory(const char *path) {
 #ifdef _WIN32
-  return _mkdir(path) == 0 || errno == EEXIST;
+  return mkdir(path) == 0 || errno == EEXIST;
 #else
   return mkdir(path, 0755) == 0 || errno == EEXIST;
 #endif
@@ -207,6 +207,7 @@ bool link_object_files_enhanced(const char *output_dir,
 }
 
 // Helper function to parse a single file and extract its module
+// Helper function to parse a single file and extract its module
 Stmt *parse_file_to_module(const char *path, size_t position,
                            ArenaAllocator *allocator, BuildConfig *config) {
   const char *source = read_file(path);
@@ -242,7 +243,7 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   }
 
   config->tokens = tokens.data;
-  config->token_count = tokens.item_size;
+  config->token_count = tokens.item_size;  // Note: This should probably be tokens.count
 
   // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator, config);

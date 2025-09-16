@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 /**
- * @enum TokenType
+ * @enum LumaTokenType
  * @brief Enumeration of all possible token types recognized by the lexer.
  */
 typedef enum {
@@ -110,7 +110,7 @@ typedef enum {
   TOK_RANGE,       /**< .. */
   TOK_WHITESPACE,  /**< whitespace */
   TOK_COMMENT      /**< comment */
-} TokenType;
+} LumaTokenType;
 
 /**
  * @struct Lexer
@@ -129,12 +129,12 @@ typedef struct {
  * @brief Represents a single token extracted by the lexer.
  */
 typedef struct {
-  TokenType type_;    /**< Token type */
-  const char *value;  /**< Pointer to token text start */
-  int line;           /**< Line number of token */
-  int col;            /**< Column number of token */
-  int length;         /**< Length of the token text */
-  int whitespace_len; /**< Leading whitespace length before token */
+  LumaTokenType type_;   /**< Token type */
+  const char *value;     /**< Pointer to token text start */
+  int line;              /**< Line number of token */
+  int col;               /**< Column number of token */
+  int length;            /**< Length of the token text */
+  int whitespace_len;    /**< Leading whitespace length before token */
 } Token;
 
 /**
@@ -142,8 +142,8 @@ typedef struct {
  * @brief Maps symbol text to token type for quick lookup.
  */
 typedef struct {
-  const char *text; /**< Symbol text */
-  TokenType type;   /**< Corresponding token type */
+  const char *text;  /**< Symbol text */
+  LumaTokenType type; /**< Corresponding token type */
 } SymbolEntry;
 
 /**
@@ -151,8 +151,8 @@ typedef struct {
  * @brief Maps keyword text to token type for quick lookup.
  */
 typedef struct {
-  const char *text; /**< Keyword text */
-  TokenType type;   /**< Corresponding token type */
+  const char *text;  /**< Keyword text */
+  LumaTokenType type; /**< Corresponding token type */
 } KeywordEntry;
 
 /**

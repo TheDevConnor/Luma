@@ -1,7 +1,7 @@
 @module "main"
+@use "fib" as fib
 
 const main = fn () int {
-    :: let x: [int; 6] = 0..5;
-    output(0..5, "\n");
+    output(fib.fib(10, 0, 1), "\n");
     return 0;
 }
