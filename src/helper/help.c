@@ -119,9 +119,35 @@ int print_license() {
  * otherwise.
  */
 // Updated BuildConfig structure
+
+
+#if defined (__MINGW32__) || defined (_WIN32_)	
+	#include <windows.h> 
+	bool PathExist(const char* p){
+    	DWORD attr = GetFileAttributes(p);
+    	if (attr == INVALID_FILE_ATTRIBUTES) return false;
+		return true;
+	};
+	bool PathIsDir(const char* p){
+		DWORD attr = GetFileAttributes(p);
+		return attr & FILE_ATTRIBUTE_DIRECTORY;
+	};
+
+#elif __linux__ 
+	#include <sys/stat.h>
+	bool PathExist(const char* p){
+		struct stat FileAttrstat;
+		if(stat(p, &FileAttrstat) != 0) return false;
+		return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
+	};
+	bool PathIsDir(const char* p){
+		struct stat FileAttrstat;
+		if(stat(p, &FileAttrstat) != 0) return false;
+		return S_ISDIR(FileAttrstat.st_mode);
+	};
+#endif
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena) {
-  // Initialize the files array
   if (!growable_array_init(&config->files, arena, 4, sizeof(char *))) {
     fprintf(stderr, "Failed to initialize files array\n");
     return false;
@@ -129,51 +155,57 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
 
   // set check_mem to true by default
   config->check_mem = true;
-
+	config->filepath = false;
   for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
-      return print_version(), false;
-    else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
-      return print_help(), false;
-    else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
-      return print_license(), false;
-    else if (strcmp(argv[i], "build") == 0 && i + 1 < argc) {
-      config->filepath = argv[++i];
-      for (int j = i + 1; j < argc; j++) {
-        if (strcmp(argv[j], "-name") == 0 && j + 1 < argc)
-          config->name = argv[++j];
-        else if (strcmp(argv[j], "-save") == 0)
-          config->save = true;
-        else if (strcmp(argv[j], "-clean") == 0)
-          config->clean = true;
-        else if (strcmp(argv[j], "--no-sanitize") == 0 ||
-                 strcmp(argv[j], "-no-sanitize") == 0) {
-          config->check_mem = false;
-        } else if (strcmp(argv[j], "-debug") == 0) {
-          // Placeholder for debug flag
-        } else if (strcmp(argv[j], "-l") == 0 ||
-                   strcmp(argv[j], "-link") == 0) {
-          // Collect files until next flag or end of args
-          int start = j + 1;
-          while (start < argc && argv[start][0] != '-') {
-            char **slot = (char **)growable_array_push(&config->files);
-            if (!slot) {
-              fprintf(stderr, "Failed to add file to array\n");
-              return false;
-            }
-            *slot = argv[start];
-            config->file_count++;
-            start++;
-          }
-          j = start - 1;
-        } else {
-          fprintf(stderr, "Unknown build option: %s\n", argv[j]);
-          return false;
-        }
-      }
-    }
+		if(!PathExist(argv[i]) || argv[i][0] == '-'){
+			if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
+	      return print_version(), false;
+	    else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+	      return print_help(), false;
+	    else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
+	      return print_license(), false;
+	    else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
+	      config->name = argv[++i];
+	    else if (strcmp(argv[i], "-save") == 0)
+	      config->save = true;
+	    else if (strcmp(argv[i], "-clean") == 0)
+	      config->clean = true;
+	    else if (strcmp(argv[i], "--no-sanitize") == 0 ||
+	      			strcmp(argv[i], "-no-sanitize") == 0) {
+	      config->check_mem = false;
+	    } else if (strcmp(argv[i], "-debug") == 0) {
+	          // Placeholder for debug flag
+	    } else if (strcmp(argv[i], "-l") == 0 ||
+	              strcmp(argv[i], "-link") == 0) {
+	          // Collect files until next flag or end of args
+	      int start = i + 1;
+	      while (start < argc && argv[start][0] != '-') {
+	        char **slot = (char **)growable_array_push(&config->files);
+	        if (!slot) {
+	          fprintf(stderr, "Failed to add file to array\n");
+	          return false;
+					}
+	        *slot = argv[start];
+	        config->file_count++;
+	        start++;
+	    	}
+	      i = start - 1;
+	    } else {
+					if(argv[i][0] == '-'){
+	        	fprintf(stderr, "Unknown build option: %s\n", argv[i]);
+	        	return false;
+					}else{
+						fprintf(stderr, "%s: No such file or directory\n", argv[i]);
+        		return false;
+					}
+	    }  
+		}else if (PathIsDir(argv[i])) {
+			fprintf(stderr, "%s: Is a directory\n", argv[i]);
+			return false;
+		}else{
+			config->filepath = argv[i];
+		}
   }
-
   return true;
 }
 
