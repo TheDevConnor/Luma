@@ -289,8 +289,10 @@ bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size) {
 }
 
 bool get_lib_paths(char *buffer, size_t buffer_size) {
+  (void)buffer;
+  (void)buffer_size;
   // This is more complex on Windows, for now just return false
-  // You might want to implement Windows-specific library path discovery
+  // Might want to implement Windows-specific library path discovery
   return false;
 }
 

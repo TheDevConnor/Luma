@@ -27,7 +27,6 @@
 #include <windows.h>
 #include <io.h>
 #define isatty _isatty
-#define STDOUT_FILENO _fileno(stdout)
 #else
 #include <unistd.h>
 #endif
