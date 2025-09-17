@@ -47,6 +47,7 @@
  */
 void parser_error(Parser *psr, const char *error_type, const char *file,
                   const char *msg, int line, int col, int tk_length) {
+  (void)file;
   ErrorInformation err = {
       .error_type = error_type,
       .file_path = psr->file_path,

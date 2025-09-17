@@ -401,6 +401,9 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
 
 AstNode *typecheck_memcpy_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
+  (void)expr;
+  (void)scope;
+  (void)arena;
   return NULL;
 }
 

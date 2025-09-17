@@ -1,7 +1,7 @@
 // Enhanced llvm.c - Module system implementation
 #include "llvm.h"
 #include <llvm-c/TargetMachine.h>
-#include <stdlib.h>`
+#include <stdlib.h>
 #include <sys/stat.h>
 
 // =============================================================================

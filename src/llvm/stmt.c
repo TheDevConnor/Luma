@@ -621,7 +621,7 @@ LLVMValueRef codegen_for_loop(CodeGenContext *ctx, AstNode *node) {
     ctx->loop_break_block = after_block;
 
     // Generate initializers in current block
-    for (int i = 0; i < node->stmt.loop_stmt.init_count; i++) {
+    for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
         if (!codegen_stmt(ctx, node->stmt.loop_stmt.initializer[i])) {
             fprintf(stderr, "Error: Failed to generate initializer for for loop at line %zu\n",
                     node->line);

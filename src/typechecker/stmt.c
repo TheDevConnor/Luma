@@ -667,7 +667,7 @@ bool typecheck_for_loop_decl(AstNode *node, Scope *scope,
   Scope *lookup_scope = create_child_scope(scope, "for_loop", arena);
 
   // Define the initializer
-  for (int i = 0; i < node->stmt.loop_stmt.init_count; i++) {
+  for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
     if (!typecheck_statement(node->stmt.loop_stmt.initializer[i], lookup_scope,
                              arena)) {
       fprintf(stderr,

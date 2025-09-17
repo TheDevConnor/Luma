@@ -140,6 +140,7 @@ void import_module_symbols(CodeGenContext *ctx,
 void import_function_symbol(CodeGenContext *ctx, LLVM_Symbol *source_symbol,
                             ModuleCompilationUnit *source_module,
                             const char *alias) {
+  (void)source_module;
   // Create the imported symbol name
   char imported_name[256];
   if (alias) {
@@ -171,6 +172,7 @@ void import_function_symbol(CodeGenContext *ctx, LLVM_Symbol *source_symbol,
 void import_variable_symbol(CodeGenContext *ctx, LLVM_Symbol *source_symbol,
                             ModuleCompilationUnit *source_module,
                             const char *alias) {
+  (void)source_module;
   // Create the imported symbol name
   char imported_name[256];
   if (alias) {

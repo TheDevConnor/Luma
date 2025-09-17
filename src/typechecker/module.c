@@ -7,6 +7,7 @@
  */
 bool register_module(Scope *global_scope, const char *module_name,
                      Scope *module_scope, ArenaAllocator *arena) {
+  (void)module_scope;
   size_t prefixed_len = strlen("__module_") + strlen(module_name) + 1;
   char *prefixed_name = arena_alloc(arena, prefixed_len, 1);
   snprintf(prefixed_name, prefixed_len, "__module_%s", module_name);

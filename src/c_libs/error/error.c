@@ -215,7 +215,7 @@ static const char *extract_token_from_error(ErrorInformation *e, char *buffer,
     if (start) {
       start++; // Move past the opening quote
       const char *end = strchr(start, '\'');
-      if (end && (end - start) < buffer_size - 1) {
+      if (end && (size_t)(end - start) < buffer_size - 1) {
         strncpy(buffer, start, end - start);
         buffer[end - start] = '\0';
         return buffer;

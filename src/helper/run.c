@@ -21,12 +21,14 @@ bool create_directory(const char *path) {
 }
 
 void handle_segfault(int sig) {
+  (void)sig;
   fprintf(stderr, "\nSegmentation fault caught during LLVM operations!\n");
   fprintf(stderr, "This likely indicates a problem in LLVM IR generation.\n");
   exit(1);
 }
 
 void handle_illegal_instruction(int sig) {
+  (void)sig;
   fprintf(stderr, "\nIllegal instruction caught!\n");
   fprintf(stderr, "This suggests LLVM generated invalid machine code.\n");
   fprintf(stderr,
@@ -359,7 +361,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  print_ast(combined_program, "", false, false);
+  // print_ast(combined_program, "", false, false);
 
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");

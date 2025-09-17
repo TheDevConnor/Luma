@@ -1,7 +1,7 @@
 @module "main"
 @use "fib" as fib
 
-const main = fn () int {
+pub const main = fn () int {
     output(fib.fib(10, 0, 1), "\n");
     return 0;
 }

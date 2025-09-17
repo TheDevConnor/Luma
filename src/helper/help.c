@@ -447,7 +447,7 @@ bool get_lib_paths(char *buffer, size_t buffer_size) {
 bool link_with_ld_simple(const char *obj_filename, const char *exe_filename) {
   char crt1_path[512], crti_path[512], crtn_path[512];
   char crtbegin_path[512], crtend_path[512];
-  char command[2048];
+  char command[4096];
 
   // Try to get paths from gcc
   bool found_crt1 = get_gcc_file_path("crt1.o", crt1_path, sizeof(crt1_path));
