@@ -12,6 +12,7 @@
 #include <llvm-c/Types.h>
 #include <stdalign.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -209,6 +210,11 @@ LLVMValueRef codegen_stmt_program(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_expression(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node);
+
+bool is_enum_constant(LLVM_Symbol *sym);
+int64_t get_enum_constant_value(LLVM_Symbol *sym);
+LLVMValueRef codegen_stmt_enum(CodeGenContext *ctx, AstNode *node);
+
 LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_block(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node);

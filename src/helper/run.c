@@ -245,7 +245,8 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   }
 
   config->tokens = tokens.data;
-  config->token_count = tokens.item_size;  // Note: This should probably be tokens.count
+  config->token_count =
+      tokens.item_size; // Note: This should probably be tokens.count
 
   // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator, config);
@@ -361,7 +362,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  // print_ast(combined_program, "", false, false);
+  print_ast(combined_program, "", false, false);
 
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");

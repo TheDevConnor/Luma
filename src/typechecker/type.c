@@ -51,7 +51,28 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
       return TYPE_MATCH_EXACT;
     }
 
-    // Check for compatible numeric types (implicit conversions)
+    // Check if one is an enum and the other is int (allow enum <-> int
+    // conversion) This assumes enum names are not "int", "float", etc.
+    bool type1_is_builtin =
+        (strcmp(name1, "int") == 0 || strcmp(name1, "float") == 0 ||
+         strcmp(name1, "double") == 0 || strcmp(name1, "bool") == 0 ||
+         strcmp(name1, "string") == 0 || strcmp(name1, "char") == 0 ||
+         strcmp(name1, "void") == 0);
+    bool type2_is_builtin =
+        (strcmp(name2, "int") == 0 || strcmp(name2, "float") == 0 ||
+         strcmp(name2, "double") == 0 || strcmp(name2, "bool") == 0 ||
+         strcmp(name2, "string") == 0 || strcmp(name2, "char") == 0 ||
+         strcmp(name2, "void") == 0);
+
+    // Allow enum to int conversion (one is enum, other is int)
+    if (!type1_is_builtin && strcmp(name2, "int") == 0) {
+      return TYPE_MATCH_COMPATIBLE; // enum -> int
+    }
+    if (!type2_is_builtin && strcmp(name1, "int") == 0) {
+      return TYPE_MATCH_COMPATIBLE; // int -> enum
+    }
+
+    // Standard numeric conversions
     if ((strcmp(name1, "int") == 0 && strcmp(name2, "float") == 0) ||
         (strcmp(name1, "float") == 0 && strcmp(name2, "int") == 0)) {
       return TYPE_MATCH_COMPATIBLE;

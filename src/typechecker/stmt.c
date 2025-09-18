@@ -423,23 +423,26 @@ bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   size_t member_count = node->stmt.enum_decl.member_count;
   bool is_public = node->stmt.enum_decl.is_public;
 
-  // Add enum type with proper visibility
-  AstNode *int_type = create_basic_type(arena, "int", node->line, node->column);
-  if (!scope_add_symbol(scope, enum_name, int_type, is_public, false, arena)) {
+  // Create a distinct enum type (not just "int")
+  AstNode *enum_type =
+      create_basic_type(arena, enum_name, node->line, node->column);
+
+  // Add the enum type itself to the symbol table
+  if (!scope_add_symbol(scope, enum_name, enum_type, is_public, false, arena)) {
     tc_error_id(node, enum_name, "Duplicate Symbol",
                 "Enum '%s' is already declared in this scope", enum_name);
     return false;
   }
 
-  // Add enum members - they inherit the enum's visibility
+  // Add enum members - they also have the enum type (not int type)
   for (size_t i = 0; i < member_count; i++) {
     size_t qualified_len = strlen(enum_name) + strlen(member_names[i]) + 2;
     char *qualified_name = arena_alloc(arena, qualified_len, 1);
     snprintf(qualified_name, qualified_len, "%s.%s", enum_name,
              member_names[i]);
 
-    // Enum members have same visibility as the enum itself
-    if (!scope_add_symbol(scope, qualified_name, int_type, is_public, false,
+    // Enum members have the same type as the enum itself
+    if (!scope_add_symbol(scope, qualified_name, enum_type, is_public, false,
                           arena)) {
       tc_error(node, "Enum Member Error", "Could not add enum member '%s'",
                qualified_name);

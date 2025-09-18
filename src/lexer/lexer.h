@@ -65,6 +65,7 @@ typedef enum {
   TOK_AS,       /**< as keyword (for use in modules) */
   TOK_DEFER,    /**< defer keyword */
   TOK_IN,       /**< in keyword */
+  TOK_SWITCH,   /**< switch keyword */
 
   // prepocessor directives
   TOK_MODULE, /**< @module */
@@ -129,12 +130,12 @@ typedef struct {
  * @brief Represents a single token extracted by the lexer.
  */
 typedef struct {
-  LumaTokenType type_;   /**< Token type */
-  const char *value;     /**< Pointer to token text start */
-  int line;              /**< Line number of token */
-  int col;               /**< Column number of token */
-  int length;            /**< Length of the token text */
-  int whitespace_len;    /**< Leading whitespace length before token */
+  LumaTokenType type_; /**< Token type */
+  const char *value;   /**< Pointer to token text start */
+  int line;            /**< Line number of token */
+  int col;             /**< Column number of token */
+  int length;          /**< Length of the token text */
+  int whitespace_len;  /**< Leading whitespace length before token */
 } Token;
 
 /**
@@ -142,7 +143,7 @@ typedef struct {
  * @brief Maps symbol text to token type for quick lookup.
  */
 typedef struct {
-  const char *text;  /**< Symbol text */
+  const char *text;   /**< Symbol text */
   LumaTokenType type; /**< Corresponding token type */
 } SymbolEntry;
 
@@ -151,7 +152,7 @@ typedef struct {
  * @brief Maps keyword text to token type for quick lookup.
  */
 typedef struct {
-  const char *text;  /**< Keyword text */
+  const char *text;   /**< Keyword text */
   LumaTokenType type; /**< Corresponding token type */
 } KeywordEntry;
 

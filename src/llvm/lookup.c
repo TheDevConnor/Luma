@@ -59,6 +59,8 @@ LLVMValueRef codegen_stmt(CodeGenContext *ctx, AstNode *node) {
     return codegen_stmt_var_decl(ctx, node);
   case AST_STMT_FUNCTION:
     return codegen_stmt_function(ctx, node);
+  case AST_STMT_ENUM:
+    return codegen_stmt_enum(ctx, node);
   case AST_STMT_RETURN:
     return codegen_stmt_return(ctx, node);
   case AST_STMT_BLOCK:

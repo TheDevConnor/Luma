@@ -1,6 +1,7 @@
 #include "llvm.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // Legacy program handler (now redirects to multi-module handler)
@@ -157,6 +158,76 @@ LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
   return function;
 }
 
+bool is_enum_constant(LLVM_Symbol *sym) {
+  if (!sym || sym->is_function) {
+    return false;
+  }
+
+  // Check if the value is a global constant
+  if (LLVMIsAGlobalVariable(sym->value)) {
+    return LLVMIsGlobalConstant(sym->value);
+  }
+
+  return false;
+}
+
+// Helper function to get enum constant value
+int64_t get_enum_constant_value(LLVM_Symbol *sym) {
+  if (!is_enum_constant(sym)) {
+    return -1;
+  }
+
+  LLVMValueRef initializer = LLVMGetInitializer(sym->value);
+  if (initializer && LLVMIsConstant(initializer)) {
+    return LLVMConstIntGetSExtValue(initializer);
+  }
+
+  return -1;
+}
+
+LLVMValueRef codegen_stmt_enum(CodeGenContext *ctx, AstNode *node) {
+  LLVMTypeRef enum_type = LLVMInt64TypeInContext(ctx->context);
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+
+  // First, register the enum type itself as a namespace symbol
+  // This helps with type resolution
+  add_symbol(ctx, node->stmt.enum_decl.name, NULL, enum_type, false);
+
+  // Then create the enum constants
+  for (size_t i = 0; i < node->stmt.enum_decl.member_count; i++) {
+    const char *member_name = node->stmt.enum_decl.members[i];
+    char full_name[256];
+    snprintf(full_name, sizeof(full_name), "%s.%s", node->stmt.enum_decl.name,
+             member_name);
+
+    char llvm_name[256];
+    snprintf(llvm_name, sizeof(llvm_name), "%s_%s", node->stmt.enum_decl.name,
+             member_name);
+
+    LLVMValueRef enum_constant =
+        LLVMAddGlobal(current_llvm_module, enum_type, llvm_name);
+
+    // Set the constant value (i as the enum ordinal)
+    LLVMValueRef const_value = LLVMConstInt(enum_type, i, false);
+    LLVMSetInitializer(enum_constant, const_value);
+
+    // Make it a constant (immutable)
+    LLVMSetGlobalConstant(enum_constant, true);
+
+    // Set linkage based on visibility
+    if (node->stmt.enum_decl.is_public) {
+      LLVMSetLinkage(enum_constant, LLVMExternalLinkage);
+    } else {
+      LLVMSetLinkage(enum_constant, LLVMInternalLinkage);
+    }
+
+    // Add to symbol table with qualified name for member access
+    add_symbol(ctx, full_name, enum_constant, enum_type, false);
+  }
+  return NULL;
+}
+
 LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef ret_val = NULL;
 
@@ -247,15 +318,17 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   LLVMBasicBlockRef *elif_cond_blocks = NULL;
   LLVMBasicBlockRef *elif_body_blocks = NULL;
   if (node->stmt.if_stmt.elif_count > 0) {
-    elif_cond_blocks = malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
-    elif_body_blocks = malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
-    
+    elif_cond_blocks =
+        malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
+    elif_body_blocks =
+        malloc(node->stmt.if_stmt.elif_count * sizeof(LLVMBasicBlockRef));
+
     for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
       char block_name[64];
       snprintf(block_name, sizeof(block_name), "elif_cond_%d", i);
       elif_cond_blocks[i] = LLVMAppendBasicBlockInContext(
           ctx->context, ctx->current_function, block_name);
-      
+
       snprintf(block_name, sizeof(block_name), "elif_body_%d", i);
       elif_body_blocks[i] = LLVMAppendBasicBlockInContext(
           ctx->context, ctx->current_function, block_name);
@@ -265,8 +338,8 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   // Create else block if needed
   LLVMBasicBlockRef else_block = NULL;
   if (node->stmt.if_stmt.else_stmt) {
-    else_block = LLVMAppendBasicBlockInContext(
-        ctx->context, ctx->current_function, "else");
+    else_block = LLVMAppendBasicBlockInContext(ctx->context,
+                                               ctx->current_function, "else");
   }
 
   // Determine where to jump if initial condition is false
@@ -293,12 +366,15 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
     // Generate condition check
     LLVMPositionBuilderAtEnd(ctx->builder, elif_cond_blocks[i]);
-    
+
     // Generate elif condition - adjust this based on your AST structure
-    LLVMValueRef elif_condition = codegen_expr(ctx, node->stmt.if_stmt.elif_stmts[i]->stmt.if_stmt.condition);
+    LLVMValueRef elif_condition = codegen_expr(
+        ctx, node->stmt.if_stmt.elif_stmts[i]->stmt.if_stmt.condition);
     if (!elif_condition) {
-      if (elif_cond_blocks) free(elif_cond_blocks);
-      if (elif_body_blocks) free(elif_body_blocks);
+      if (elif_cond_blocks)
+        free(elif_cond_blocks);
+      if (elif_body_blocks)
+        free(elif_body_blocks);
       return NULL;
     }
 
@@ -313,7 +389,8 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
     }
 
     // Build conditional branch for this elif
-    LLVMBuildCondBr(ctx->builder, elif_condition, elif_body_blocks[i], elif_false_target);
+    LLVMBuildCondBr(ctx->builder, elif_condition, elif_body_blocks[i],
+                    elif_false_target);
 
     // Generate elif body
     LLVMPositionBuilderAtEnd(ctx->builder, elif_body_blocks[i]);
@@ -333,8 +410,10 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
   }
 
   // Clean up
-  if (elif_cond_blocks) free(elif_cond_blocks);
-  if (elif_body_blocks) free(elif_body_blocks);
+  if (elif_cond_blocks)
+    free(elif_cond_blocks);
+  if (elif_body_blocks)
+    free(elif_body_blocks);
 
   // Continue with merge block
   LLVMPositionBuilderAtEnd(ctx->builder, merge_block);
@@ -342,57 +421,63 @@ LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {
 }
 
 bool is_range_type(LLVMTypeRef type) {
-    // Check if this is a struct with exactly 2 fields of the same integer type
-    if (LLVMGetTypeKind(type) != LLVMStructTypeKind) {
-        return false;
-    }
-    
-    unsigned field_count = LLVMCountStructElementTypes(type);
-    if (field_count != 2) {
-        return false;
-    }
-    
-    // Get field types
-    LLVMTypeRef field_types[2];
-    LLVMGetStructElementTypes(type, field_types);
-    
-    // Check if both fields are the same integer type
-    return (field_types[0] == field_types[1] && 
-            LLVMGetTypeKind(field_types[0]) == LLVMIntegerTypeKind);
+  // Check if this is a struct with exactly 2 fields of the same integer type
+  if (LLVMGetTypeKind(type) != LLVMStructTypeKind) {
+    return false;
+  }
+
+  unsigned field_count = LLVMCountStructElementTypes(type);
+  if (field_count != 2) {
+    return false;
+  }
+
+  // Get field types
+  LLVMTypeRef field_types[2];
+  LLVMGetStructElementTypes(type, field_types);
+
+  // Check if both fields are the same integer type
+  return (field_types[0] == field_types[1] &&
+          LLVMGetTypeKind(field_types[0]) == LLVMIntegerTypeKind);
 }
 
-LLVMValueRef get_range_start_value(CodeGenContext *ctx, LLVMValueRef range_struct) {
-    LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
-    
-    // Create a temporary alloca to store the struct
-    LLVMValueRef temp_alloca = LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
-    LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
-    
-    // Get pointer to first field (start)
-    LLVMValueRef start_ptr = LLVMBuildStructGEP2(ctx->builder, struct_type, temp_alloca, 0, "start_ptr");
-    
-    // Get field type for load
-    LLVMTypeRef field_types[2];
-    LLVMGetStructElementTypes(struct_type, field_types);
-    
-    return LLVMBuildLoad2(ctx->builder, field_types[0], start_ptr, "range_start");
+LLVMValueRef get_range_start_value(CodeGenContext *ctx,
+                                   LLVMValueRef range_struct) {
+  LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
+
+  // Create a temporary alloca to store the struct
+  LLVMValueRef temp_alloca =
+      LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
+  LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
+
+  // Get pointer to first field (start)
+  LLVMValueRef start_ptr = LLVMBuildStructGEP2(ctx->builder, struct_type,
+                                               temp_alloca, 0, "start_ptr");
+
+  // Get field type for load
+  LLVMTypeRef field_types[2];
+  LLVMGetStructElementTypes(struct_type, field_types);
+
+  return LLVMBuildLoad2(ctx->builder, field_types[0], start_ptr, "range_start");
 }
 
-LLVMValueRef get_range_end_value(CodeGenContext *ctx, LLVMValueRef range_struct) {
-    LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
-    
-    // Create a temporary alloca to store the struct
-    LLVMValueRef temp_alloca = LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
-    LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
-    
-    // Get pointer to second field (end)
-    LLVMValueRef end_ptr = LLVMBuildStructGEP2(ctx->builder, struct_type, temp_alloca, 1, "end_ptr");
-    
-    // Get field type for load  
-    LLVMTypeRef field_types[2];
-    LLVMGetStructElementTypes(struct_type, field_types);
-    
-    return LLVMBuildLoad2(ctx->builder, field_types[1], end_ptr, "range_end");
+LLVMValueRef get_range_end_value(CodeGenContext *ctx,
+                                 LLVMValueRef range_struct) {
+  LLVMTypeRef struct_type = LLVMTypeOf(range_struct);
+
+  // Create a temporary alloca to store the struct
+  LLVMValueRef temp_alloca =
+      LLVMBuildAlloca(ctx->builder, struct_type, "temp_range");
+  LLVMBuildStore(ctx->builder, range_struct, temp_alloca);
+
+  // Get pointer to second field (end)
+  LLVMValueRef end_ptr =
+      LLVMBuildStructGEP2(ctx->builder, struct_type, temp_alloca, 1, "end_ptr");
+
+  // Get field type for load
+  LLVMTypeRef field_types[2];
+  LLVMGetStructElementTypes(struct_type, field_types);
+
+  return LLVMBuildLoad2(ctx->builder, field_types[1], end_ptr, "range_end");
 }
 
 LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
@@ -423,68 +508,72 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
 
     if (expr->type == AST_EXPR_LITERAL &&
         expr->expr.literal.lit_type == LITERAL_STRING) {
-        // Handle string literals as before
-        char *processed_str =
-            process_escape_sequences(expr->expr.literal.value.string_val);
-        value = LLVMBuildGlobalStringPtr(ctx->builder, processed_str, "str");
-        format_str = "%s";
-        free(processed_str);
+      // Handle string literals as before
+      char *processed_str =
+          process_escape_sequences(expr->expr.literal.value.string_val);
+      value = LLVMBuildGlobalStringPtr(ctx->builder, processed_str, "str");
+      format_str = "%s";
+      free(processed_str);
     } else {
-        // Generate the expression value
-        value = codegen_expr(ctx, expr);
-        if (!value)
-            return NULL;
+      // Generate the expression value
+      value = codegen_expr(ctx, expr);
+      if (!value)
+        return NULL;
 
-        LLVMTypeRef value_type = LLVMTypeOf(value);
-        
-        // Check if this is a range type
-        if (is_range_type(value_type)) {
-            // Handle range printing: format as "start..end"
-            LLVMValueRef start_val = get_range_start_value(ctx, value);
-            LLVMValueRef end_val = get_range_end_value(ctx, value);
-            
-            // Create format string for range: "%lld..%lld" or "%d..%d" depending on type
-            LLVMTypeRef field_types[2];
-            LLVMGetStructElementTypes(value_type, field_types);
-            unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
-            
-            const char *int_format = (bits == 64) ? "%lld" : "%d";
-            char range_format[32];
-            snprintf(range_format, sizeof(range_format), "%s..%s", int_format, int_format);
-            
-            // Create format string value
-            LLVMValueRef range_format_str = LLVMBuildGlobalStringPtr(ctx->builder, range_format, "range_fmt");
-            
-            // Call printf with start and end values
-            LLVMValueRef range_args[] = {range_format_str, start_val, end_val};
-            LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3, "");
-            
-            continue; // Skip the regular printing logic
-        }
-        
-        // Handle non-range expressions as before
-        if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
-            unsigned int bits = LLVMGetIntTypeWidth(value_type);
-            if (bits == 8 || bits == 16 || bits == 32) {
-                format_str = "%d";
-            } else if (bits == 64) {
-                format_str = "%lld";
-            } else {
-                format_str = "%d";
-            }
-        } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
-            format_str = "%f";
+      LLVMTypeRef value_type = LLVMTypeOf(value);
+
+      // Check if this is a range type
+      if (is_range_type(value_type)) {
+        // Handle range printing: format as "start..end"
+        LLVMValueRef start_val = get_range_start_value(ctx, value);
+        LLVMValueRef end_val = get_range_end_value(ctx, value);
+
+        // Create format string for range: "%lld..%lld" or "%d..%d" depending on
+        // type
+        LLVMTypeRef field_types[2];
+        LLVMGetStructElementTypes(value_type, field_types);
+        unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
+
+        const char *int_format = (bits == 64) ? "%lld" : "%d";
+        char range_format[32];
+        snprintf(range_format, sizeof(range_format), "%s..%s", int_format,
+                 int_format);
+
+        // Create format string value
+        LLVMValueRef range_format_str =
+            LLVMBuildGlobalStringPtr(ctx->builder, range_format, "range_fmt");
+
+        // Call printf with start and end values
+        LLVMValueRef range_args[] = {range_format_str, start_val, end_val};
+        LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3,
+                       "");
+
+        continue; // Skip the regular printing logic
+      }
+
+      // Handle non-range expressions as before
+      if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
+        unsigned int bits = LLVMGetIntTypeWidth(value_type);
+        if (bits == 8 || bits == 16 || bits == 32) {
+          format_str = "%d";
+        } else if (bits == 64) {
+          format_str = "%lld";
         } else {
-            format_str = "%p";
+          format_str = "%d";
         }
+      } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
+        format_str = "%f";
+      } else {
+        format_str = "%p";
+      }
     }
 
     // Create format string and call printf (for non-range values)
     if (format_str) {
-        LLVMValueRef format_str_val =
-            LLVMBuildGlobalStringPtr(ctx->builder, format_str, "fmt");
-        LLVMValueRef args[] = {format_str_val, value};
-        LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 2, "");
+      LLVMValueRef format_str_val =
+          LLVMBuildGlobalStringPtr(ctx->builder, format_str, "fmt");
+      LLVMValueRef args[] = {format_str_val, value};
+      LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 2, "");
     }
   }
   return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
@@ -571,8 +660,10 @@ LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
   if (node->stmt.loop_stmt.condition) {
     LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
     if (!cond) {
-      fprintf(stderr, "Error: Failed to generate condition for while loop at line %zu\n",
-              node->line);
+      fprintf(
+          stderr,
+          "Error: Failed to generate condition for while loop at line %zu\n",
+          node->line);
       return NULL;
     }
     LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
@@ -587,12 +678,13 @@ LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
 
   // Generate increment expressions if they exist
   if (node->stmt.loop_stmt.optional) {
-      codegen_expr(ctx, node->stmt.loop_stmt.optional);
+    codegen_expr(ctx, node->stmt.loop_stmt.optional);
   }
 
   // If body doesn't have a terminator, jump back to condition check
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-      LLVMBuildBr(ctx->builder, cond_block);  // Jump back to condition, not after_block
+    LLVMBuildBr(ctx->builder,
+                cond_block); // Jump back to condition, not after_block
   }
 
   // Continue with after loop block
@@ -604,86 +696,90 @@ LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
 // loop [i: int = 0](i < 10) : (i++) { ... }
 // loop [i: int = 0, j: int = 0](i < 10 && j < 20) { ... }
 LLVMValueRef codegen_for_loop(CodeGenContext *ctx, AstNode *node) {
-    // Create basic blocks for the loop structure
-    LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
-        ctx->context, ctx->current_function, "for_cond");
-    LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
-        ctx->context, ctx->current_function, "for_body");
-    LLVMBasicBlockRef increment_block = LLVMAppendBasicBlockInContext(
-        ctx->context, ctx->current_function, "for_inc");
-    LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
-        ctx->context, ctx->current_function, "for_end");
+  // Create basic blocks for the loop structure
+  LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "for_cond");
+  LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "for_body");
+  LLVMBasicBlockRef increment_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "for_inc");
+  LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
+      ctx->context, ctx->current_function, "for_end");
 
-    // Store old loop blocks for nested loop support
-    LLVMBasicBlockRef old_continue = ctx->loop_continue_block;
-    LLVMBasicBlockRef old_break = ctx->loop_break_block;
-    ctx->loop_continue_block = increment_block;
-    ctx->loop_break_block = after_block;
+  // Store old loop blocks for nested loop support
+  LLVMBasicBlockRef old_continue = ctx->loop_continue_block;
+  LLVMBasicBlockRef old_break = ctx->loop_break_block;
+  ctx->loop_continue_block = increment_block;
+  ctx->loop_break_block = after_block;
 
-    // Generate initializers in current block
-    for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
-        if (!codegen_stmt(ctx, node->stmt.loop_stmt.initializer[i])) {
-            fprintf(stderr, "Error: Failed to generate initializer for for loop at line %zu\n",
-                    node->line);
-            // Restore old blocks
-            ctx->loop_continue_block = old_continue;
-            ctx->loop_break_block = old_break;
-            return NULL;
-        }
+  // Generate initializers in current block
+  for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
+    if (!codegen_stmt(ctx, node->stmt.loop_stmt.initializer[i])) {
+      fprintf(
+          stderr,
+          "Error: Failed to generate initializer for for loop at line %zu\n",
+          node->line);
+      // Restore old blocks
+      ctx->loop_continue_block = old_continue;
+      ctx->loop_break_block = old_break;
+      return NULL;
     }
+  }
 
-    // Jump to condition check
-    LLVMBuildBr(ctx->builder, cond_block);
+  // Jump to condition check
+  LLVMBuildBr(ctx->builder, cond_block);
 
-    // Generate condition block
-    LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
-    if (node->stmt.loop_stmt.condition) {
-        LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
-        if (!cond) {
-            // Restore old blocks
-            ctx->loop_continue_block = old_continue;
-            ctx->loop_break_block = old_break;
-            return NULL;
-        }
-        LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
-    } else {
-        // Infinite loop if no condition
-        LLVMBuildBr(ctx->builder, body_block);
+  // Generate condition block
+  LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
+  if (node->stmt.loop_stmt.condition) {
+    LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
+    if (!cond) {
+      // Restore old blocks
+      ctx->loop_continue_block = old_continue;
+      ctx->loop_break_block = old_break;
+      return NULL;
     }
+    LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
+  } else {
+    // Infinite loop if no condition
+    LLVMBuildBr(ctx->builder, body_block);
+  }
 
-    // Generate loop body
-    LLVMPositionBuilderAtEnd(ctx->builder, body_block);
-    codegen_stmt(ctx, node->stmt.loop_stmt.body);
+  // Generate loop body
+  LLVMPositionBuilderAtEnd(ctx->builder, body_block);
+  codegen_stmt(ctx, node->stmt.loop_stmt.body);
 
-    // If body doesn't have a terminator, jump to increment
-    if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-        LLVMBuildBr(ctx->builder, increment_block);
-    }
+  // If body doesn't have a terminator, jump to increment
+  if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+    LLVMBuildBr(ctx->builder, increment_block);
+  }
 
-    // Generate increment block
-    LLVMPositionBuilderAtEnd(ctx->builder, increment_block);
-    
-    // Generate increment expressions if they exist
-    if (node->stmt.loop_stmt.optional) {
-        codegen_expr(ctx, node->stmt.loop_stmt.optional);
-    }
-    
-    // Jump back to condition check
-    LLVMBuildBr(ctx->builder, cond_block);
+  // Generate increment block
+  LLVMPositionBuilderAtEnd(ctx->builder, increment_block);
 
-    // Restore old loop blocks
-    ctx->loop_continue_block = old_continue;
-    ctx->loop_break_block = old_break;
+  // Generate increment expressions if they exist
+  if (node->stmt.loop_stmt.optional) {
+    codegen_expr(ctx, node->stmt.loop_stmt.optional);
+  }
 
-    // Continue with after loop block
-    LLVMPositionBuilderAtEnd(ctx->builder, after_block);
-    return NULL;
+  // Jump back to condition check
+  LLVMBuildBr(ctx->builder, cond_block);
+
+  // Restore old loop blocks
+  ctx->loop_continue_block = old_continue;
+  ctx->loop_break_block = old_break;
+
+  // Continue with after loop block
+  LLVMPositionBuilderAtEnd(ctx->builder, after_block);
+  return NULL;
 }
 
 LLVMValueRef codegen_loop(CodeGenContext *ctx, AstNode *node) {
-  if (node->stmt.loop_stmt.condition == NULL && node->stmt.loop_stmt.initializer == NULL)
+  if (node->stmt.loop_stmt.condition == NULL &&
+      node->stmt.loop_stmt.initializer == NULL)
     return codegen_infinite_loop(ctx, node);
-  else if (node->stmt.loop_stmt.condition != NULL && node->stmt.loop_stmt.initializer == NULL)
+  else if (node->stmt.loop_stmt.condition != NULL &&
+           node->stmt.loop_stmt.initializer == NULL)
     return codegen_while_loop(ctx, node);
   else
     return codegen_for_loop(ctx, node);

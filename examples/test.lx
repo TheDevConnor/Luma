@@ -1,8 +1,17 @@
 @module "main"
 
-@use "fib" as fib
+const WeekDay = enum {
+    Sunday,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+};
 
-const main = fn () int {
-    output(fib.fib(10, 0, 1), "\n");
+pub const main = fn () int {
+    let x: WeekDay = WeekDay.Friday;
+    output(x, "\n");
     return 0;
 }

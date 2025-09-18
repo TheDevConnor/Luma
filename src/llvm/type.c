@@ -1,8 +1,48 @@
 #include "llvm.h"
 #include <llvm-c/Core.h>
 
+bool is_enum_type(CodeGenContext *ctx, const char *type_name) {
+  char enum_prefix[256];
+  snprintf(enum_prefix, sizeof(enum_prefix), "%s.", type_name);
+
+  // Search for enum members in current module
+  if (ctx->current_module) {
+    for (LLVM_Symbol *sym = ctx->current_module->symbols; sym;
+         sym = sym->next) {
+      if (strncmp(sym->name, enum_prefix, strlen(enum_prefix)) == 0) {
+        return true;
+      }
+    }
+  }
+
+  // If not found in current module, search other modules
+  for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
+    if (unit == ctx->current_module)
+      continue;
+
+    for (LLVM_Symbol *sym = unit->symbols; sym; sym = sym->next) {
+      if (strncmp(sym->name, enum_prefix, strlen(enum_prefix)) == 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Get the LLVM type for an enum (always int64 for now)
+LLVMTypeRef get_enum_type(CodeGenContext *ctx, const char *enum_name) {
+  if (is_enum_type(ctx, enum_name)) {
+    return LLVMInt64TypeInContext(ctx->context);
+  }
+  return NULL;
+}
+
+// Enhanced codegen_type_basic using the helper functions
 LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
   const char *type_name = node->type_data.basic.name;
+
+  // Handle built-in primitive types
   if (strcmp(type_name, "int") == 0) {
     return LLVMInt64TypeInContext(ctx->context);
   } else if (strcmp(type_name, "float") == 0) {
@@ -17,7 +57,11 @@ LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
     return LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
   } else if (strcmp(type_name, "char") == 0) {
     return LLVMInt8TypeInContext(ctx->context);
+  } else {
+    // Check if this is an enum type
+    return get_enum_type(ctx, type_name);
   }
+
   return NULL;
 }
 
