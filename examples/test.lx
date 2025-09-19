@@ -13,12 +13,12 @@ const WeekDay = enum {
 };
 
 pub const main = fn () int {
-    let x: WeekDay;
+    let x: WeekDay = WeekDay::Saturday;
 
     switch (x) {
         WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
         WeekDay::Thursday => {
-            output("Here ", fib.fib(x, 0, 1), "\n");
+            output("Here ", fib::fib(x, 0, 1), "\n");
         }
         WeekDay::Friday, WeekDay::Saturday, 
         WeekDay::Sunday => {

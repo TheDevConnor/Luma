@@ -51,7 +51,7 @@ typedef struct {
   GrowableArray files; // Change from char** to GrowableArray
   size_t file_count;   // Keep for convenience, or remove and use files.count
 
-  Token *tokens;
+  GrowableArray tokens;
   size_t token_count;
 } BuildConfig;
 

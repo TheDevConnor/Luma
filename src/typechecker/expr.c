@@ -137,7 +137,6 @@ AstNode *typecheck_unary_expr(AstNode *expr, Scope *scope,
   return NULL;
 }
 
-// Fixed version of typecheck_call_expr for expr.c
 AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
                              ArenaAllocator *arena) {
   AstNode *callee = expr->expr.call.callee;
@@ -153,31 +152,57 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     func_symbol = scope_lookup(scope, func_name);
 
   } else if (callee->type == AST_EXPR_MEMBER) {
-    // Member function call: module.func()
+    // Member function call: could be module.func() or obj.method()
     const char *base_name = callee->expr.member.object->expr.identifier.name;
     const char *member_name = callee->expr.member.member;
+    bool is_compiletime = callee->expr.member.is_compiletime;
 
-    // Use qualified symbol lookup with proper visibility checking
-    func_symbol = lookup_qualified_symbol(scope, base_name, member_name);
-    func_name = member_name;
+    if (is_compiletime) {
+      // Compile-time member function call: module::func() or Type::static_method()
+      func_symbol = lookup_qualified_symbol(scope, base_name, member_name);
+      func_name = member_name;
 
-    // No fallback for function calls - functions must respect module visibility
-    // rules The previous fallback to scope_lookup bypassed visibility checks
-    // and allowed access to private functions, which was the source of the bug
+      if (!func_symbol) {
+        tc_error(expr, "Compile-time Call Error", 
+                 "No compile-time callable '%s::%s' found", 
+                 base_name, member_name);
+        return NULL;
+      }
+
+    } else {
+      // Runtime member function call: obj.method()
+      // This would be for instance methods on struct objects
+      
+      // First check if it's actually a module access that should be compile-time
+      Symbol *potential_module_symbol = lookup_qualified_symbol(scope, base_name, member_name);
+      if (potential_module_symbol && potential_module_symbol->type->type == AST_TYPE_FUNCTION) {
+        tc_error_help(expr, "Access Method Error",
+                      "Use '::' for compile-time access to module functions",
+                      "Cannot use runtime access '.' for module function - did you mean '%s::%s()'?",
+                      base_name, member_name);
+        return NULL;
+      }
+
+      // For now, we don't support instance methods on structs
+      // This would need to be implemented when you add method support to structs
+      tc_error(expr, "Runtime Call Error",
+               "Runtime member function calls not yet supported");
+      return NULL;
+    }
 
   } else {
-    tc_error(expr, "Type Error", "Unsupported callee type for function call");
+    tc_error(expr, "Call Error", "Unsupported callee type for function call");
     return NULL;
   }
 
   if (!func_symbol) {
-    tc_error(expr, "Type Error", "Undefined function '%s'",
+    tc_error(expr, "Call Error", "Undefined function '%s'",
              func_name ? func_name : "unknown");
     return NULL;
   }
 
   if (func_symbol->type->type != AST_TYPE_FUNCTION) {
-    tc_error(expr, "Type Error", "'%s' is not a function", func_name);
+    tc_error(expr, "Call Error", "'%s' is not a function", func_name);
     return NULL;
   }
 
@@ -187,7 +212,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
   AstNode *return_type = func_type->type_data.function.return_type;
 
   if (arg_count != param_count) {
-    tc_error(expr, "Type Error", "Function '%s' expects %zu arguments, got %zu",
+    tc_error(expr, "Call Error", "Function '%s' expects %zu arguments, got %zu",
              func_name, param_count, arg_count);
     return NULL;
   }
@@ -195,7 +220,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
   for (size_t i = 0; i < arg_count; i++) {
     AstNode *arg_type = typecheck_expression(arguments[i], scope, arena);
     if (!arg_type) {
-      tc_error(expr, "Type Error",
+      tc_error(expr, "Call Error",
                "Failed to type-check argument %zu in call to '%s'", i + 1,
                func_name);
       return NULL;
@@ -203,7 +228,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
 
     TypeMatchResult match = types_match(param_types[i], arg_type);
     if (match == TYPE_MATCH_NONE) {
-      tc_error_help(expr, "Type Error",
+      tc_error_help(expr, "Call Error",
                     "Argument %zu to function '%s' has wrong type.",
                     "Expected '%s', got '%s'", i + 1, func_name,
                     type_to_string(param_types[i], arena),
@@ -215,37 +240,85 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
   return return_type;
 }
 
-// Updated version of typecheck_member_expr in expr.c
 AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   const char *base_name = expr->expr.member.object->expr.identifier.name;
   const char *member_name = expr->expr.member.member;
+  bool is_compiletime = expr->expr.member.is_compiletime;
 
-  // First try the existing logic for modules and enums
-  Symbol *module_symbol =
-      lookup_qualified_symbol(scope, base_name, member_name);
-  if (module_symbol) {
-    return module_symbol->type;
-  }
+  if (is_compiletime) {
+    // Compile-time access (::) - for modules, enums, static members
 
-  // Try enum-style lookup
-  size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
-  char *qualified_name = arena_alloc(arena, qualified_len, 1);
-  snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
+    // First try module-qualified symbol lookup
+    Symbol *module_symbol =
+        lookup_qualified_symbol(scope, base_name, member_name);
+    if (module_symbol) {
+      return module_symbol->type;
+    }
 
-  Symbol *member_symbol = scope_lookup(scope, qualified_name);
-  if (member_symbol) {
-    return member_symbol->type;
-  }
+    // Try enum-style lookup (EnumName::Member)
+    size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
+    char *qualified_name = arena_alloc(arena, qualified_len, 1);
+    snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
 
-  // NEW: Try struct member access
-  Symbol *base_symbol = scope_lookup(scope, base_name);
-  if (base_symbol && base_symbol->type) {
+    Symbol *member_symbol = scope_lookup(scope, qualified_name);
+    if (member_symbol) {
+      return member_symbol->type;
+    }
+
+    // Error handling for compile-time access
+    Symbol *base_symbol = scope_lookup(scope, base_name);
+    if (!base_symbol) {
+      // Check if it's an unknown module
+      for (size_t i = 0; i < scope->imported_modules.count; i++) {
+        ModuleImport *import =
+            (ModuleImport *)((char *)scope->imported_modules.data +
+                             i * sizeof(ModuleImport));
+        if (strcmp(import->alias, base_name) == 0) {
+          tc_error(expr, "Compile-time Access Error",
+                   "Module '%s' has no exported symbol '%s'", base_name,
+                   member_name);
+          return NULL;
+        }
+      }
+      tc_error(expr, "Compile-time Access Error",
+               "Undefined identifier '%s' in compile-time access", base_name);
+    } else {
+      // Base exists but member doesn't - check what kind of symbol it is
+      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
+        // Could be an enum type
+        tc_error(expr, "Compile-time Access Error",
+                 "Type '%s' has no compile-time member '%s'", base_name,
+                 member_name);
+      } else {
+        tc_error(expr, "Compile-time Access Error",
+                 "Cannot use compile-time access '::' on runtime value '%s'",
+                 base_name);
+      }
+    }
+    return NULL;
+
+  } else {
+    // Runtime access (.) - for struct members, instance data
+
+    Symbol *base_symbol = scope_lookup(scope, base_name);
+    if (!base_symbol) {
+      tc_error(expr, "Runtime Access Error", "Undefined identifier '%s'",
+               base_name);
+      return NULL;
+    }
+
+    if (!base_symbol->type) {
+      tc_error(expr, "Runtime Access Error",
+               "Symbol '%s' has no type information", base_name);
+      return NULL;
+    }
+
     AstNode *base_type = base_symbol->type;
 
-    printf(
-        "DEBUG: Member access - base '%s' has type %p (category %d, type %d)\n",
-        base_name, (void *)base_type, base_type->category, base_type->type);
+    // printf("DEBUG: Runtime member access - base '%s' has type %p (category %d, "
+    //        "type %d)\n",
+    //        base_name, (void *)base_type, base_type->category, base_type->type);
 
     // Handle pointer dereference: if we have a pointer to struct, automatically
     // dereference it
@@ -271,8 +344,8 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
     // Handle case where base_type is a basic type that references a struct
     if (base_type->type == AST_TYPE_BASIC) {
-      printf("DEBUG: Base type is basic: '%s'\n",
-             base_type->type_data.basic.name);
+      // printf("DEBUG: Base type is basic: '%s'\n",
+      //        base_type->type_data.basic.name);
       // Look up the struct type by name
       Symbol *struct_symbol =
           scope_lookup(scope, base_type->type_data.basic.name);
@@ -294,35 +367,38 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
         return member_type;
       }
 
-      // Member exists but might have visibility issues
-      tc_error(expr, "Member Access Error",
-               "Member '%s' not found in struct '%s' or not accessible",
-               member_name, base_type->type_data.struct_type.name);
+      // Member doesn't exist
+      tc_error(expr, "Runtime Access Error", "Struct '%s' has no member '%s'",
+               base_type->type_data.struct_type.name, member_name);
       return NULL;
+
     } else {
-      printf("DEBUG: Base type is not a struct (type=%d)\n", base_type->type);
-    }
-  }
+      // Base is not a struct - runtime access is invalid
+      // printf("DEBUG: Base type is not a struct (type=%d)\n", base_type->type);
 
-  // Provide appropriate error messages (existing logic)
-  if (!base_symbol) {
-    for (size_t i = 0; i < scope->imported_modules.count; i++) {
-      ModuleImport *import =
-          (ModuleImport *)((char *)scope->imported_modules.data +
-                           i * sizeof(ModuleImport));
-      if (strcmp(import->alias, base_name) == 0) {
-        tc_error(expr, "Type Error", "Module '%s' has no exported symbol '%s'",
-                 base_name, member_name);
-        return NULL;
+      // Check if user should have used compile-time access instead
+      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
+        // Could be an enum or module
+        Symbol *potential_enum =
+            scope_lookup(scope, base_symbol->type->type_data.basic.name);
+        if (potential_enum) {
+          tc_error_help(expr, "Access Method Error",
+                        "Use '::' for compile-time access to enum members",
+                        "Cannot use runtime access '.' on type '%s' - did you "
+                        "mean '%s::%s'?",
+                        base_name, base_name, member_name);
+        } else {
+          tc_error(expr, "Runtime Access Error",
+                   "Cannot use runtime access '.' on non-struct type '%s'",
+                   base_name);
+        }
+      } else {
+        tc_error(expr, "Runtime Access Error",
+                 "Type '%s' does not support member access", base_name);
       }
+      return NULL;
     }
-    tc_error(expr, "Type Error", "Undefined identifier '%s'", base_name);
-  } else {
-    tc_error(expr, "Type Error", "'%s' has no member '%s'", base_name,
-             member_name);
   }
-
-  return NULL;
 }
 
 AstNode *typecheck_deref_expr(AstNode *expr, Scope *scope,

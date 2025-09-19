@@ -244,9 +244,9 @@ Stmt *parse_file_to_module(const char *path, size_t position,
     return NULL;
   }
 
-  config->tokens = tokens.data;
+  config->tokens = tokens;
   config->token_count =
-      tokens.item_size; // Note: This should probably be tokens.count
+      tokens.count;
 
   // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator, config);
@@ -362,14 +362,14 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
-  print_ast(combined_program, "", false, false);
+  // print_ast(combined_program, "", false, false);`
 
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
-  tc_error_init(config.tokens, config.token_count, config.filepath, allocator);
+  tc_error_init(config.tokens.data, config.token_count, config.filepath, allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
   error_report();
   // debug_print_scope(&root_scope, 0);
@@ -385,7 +385,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
         int memory_issues = static_memory_check_and_report(
             analyzer,
             allocator,          // Your arena allocator
-            config.tokens,      // Your token array
+            config.tokens.data,      // Your token array
             config.token_count, // Number of tokens
             config.filepath);   // Source file path
 
