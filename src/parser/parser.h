@@ -211,3 +211,4 @@ Stmt *loop_stmt(Parser *parser);
 Stmt *if_stmt(Parser *parser);
 Stmt *break_continue_stmt(Parser *parser, bool is_continue);
 Stmt *defer_stmt(Parser *parser);
+Stmt *switch_stmt(Parser *parser);

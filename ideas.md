@@ -20,6 +20,15 @@
    - modules, including modulemap
    - (probably many more, maybe starting with C not a great idea)
 
+## NOTE: for runtime constants on switch cases
+```
+LLVM IRError: Case values must be compile-time constants
+Error: Case value must be a compile-time constant
+Basic Block in function 'main' does not have terminator!
+label %switch_end
+LLVM ERROR: Broken module found, compilation aborted!
+```
+
 ## Linked List Ideas
 ```lux
 ;; Syntax will change on somethins

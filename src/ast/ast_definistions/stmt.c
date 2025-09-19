@@ -171,3 +171,31 @@ AstNode *create_defer_stmt(ArenaAllocator *arena, AstNode *statement,
   node->stmt.defer_stmt.statement = statement;
   return node;
 }
+
+AstNode *create_switch_stmt(ArenaAllocator *arena, AstNode *condition, AstNode **cases,
+                            size_t case_count, AstNode *default_case,
+                            size_t line, size_t column) {
+  AstNode *node = create_stmt_node(arena, AST_STMT_SWITCH, line, column);
+  node->stmt.switch_stmt.condition = condition;
+  node->stmt.switch_stmt.case_count = case_count;
+  node->stmt.switch_stmt.cases = cases;
+  node->stmt.switch_stmt.default_case = default_case;
+  return node;
+}
+
+AstNode *create_case_stmt(ArenaAllocator *arena, AstNode **values,
+                          size_t value_count, AstNode *body, size_t line,
+                          size_t column) {
+  AstNode *node = create_stmt_node(arena, AST_STMT_CASE, line, column);
+  node->stmt.case_clause.values = values;
+  node->stmt.case_clause.value_count = value_count;
+  node->stmt.case_clause.body = body;
+  return node;
+}
+
+AstNode *create_default_stmt(ArenaAllocator *arena, AstNode *body, 
+                            size_t line, size_t column) {
+  AstNode *node = create_stmt(arena, AST_STMT_DEFAULT, line, column);
+  node->stmt.default_clause.body = body;
+  return node;
+}

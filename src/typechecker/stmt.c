@@ -719,3 +719,296 @@ bool typecheck_loop_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   else
     return typecheck_for_loop_decl(node, scope, arena);
 }
+
+void find_enum_members(Scope *scope, const char *enum_name, GrowableArray *members, ArenaAllocator *arena) {
+  size_t enum_name_len = strlen(enum_name);
+  
+  // Recursively search up the scope chain
+  Scope *current = scope;
+  while (current) {
+    // Check all symbols in current scope
+    for (size_t i = 0; i < current->symbols.count; i++) {
+      Symbol *symbol = (Symbol*)((char*)current->symbols.data + i * sizeof(Symbol));
+      
+      // Look for symbols that match the pattern "EnumName.MemberName"
+      if (strncmp(symbol->name, enum_name, enum_name_len) == 0 && 
+          symbol->name[enum_name_len] == '.') {
+        
+        // Extract the member name (everything after the dot)
+        const char *member_name = symbol->name + enum_name_len + 1;
+        
+        // Check if we already have this member (avoid duplicates)
+        bool already_exists = false;
+        for (size_t j = 0; j < members->count; j++) {
+          char **existing = (char**)((char*)members->data + j * sizeof(char*));
+          if (strcmp(*existing, member_name) == 0) {
+            already_exists = true;
+            break;
+          }
+        }
+        
+        if (!already_exists) {
+          char **slot = (char**)growable_array_push(members);
+          if (slot) {
+            *slot = arena_strdup(arena, member_name);
+            // printf("DEBUG: Found enum member: %s.%s\n", enum_name, member_name);
+          }
+        }
+      }
+    }
+    current = current->parent;
+  }
+}
+
+bool typecheck_switch_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena) {
+  if (node->type != AST_STMT_SWITCH) {
+    tc_error(node, "Internal Error", "Expected switch statement node");
+    return false;
+  }
+
+  // Typecheck the switch condition
+  AstNode *condition_type = typecheck_expression(node->stmt.switch_stmt.condition, scope, arena);
+  if (!condition_type) {
+    tc_error(node, "Switch Error", "Failed to typecheck switch condition");
+    return false;
+  }
+
+  // printf("DEBUG: Switch condition type: %s\n", type_to_string(condition_type, arena));
+
+  // Create a new scope for the switch body
+  Scope *switch_scope = create_child_scope(scope, "switch", arena);
+  
+  // Track if we've seen a default case
+  bool has_default = false;
+  
+  // For enum exhaustiveness checking
+  GrowableArray covered_enum_members;
+  bool is_enum_switch = false;
+  const char *enum_name = NULL;
+  
+  // Check if this is an enum switch
+  if (condition_type->type == AST_TYPE_BASIC) {
+    const char *type_name = condition_type->type_data.basic.name;
+    bool is_builtin = (strcmp(type_name, "int") == 0 || 
+                       strcmp(type_name, "float") == 0 || 
+                       strcmp(type_name, "bool") == 0 || 
+                       strcmp(type_name, "string") == 0 || 
+                       strcmp(type_name, "char") == 0 ||
+                       strcmp(type_name, "void") == 0);
+    
+    if (!is_builtin) {
+      is_enum_switch = true;
+      enum_name = type_name;
+      growable_array_init(&covered_enum_members, arena, 16, sizeof(char*));
+      // printf("DEBUG: Detected enum switch on '%s'\n", enum_name);
+    }
+  }
+  
+  // Typecheck all case statements and track covered enum members
+  for (size_t i = 0; i < node->stmt.switch_stmt.case_count; i++) {
+    AstNode *case_stmt = node->stmt.switch_stmt.cases[i];
+    if (!case_stmt) {
+      tc_error(node, "Switch Error", "Case statement %zu is NULL", i);
+      return false;
+    }
+
+    // Pass the condition type to case typechecking for value compatibility
+    if (!typecheck_case_stmt(case_stmt, switch_scope, arena, condition_type)) {
+      tc_error(node, "Switch Error", "Failed to typecheck case statement %zu", i);
+      return false;
+    }
+
+    // Track covered enum members
+    if (is_enum_switch) {
+      for (size_t j = 0; j < case_stmt->stmt.case_clause.value_count; j++) {
+        AstNode *case_value = case_stmt->stmt.case_clause.values[j];
+        if (case_value && case_value->type == AST_EXPR_MEMBER) {
+          const char *member_name = case_value->expr.member.member;
+          if (member_name) {
+            // Check if we already covered this member
+            bool already_covered = false;
+            for (size_t k = 0; k < covered_enum_members.count; k++) {
+              char **existing = (char**)((char*)covered_enum_members.data + k * sizeof(char*));
+              if (strcmp(*existing, member_name) == 0) {
+                already_covered = true;
+                tc_error_help(node, "Duplicate Case", 
+                              "Each enum member should only appear in one case",
+                              "Enum member '%s.%s' appears in multiple cases", 
+                              enum_name, member_name);
+                break;
+              }
+            }
+            
+            if (!already_covered) {
+              char **slot = (char**)growable_array_push(&covered_enum_members);
+              if (slot) {
+                *slot = arena_strdup(arena, member_name);
+                // printf("DEBUG: Covered enum member: %s.%s\n", enum_name, member_name);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Typecheck default case if present
+  if (node->stmt.switch_stmt.default_case) {
+    has_default = true;
+    if (!typecheck_default_stmt(node->stmt.switch_stmt.default_case, switch_scope, arena)) {
+      tc_error(node, "Switch Error", "Failed to typecheck default case");
+      return false;
+    }
+  }
+
+  // Perform exhaustiveness analysis for enum switches
+  if (is_enum_switch) {
+    // Find all enum members by looking up the enum symbol
+    Symbol *enum_symbol = scope_lookup(scope, enum_name);
+    if (enum_symbol && enum_symbol->type && enum_symbol->type->type == AST_TYPE_BASIC) {
+      // Get all enum members by scanning the symbol table for EnumName.Member patterns
+      GrowableArray all_enum_members;
+      growable_array_init(&all_enum_members, arena, 16, sizeof(char*));
+      
+      // Scan the scope for enum members (this is a simplified approach)
+      find_enum_members(scope, enum_name, &all_enum_members, arena);
+      
+      // printf("DEBUG: Found %zu total enum members, covered %zu\n", 
+            //  all_enum_members.count, covered_enum_members.count);
+      
+      // Check if all members are covered
+      bool is_exhaustive = (covered_enum_members.count >= all_enum_members.count);
+      
+      if (is_exhaustive && has_default) {
+        // All cases covered, default is unnecessary
+        tc_error_help(node, "Unnecessary Default", 
+                      "When all enum members are covered in cases, a default clause is not needed",
+                      "Switch on enum '%s' covers all %zu members, default case is redundant", 
+                      enum_name, all_enum_members.count);
+      } else if (!is_exhaustive && !has_default) {
+        // Missing cases and no default
+        tc_error_help(node, "Non-Exhaustive Switch", 
+                      "Add a default case or handle all enum members",
+                      "Switch on enum '%s' covers only %zu of %zu members and has no default case", 
+                      enum_name, covered_enum_members.count, all_enum_members.count);
+        
+        // List missing members
+        // printf("Missing enum members:\n");
+        for (size_t i = 0; i < all_enum_members.count; i++) {
+          char **all_member = (char**)((char*)all_enum_members.data + i * sizeof(char*));
+          bool is_covered = false;
+          
+          for (size_t j = 0; j < covered_enum_members.count; j++) {
+            char **covered_member = (char**)((char*)covered_enum_members.data + j * sizeof(char*));
+            if (strcmp(*all_member, *covered_member) == 0) {
+              is_covered = true;
+              break;
+            }
+          }
+          
+          if (!is_covered) {
+            // printf("  - %s.%s\n", enum_name, *all_member);
+          }
+        }
+      }
+      // If (!is_exhaustive && has_default) - this is fine, default catches missing cases
+      // If (is_exhaustive && has_default) - also fine, just redundant (warned above)
+    }
+  }
+
+  return true;
+}
+
+bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena, AstNode *expected_type) {
+if (node->type != AST_STMT_CASE) {
+    tc_error(node, "Internal Error", "Expected case statement node");
+    return false;
+  }
+
+  // printf("DEBUG: Typechecking case with %zu values\n", node->stmt.case_clause.value_count);
+
+  // Typecheck each case value
+  for (size_t i = 0; i < node->stmt.case_clause.value_count; i++) {
+    AstNode *case_value = node->stmt.case_clause.values[i];
+    if (!case_value) {
+      tc_error(node, "Case Error", "Case value %zu is NULL", i);
+      return false;
+    }
+
+    AstNode *value_type = typecheck_expression(case_value, scope, arena);
+    if (!value_type) {
+      tc_error(node, "Case Error", "Failed to typecheck case value %zu", i);
+      return false;
+    }
+
+    // printf("DEBUG: Case value %zu type: %s\n", i, type_to_string(value_type, arena));
+
+    // If we know the expected type, check compatibility
+    if (expected_type) {
+      TypeMatchResult match = types_match(expected_type, value_type);
+      if (match == TYPE_MATCH_NONE) {
+        tc_error_help(node, "Case Type Mismatch",
+                      "All case values must be compatible with the switch condition type",
+                      "Case value %zu has type '%s', but switch condition expects '%s'",
+                      i, type_to_string(value_type, arena), type_to_string(expected_type, arena));
+        return false;
+      }
+
+      // Special validation for enum cases
+      if (expected_type->type == AST_TYPE_BASIC && value_type->type == AST_TYPE_BASIC) {
+        const char *expected_name = expected_type->type_data.basic.name;
+        const char *value_name = value_type->type_data.basic.name;
+        
+        // Check if they're the same enum type
+        if (strcmp(expected_name, value_name) != 0) {
+          // Check if this is an enum member access pattern (EnumName.Member)
+          if (case_value->type == AST_EXPR_MEMBER) {
+            const char *base_name = case_value->expr.member.object->expr.identifier.name;
+            if (strcmp(base_name, expected_name) != 0) {
+              tc_error_help(node, "Enum Case Mismatch",
+                            "Case values must belong to the same enum as the switch condition",
+                            "Case value references enum '%s', but switch condition is of type '%s'",
+                            base_name, expected_name);
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Create a new scope for the case body to handle any local declarations
+  Scope *case_scope = create_child_scope(scope, "case", arena);
+
+  // Typecheck the case body
+  if (node->stmt.case_clause.body) {
+    if (!typecheck_statement(node->stmt.case_clause.body, case_scope, arena)) {
+      tc_error(node, "Case Error", "Failed to typecheck case body");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool typecheck_default_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena) {
+  if (node->type != AST_STMT_DEFAULT) {
+    tc_error(node, "Internal Error", "Expected default statement node");
+    return false;
+  }
+
+  // printf("DEBUG: Typechecking default case\n");
+
+  // Create a new scope for the default body
+  Scope *default_scope = create_child_scope(scope, "default", arena);
+
+  // Typecheck the default body
+  if (node->stmt.default_clause.body) {
+    if (!typecheck_statement(node->stmt.default_clause.body, default_scope, arena)) {
+      tc_error(node, "Default Error", "Failed to typecheck default case body");
+      return false;
+    }
+  }
+
+  return true;
+}

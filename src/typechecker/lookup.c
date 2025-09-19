@@ -58,9 +58,11 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
   case AST_STMT_BREAK_CONTINUE:
     return true; // Nothing to typecheck
 
+  case AST_STMT_SWITCH:
+    return typecheck_switch_stmt(stmt, scope, arena);
+
   default:
     tc_error(stmt, "Unsupported Statement", "Warning: Unhandled statement type %d", stmt->type);
-    tc_error(stmt, "Unsupported Statement", "Unsupported statement type %d", stmt->type);
     return true; // Don't fail on unimplemented statements yet
   }
 }

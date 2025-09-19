@@ -784,3 +784,193 @@ LLVMValueRef codegen_loop(CodeGenContext *ctx, AstNode *node) {
   else
     return codegen_for_loop(ctx, node);
 }
+
+LLVMValueRef codegen_stmt_switch(CodeGenContext *ctx, AstNode *node) {
+    if (!node || node->type != AST_STMT_SWITCH) {
+        return NULL;
+    }
+
+    // Generate the switch condition
+    LLVMValueRef switch_value = codegen_expr(ctx, node->stmt.switch_stmt.condition);
+    if (!switch_value) {
+        fprintf(stderr, "Error: Failed to generate switch condition\n");
+        return NULL;
+    }
+
+    // Create basic blocks
+    LLVMBasicBlockRef default_block = NULL;
+    LLVMBasicBlockRef merge_block = LLVMAppendBasicBlockInContext(
+        ctx->context, ctx->current_function, "switch_end");
+
+    // Handle default case
+    if (node->stmt.switch_stmt.default_case) {
+        default_block = LLVMAppendBasicBlockInContext(
+            ctx->context, ctx->current_function, "switch_default");
+    } else {
+        // If no default, merge_block serves as the default
+        default_block = merge_block;
+    }
+
+    // Create the switch instruction
+    LLVMValueRef switch_inst = LLVMBuildSwitch(ctx->builder, switch_value, 
+                                               default_block, 
+                                               node->stmt.switch_stmt.case_count);
+
+    // Arrays to store case blocks for later generation
+    LLVMBasicBlockRef *case_blocks = malloc(node->stmt.switch_stmt.case_count * sizeof(LLVMBasicBlockRef));
+    
+    // Create basic blocks for each case
+    for (size_t i = 0; i < node->stmt.switch_stmt.case_count; i++) {
+        char block_name[64];
+        snprintf(block_name, sizeof(block_name), "case_%zu", i);
+        case_blocks[i] = LLVMAppendBasicBlockInContext(
+            ctx->context, ctx->current_function, block_name);
+    }
+
+    // Add case values to switch instruction
+    for (size_t i = 0; i < node->stmt.switch_stmt.case_count; i++) {
+        AstNode *case_stmt = node->stmt.switch_stmt.cases[i];
+        if (!case_stmt || case_stmt->type != AST_STMT_CASE) {
+            continue;
+        }
+
+        // Add each case value to the switch
+        for (size_t j = 0; j < case_stmt->stmt.case_clause.value_count; j++) {
+            AstNode *case_value = case_stmt->stmt.case_clause.values[j];
+            LLVMValueRef case_const = codegen_case_value(ctx, case_value);
+            
+            if (case_const && LLVMIsConstant(case_const)) {
+                LLVMAddCase(switch_inst, case_const, case_blocks[i]);
+            } else {
+                fprintf(stderr, "Error: Case value must be a compile-time constant\n");
+                free(case_blocks);
+                return NULL;
+            }
+        }
+    }
+
+    // Generate code for each case body
+    for (size_t i = 0; i < node->stmt.switch_stmt.case_count; i++) {
+        AstNode *case_stmt = node->stmt.switch_stmt.cases[i];
+        
+        LLVMPositionBuilderAtEnd(ctx->builder, case_blocks[i]);
+        
+        if (case_stmt->stmt.case_clause.body) {
+            codegen_stmt(ctx, case_stmt->stmt.case_clause.body);
+        }
+        
+        // If no terminator was added by the case body, fall through to merge
+        if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+            LLVMBuildBr(ctx->builder, merge_block);
+        }
+    }
+
+    // Generate default case if it exists
+    if (node->stmt.switch_stmt.default_case && 
+        node->stmt.switch_stmt.default_case->type == AST_STMT_DEFAULT) {
+        
+        LLVMPositionBuilderAtEnd(ctx->builder, default_block);
+        
+        if (node->stmt.switch_stmt.default_case->stmt.default_clause.body) {
+            codegen_stmt(ctx, node->stmt.switch_stmt.default_case->stmt.default_clause.body);
+        }
+        
+        // If no terminator, branch to merge
+        if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+            LLVMBuildBr(ctx->builder, merge_block);
+        }
+    }
+
+    free(case_blocks);
+
+    // Continue execution from merge block
+    LLVMPositionBuilderAtEnd(ctx->builder, merge_block);
+    return NULL;
+}
+
+// Helper function to generate case values (constants)
+LLVMValueRef codegen_case_value(CodeGenContext *ctx, AstNode *case_value) {
+    switch (case_value->type) {
+        case AST_EXPR_LITERAL:
+            // Handle literal constants
+            switch (case_value->expr.literal.lit_type) {
+                case LITERAL_INT:
+                    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context),
+                                      case_value->expr.literal.value.int_val, false);
+                case LITERAL_CHAR:
+                    return LLVMConstInt(LLVMInt8TypeInContext(ctx->context),
+                                      case_value->expr.literal.value.char_val, false);
+                default:
+                    fprintf(stderr, "Error: Unsupported literal type in case value\n");
+                    return NULL;
+            }
+            
+        case AST_EXPR_MEMBER:
+            // Handle enum member access (EnumName.Member)
+            return codegen_enum_member_case(ctx, case_value);
+            
+        default:
+            fprintf(stderr, "Error: Case values must be compile-time constants\n");
+            return NULL;
+    }
+}
+
+// Helper function to generate enum member constants for switch cases
+LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx, AstNode *member_expr) {
+    if (!member_expr || member_expr->type != AST_EXPR_MEMBER) {
+        return NULL;
+    }
+
+    // Get the enum name and member name
+    const char *enum_name = member_expr->expr.member.object->expr.identifier.name;
+    const char *member_name = member_expr->expr.member.member;
+
+    // Create qualified member name
+    char qualified_name[256];
+    snprintf(qualified_name, sizeof(qualified_name), "%s.%s", enum_name, member_name);
+
+    // Look up the enum member symbol
+    LLVM_Symbol *enum_member = find_symbol(ctx, qualified_name);
+    if (!enum_member) {
+        fprintf(stderr, "Error: Enum member '%s' not found\n", qualified_name);
+        return NULL;
+    }
+
+    // Get the constant value from the enum member
+    if (is_enum_constant(enum_member)) {
+        return LLVMGetInitializer(enum_member->value);
+    } else {
+        fprintf(stderr, "Error: '%s' is not an enum constant\n", qualified_name);
+        return NULL;
+    }
+}
+
+// Individual case statement handler (for completeness, though not directly called in switch)
+LLVMValueRef codegen_stmt_case(CodeGenContext *ctx, AstNode *node) {
+    if (!node || node->type != AST_STMT_CASE) {
+        return NULL;
+    }
+    
+    // Case bodies are handled by the switch statement itself
+    // This function mainly exists for completeness
+    if (node->stmt.case_clause.body) {
+        return codegen_stmt(ctx, node->stmt.case_clause.body);
+    }
+    
+    return NULL;
+}
+
+// Default case statement handler
+LLVMValueRef codegen_stmt_default(CodeGenContext *ctx, AstNode *node) {
+    if (!node || node->type != AST_STMT_DEFAULT) {
+        return NULL;
+    }
+    
+    // Default bodies are handled by the switch statement itself
+    // This function mainly exists for completeness
+    if (node->stmt.default_clause.body) {
+        return codegen_stmt(ctx, node->stmt.default_clause.body);
+    }
+    
+    return NULL;
+}

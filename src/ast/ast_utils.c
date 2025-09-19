@@ -82,6 +82,12 @@ const char *node_type_to_string(NodeType type) {
     return "Defer";
   case AST_STMT_FIELD_DECL:
     return "FieldDecl";
+  case AST_STMT_SWITCH:
+    return "SwitchStmt";
+  case AST_STMT_CASE:
+    return "CaseStmt";
+  case AST_STMT_DEFAULT:
+    return "DefaultStmt";
   case AST_TYPE_BASIC:
     return "TypeBasic";
   case AST_TYPE_POINTER:
@@ -196,7 +202,7 @@ void print_prefix(const char *prefix, bool is_last) {
 #ifdef _WIN32
   // Use ASCII characters on Windows for better compatibility
   if (is_last) {
-    printf("%s+-- ", prefix);  // or "`-- "
+    printf("%s+-- ", prefix); // or "`-- "
   } else {
     printf("%s|-- ", prefix);
   }
@@ -209,6 +215,7 @@ void print_prefix(const char *prefix, bool is_last) {
   }
 #endif
 }
+
 void print_ast(const AstNode *node, const char *prefix, bool is_last,
                bool is_root) {
   if (!node) {
@@ -223,13 +230,13 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
   printf(BOLD_MAGENTA("%s\n"), node_type_to_string(node->type));
 
   char next_prefix[512];
-  #ifdef _WIN32
-    snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
-            is_last ? "    " : "|   ");
-  #else
-    snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
-            is_last ? "    " : "│   ");
-  #endif
+#ifdef _WIN32
+  snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
+           is_last ? "    " : "|   ");
+#else
+  snprintf(next_prefix, sizeof(next_prefix), "%s%s", prefix,
+           is_last ? "    " : "│   ");
+#endif
 
   if (node->line > 0 || node->column > 0) {
     print_prefix(next_prefix, true);
@@ -870,6 +877,77 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
     } else {
       print_prefix(next_prefix, true);
       printf(GRAY("<no deferred statement>\n"));
+    }
+    break;
+
+  case AST_STMT_SWITCH:
+    print_prefix(next_prefix, true);
+    printf(BOLD_CYAN("Switch Statement\n"));
+
+    if (node->stmt.switch_stmt.condition) {
+      print_prefix(next_prefix, false);
+      printf(BOLD_CYAN("Condition:\n"));
+      print_ast(node->stmt.switch_stmt.condition, next_prefix, false, false);
+    } else {
+      print_prefix(next_prefix, false);
+      printf(GRAY("<no condition>\n"));
+    }
+
+    if (node->stmt.switch_stmt.case_count > 0) {
+      print_prefix(next_prefix, true);
+      printf(BOLD_CYAN("Cases: %zu\n"), node->stmt.switch_stmt.case_count);
+      for (size_t i = 0; i < node->stmt.switch_stmt.case_count; ++i) {
+        bool last = (i == node->stmt.switch_stmt.case_count - 1 &&
+                     node->stmt.switch_stmt.default_case == NULL);
+        print_ast(node->stmt.switch_stmt.cases[i], next_prefix, last, false);
+      }
+    } else {
+      print_prefix(next_prefix, true);
+      printf(GRAY("<no cases>\n"));
+    }
+
+    if (node->stmt.switch_stmt.default_case) {
+      print_prefix(next_prefix, true);
+      printf(BOLD_CYAN("Default Case:\n"));
+      print_ast(node->stmt.switch_stmt.default_case, next_prefix, true, false);
+    }
+    break;
+
+  case AST_STMT_CASE:
+    print_prefix(next_prefix, true);
+    printf(BOLD_CYAN("Case Clause\n"));
+
+    if (node->stmt.case_clause.value_count > 0) {
+      print_prefix(next_prefix, true);
+      printf(BOLD_CYAN("Values: %zu\n"), node->stmt.case_clause.value_count);
+      for (size_t i = 0; i < node->stmt.case_clause.value_count; ++i) {
+        bool last = (i == node->stmt.case_clause.value_count - 1 &&
+                     node->stmt.case_clause.body == NULL);
+        print_ast(node->stmt.case_clause.values[i], next_prefix, last, false);
+      }
+    } else {
+      print_prefix(next_prefix, true);
+      printf(GRAY("<no values>\n"));
+    }
+
+    if (node->stmt.case_clause.body) {
+      print_prefix(next_prefix, true);
+      printf(BOLD_CYAN("Body:\n"));
+      print_ast(node->stmt.case_clause.body, next_prefix, true, false);
+    } else {
+      print_prefix(next_prefix, true);
+      printf(GRAY("<no body>\n"));
+    }
+    break;
+
+  case AST_STMT_DEFAULT:
+    print_prefix(next_prefix, true);
+    printf(BOLD_CYAN("Default Clause\n"));
+    if (node->stmt.default_clause.body) {
+      print_ast(node->stmt.default_clause.body, next_prefix, true, false);
+    } else {
+      print_prefix(next_prefix, true);
+      printf(GRAY("<no body>\n"));
     }
     break;
 

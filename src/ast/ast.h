@@ -52,6 +52,9 @@ typedef enum {
   AST_STMT_STRUCT,         // Struct declarations
   AST_STMT_FIELD_DECL,     // Field declarations (for structs)
   AST_STMT_DEFER,          // Defer statements
+  AST_STMT_SWITCH,         // Switch statement
+  AST_STMT_CASE,
+  AST_STMT_DEFAULT,
 
   // Type nodes
   AST_TYPE_BASIC,    // Basic types (int, float, string, etc.)
@@ -374,6 +377,24 @@ struct AstNode {
         struct {
           AstNode *statement;
         } defer_stmt;
+
+        struct {
+          AstNode *condition;     // The switch expression
+          struct AstNode **cases; // Array of case clauses
+          size_t case_count;
+          struct AstNode *default_case; // Optional default case
+        } switch_stmt;
+
+        // Case clause node
+        struct {
+          AstNode **values;   // Array of expressions (0, 1, 2, 3, ...)
+          size_t value_count; // Number of values in this case
+          AstNode *body;      // Block statement for this case
+        } case_clause;
+
+        struct {
+          AstNode *body; // Block statement for default case
+        } default_clause;
       };
     } stmt;
 
@@ -543,6 +564,14 @@ AstNode *create_break_continue_stmt(ArenaAllocator *arena, bool is_continue,
                                     size_t line, size_t column);
 AstNode *create_defer_stmt(ArenaAllocator *arena, AstNode *statement,
                            size_t line, size_t column);
+AstNode *create_switch_stmt(ArenaAllocator *arena, AstNode *condition,
+                            AstNode **cases, size_t case_count,
+                            AstNode *default_case, size_t line, size_t column);
+AstNode *create_case_stmt(ArenaAllocator *arena, AstNode **values,
+                          size_t value_count, AstNode *body, size_t line,
+                          size_t column);
+AstNode *create_default_stmt(ArenaAllocator *arena, AstNode *body, size_t line,
+                             size_t column);
 
 // Type creation macros
 AstNode *create_basic_type(ArenaAllocator *arena, const char *name, size_t line,

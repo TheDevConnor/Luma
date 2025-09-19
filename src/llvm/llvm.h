@@ -228,6 +228,12 @@ LLVMValueRef codegen_loop(CodeGenContext *ctx, AstNode *node);
 
 LLVMValueRef codegen_stmt_break_continue(CodeGenContext *ctx, AstNode *node);
 
+LLVMValueRef codegen_stmt_switch(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_stmt_case(CodeGenContext *ctx, AstNode *node);  
+LLVMValueRef codegen_stmt_default(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_case_value(CodeGenContext *ctx, AstNode *case_value);
+LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx, AstNode *member_expr);
+
 // =============================================================================
 // DEFER MANAGEMENT FUNCTIONS
 // =============================================================================

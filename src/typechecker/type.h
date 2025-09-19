@@ -211,6 +211,10 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 bool typecheck_defer_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
 
+bool typecheck_switch_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena);
+bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena, AstNode *expected_type);
+bool typecheck_default_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena);
+
 bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
                                   ArenaAllocator *arena);
 bool typecheck_while_loop_decl(AstNode *node, Scope *scope,

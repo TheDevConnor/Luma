@@ -10,8 +10,26 @@ const WeekDay = enum {
     Saturday,
 };
 
+/* 
+ * LLVM IRError: Case values must be compile-time constants
+ * Error: Case value must be a compile-time constant
+ * Basic Block in function 'main' does not have terminator!
+ * label %switch_end
+ * LLVM ERROR: Broken module found, compilation aborted!
+*/
+
 pub const main = fn () int {
-    let x: WeekDay = WeekDay.Friday;
-    output(x, "\n");
+    let x: WeekDay = 10;
+
+    switch (x) {
+        WeekDay.Monday, WeekDay.Tuesday, WeekDay.Wednesday, 
+        WeekDay.Thursday: 
+            output(x, "\n");
+        WeekDay.Friday, WeekDay.Saturday, 
+        WeekDay.Sunday: 
+            output(x, "\n");
+        :: _ : output("Weekday was not found.\n");
+    }
+
     return 0;
 }
