@@ -5,9 +5,13 @@ Luma is a statically typed, compiled programming language designed for systems p
 ## Table of Contents
 
 - [Language Philosophy](#language-philosophy)
-- [Top-Level Bindings with `const`](#top-level-bindings-with-const)
-- [Control Flow](#control-flow)
+- [Quick Start](#quick-start)
 - [Type System](#type-system)
+- [Top-Level Bindings with `const`](#top-level-bindings-with-const)
+- [Name Resolution](#name-resolution)
+- [Control Flow](#control-flow)
+- [Switch Statements](#switch-statements)
+- [Module System](#module-system)
 - [Memory Management](#memory-management)
 - [Error Handling](#error-handling)
 - [Performance](#performance)
@@ -21,116 +25,55 @@ Luma is built on three core principles:
 - **Safety**: Strong typing and memory safety features
 - **Performance**: Zero-cost abstractions and predictable performance
 
-## Top-Level Bindings with `const`
+## Quick Start
 
-Luma uses the `const` keyword as a **unified declaration mechanism** for all top-level bindings. Whether you're declaring variables, functions, types, or enums, `const` provides a consistent syntax that enforces immutability at the binding level.
+Here's a complete Luma program that demonstrates the core language features:
 
-### Basic Syntax
+```luma
+@module "main"
 
-```Luma
-const NUM: int = 42;                    // Immutable variable
-const Direction = enum { North, South, East, West };  // Enum definition
-const Point = struct { x: int, y: int }; // Struct definition
-const add = fn (a: int, b: int) int {   // Function definition
-    return a + b; 
-};
-```
-
-### Why This Design?
-
-**Unified syntax**: One parsing rule handles all top-level declarations, simplifying both the compiler and developer experience.
-
-**Semantic clarity**: The binding itself is immutable—you cannot reassign or shadow a top-level `const`. This prevents accidental redefinition bugs.
-
-**Compiler optimization**: Immutable bindings enable better optimization opportunities.
-
-**Future extensibility**: This approach naturally supports compile-time metaprogramming and uniform import behavior.
-
-### Important Notes
-
-```Luma
-const x: int = 5;
-x = 10; // ❌ Error: `x` is immutable
-
-const add = fn (a: int, b: int) int { return a + b; };
-add = something_else; // ❌ Error: cannot reassign function binding
-```
-
-## Control Flow
-
-Luma provides clean, flexible control flow constructs that handle most programming patterns without unnecessary complexity.
-
-### Conditional Statements
-
-Use `if`, `elif`, and `else` for branching logic:
-
-```Luma
-const x: int = 7;
-
-if x > 10 {
-    print("Large number");
-} elif x > 5 {
-    print("Medium number");  // This will execute
-} else {
-    print("Small number");
-}
-```
-
-### Loop Constructs
-
-The `loop` keyword provides several iteration patterns:
-
-#### For-Style Loops
-
-```Luma
-// Basic for loop
-loop [i: int = 0](i < 10) {
-    outputln("Iteration: ", i);
-    ++i;
-}
-
-// For loop with post-increment
-loop [i: int = 0](i < 10) : (++i) {
-    outputln("i = ", i);
-}
-
-// Multiple loop variables
-loop [i: int = 0, j: int = 0](i < 10) : (++i) {
-    outputln("i = ", i, ", j = ", j);
-    ++j;
-}
-```
-
-#### While-Style Loops
-
-```Luma
-// Condition-only loop
-let counter: int = 0;
-loop (counter < 5) {
-    outputln("Count: ", counter);
-    counter++;
-}
-
-// While loop with post-action
-let j: int = 0;
-loop (j < 10) : (j++) {
-    outputln("Processing: ", j);
-}
-```
-
-#### Infinite Loops
-
-```Luma
-loop {
-    // Runs forever until `break` is encountered
-    if should_exit() {
-        break;
+const Point = struct {
+    x: int,
+    y: int,
+    
+    distance_to = fn (other: Point) float {
+        let dx: int = other.x - x;
+        let dy: int = other.y - y;
+        return sqrt(cast<float>(dx * dx + dy * dy));
     }
-    do_work();
+};
+
+const Status = enum {
+    Active,
+    Inactive,
+    Pending,
+};
+
+const main = fn () int {
+    let origin: Point = Point { x: 0, y: 0 };
+    let destination: Point = Point { x: 3, y: 4 };
+    let current_status: Status = Status::Active;
+    
+    outputln("Distance: ", origin.distance_to(destination));
+    
+    switch (current_status) {
+        Status::Active: outputln("System is running");
+        Status::Inactive: outputln("System is stopped");
+        Status::Pending: outputln("System is starting");
+    }
+    
+    return 0;
 }
 ```
 
-> **Note**: In Luma, `//` starts single-line comments, and `/* */` are used for multi-line comments.
+This example shows:
+- Module declaration with `@module`
+- Struct definitions with methods
+- Enum definitions
+- Static access with `::` for enum variants
+- Runtime access with `.` for struct members
+- Function definitions and calls
+- Switch statements with pattern matching
 
 ## Type System
 
@@ -144,13 +87,14 @@ Luma provides a straightforward type system with both primitive and compound typ
 | `uint` | Unsigned integer | 64-bit |
 | `float` | Floating point | 64-bit |
 | `bool` | Boolean | 1 byte |
+| `char` | Unicode Character| 1 byte |
 | `str` | String | Variable |
 
 ### Enumerations
 
 Enums provide type-safe constants with clean syntax:
 
-```Luma
+```luma
 const Direction = enum {
     North,
     South,
@@ -158,14 +102,14 @@ const Direction = enum {
     West
 };
 
-const current_direction: Direction = Direction.North;
+const current_direction: Direction = Direction::North;
 ```
 
 ### Structures
 
 Structures group related data with optional access control:
 
-```Luma
+```luma
 const Point = struct {
     x: int,
     y: int
@@ -188,7 +132,7 @@ private:
 
 ### Using Types
 
-```Luma
+```luma
 const origin: Point = Point { x: 0, y: 0 };
 const player: Player = Player { 
     name: "Alice", 
@@ -197,13 +141,284 @@ const player: Player = Player {
 };
 ```
 
+## Top-Level Bindings with `const`
+
+Luma uses the `const` keyword as a **unified declaration mechanism** for all top-level bindings. Whether you're declaring variables, functions, types, or enums, `const` provides a consistent syntax that enforces immutability at the binding level.
+
+### Basic Syntax
+
+```luma
+const NUM: int = 42;                                  // Immutable variable
+const Direction = enum { North, South, East, West };  // Enum definition
+const Point = struct { x: int, y: int };              // Struct definition
+const add = fn (a: int, b: int) int {                 // Function definition
+    return a + b; 
+};
+```
+
+### Why This Design?
+
+**Unified syntax**: One parsing rule handles all top-level declarations, simplifying both the compiler and developer experience.
+
+**Semantic clarity**: The binding itself is immutable—you cannot reassign or shadow a top-level `const`. This prevents accidental redefinition bugs.
+
+**Compiler optimization**: Immutable bindings enable better optimization opportunities.
+
+**Future extensibility**: This approach naturally supports compile-time metaprogramming and uniform import behavior.
+
+### Important Notes
+
+```luma
+const x: int = 5;
+x = 10; // ❌ Error: `x` is immutable
+
+const add = fn (a: int, b: int) int { return a + b; };
+add = something_else; // ❌ Error: cannot reassign function binding
+```
+
+## Name Resolution
+
+Luma uses two distinct operators for name resolution to provide semantic clarity:
+
+### Static Access with `::`
+
+The `::` operator is used for **compile-time static access**:
+
+```luma
+// Enum variants
+const day: WeekDay = WeekDay::Monday;
+
+// Module/namespace access
+math::sqrt(16.0)
+
+// Associated functions (if added later)
+Point::new(10, 20)
+```
+
+### Runtime Member Access with `.`
+
+The `.` operator is used for **runtime member access**:
+
+```luma
+// Struct field access
+let point: Point = Point { x: 10, y: 20 };
+outputln(point.x);  // Access field at runtime
+
+// Method calls on instances
+let distance: float = origin.distance_to(destination);
+```
+
+### Benefits of This Distinction
+
+- **Semantic clarity**: `::` means "resolved at compile time", `.` means "accessed at runtime"
+- **Easier parsing**: The compiler immediately knows the access type
+- **Consistent with systems languages**: Similar to C++ and Rust conventions
+- **Future-proof**: Supports advanced features like associated functions
+
+## Control Flow
+
+Luma provides clean, flexible control flow constructs that handle most programming patterns without unnecessary complexity.
+
+### Conditional Statements
+
+Use `if`, `elif`, and `else` for branching logic:
+
+```luma
+const x: int = 7;
+
+if x > 10 {
+    print("Large number");
+} elif x > 5 {
+    print("Medium number");  // This will execute
+} else {
+    print("Small number");
+}
+```
+
+### Loop Constructs
+
+The `loop` keyword provides several iteration patterns:
+
+#### For-Style Loops
+
+```luma
+// Basic for loop
+loop [i: int = 0](i < 10) {
+    outputln("Iteration: ", i);
+    ++i;
+}
+
+// For loop with post-increment
+loop [i: int = 0](i < 10) : (++i) {
+    outputln("i = ", i);
+}
+
+// Multiple loop variables
+loop [i: int = 0, j: int = 0](i < 10) : (++i) {
+    outputln("i = ", i, ", j = ", j);
+    ++j;
+}
+```
+
+#### While-Style Loops
+
+```luma
+// Condition-only loop
+let counter: int = 0;
+loop (counter < 5) {
+    outputln("Count: ", counter);
+    counter++;
+}
+
+// While loop with post-action
+let j: int = 0;
+loop (j < 10) : (j++) {
+    outputln("Processing: ", j);
+}
+```
+
+#### Infinite Loops
+
+```luma
+loop {
+    // Runs forever until `break` is encountered
+    if should_exit() {
+        break;
+    }
+    do_work();
+}
+```
+
+## Switch Statements
+
+Luma provides powerful pattern matching through `switch` statements that work with enums, integers, and other types. Switch statements must be exhaustive and all cases must be compile-time constants.
+
+### Basic Switch Syntax
+
+```luma
+const WeekDay = enum {
+    Sunday,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+};
+
+const classify_day = fn (day: WeekDay) {
+    switch (day) {
+        WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
+        WeekDay::Thursday, WeekDay::Friday: 
+            outputln("Weekday");
+        WeekDay::Saturday, WeekDay::Sunday: 
+            outputln("Weekend");
+    }
+};
+```
+
+### Switch with Default Case
+
+When you need to handle unexpected values or want a catch-all case, use the default wildcard pattern `_`:
+
+```luma
+const handle_status_code = fn (code: int) {
+    switch (code) {
+        200: outputln("OK");
+        404: outputln("Not Found");
+        500: outputln("Internal Server Error");
+        _: outputln("Unknown status code");
+    }
+};
+```
+
+### Switch Features
+
+- **Multiple values per case**: Combine multiple values using commas
+- **Exhaustiveness**: All possible values must be covered (or use `_` for default)
+- **Compile-time constants**: All case values must be compile-time constants
+- **No fallthrough**: Each case is automatically contained (no `break` needed)
+
+## Module System
+
+Luma provides a simple module system for code organization and namespace management.
+
+### Module Declaration
+
+Every Luma source file must declare its module name:
+
+```luma
+@module "main"
+
+// Your code here...
+```
+
+### Importing Modules
+
+Use the `@use` directive to import other modules:
+
+```luma
+@module "main"
+@use "math" as math
+@use "fib" as fibonacci
+
+const main = fn () int {
+    // Access imported functions with namespace
+    let result: float = math::sqrt(25.0);
+    let fib_num: int = fibonacci::fib(10);
+    
+    outputln("Square root: ", result);
+    outputln("Fibonacci: ", fib_num);
+    return 0;
+}
+```
+
+### Module Features
+
+- **Explicit imports**: All dependencies must be explicitly declared
+- **Namespace isolation**: Imported modules are accessed through their aliases
+- **Static resolution**: All module access is resolved at compile time using `::`
+- **Clean syntax**: Simple `@use "module" as alias` pattern
+
+### Example: Math Module
+
+```luma
+// File: math.luma
+@module "math"
+
+pub const PI: float = 3.14159265359;
+
+pub const sqrt = fn (x: float) float {
+    // Implementation here
+    return x;  // Placeholder
+};
+
+pub const pow = fn (base: float, exp: float) float {
+    // Implementation here
+    return base;  // Placeholder
+};
+```
+
+```luma
+// File: main.luma
+@module "main"
+@use "math" as math
+
+const main = fn () int {
+    let radius: float = 5.0;
+    let area: float = math::PI * math::pow(radius, 2.0);
+    outputln("Circle area: ", area);
+    return 0;
+}
+```
+
 ## Memory Management
 
-Luma provides explicit memory management with safety-oriented features. While manual, it includes tools to prevent common memory errors.
+Luma provides explicit memory management with safety-oriented features. While manual, it includes compile-time static analysis and runtime tools to prevent common memory errors like leaks, double-frees, and use-after-free bugs.
 
 ### Basic Memory Operations
 
-```Luma
+```luma
 alloc(size: uint) -> *void    // Allocate memory
 free(ptr: *void)              // Deallocate memory
 cast<T>(ptr: *void) -> *T     // Type casting
@@ -213,7 +428,7 @@ memcpy(dest: *void, src: *void, size: uint)  // Memory copy
 
 ### Example Usage
 
-```Luma
+```luma
 const main = fn () int {
     // Allocate memory for an integer
     let ptr: *int = cast<*int>(alloc(sizeof(int)));
@@ -232,7 +447,7 @@ const main = fn () int {
 
 To prevent memory leaks and ensure cleanup, Luma provides `defer` statements that execute when leaving the current scope:
 
-```Luma
+```luma
 const process_data = fn () {
     let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
     defer free(buffer);  // Guaranteed to run when function exits
@@ -252,7 +467,7 @@ const process_data = fn () {
 
 You can also defer multiple statements:
 
-```Luma
+```luma
 defer {
     close_file(file);
     cleanup_resources();
@@ -268,7 +483,7 @@ defer {
 
 ### Size Queries
 
-```Luma
+```luma
 const check_sizes = fn () {
     outputln("int size: ", sizeof(int));        // 8 bytes
     outputln("Point size: ", sizeof(Point));    // 16 bytes
@@ -276,42 +491,128 @@ const check_sizes = fn () {
 }
 ```
 
-## Error Handling
+### Static Memory Analysis
 
-*[This section would cover Luma's approach to error handling - perhaps result types, error propagation, or exception mechanisms]*
+Luma's compiler includes a powerful static analyzer that tracks memory allocations and deallocations at compile time. This helps catch memory management errors before your program runs.
 
-## Performance
+#### What the Analyzer Tracks
 
-*[This section would detail Luma's performance characteristics, optimization strategies, and benchmarking approach]*
+- **Allocation/Deallocation Pairs**: Ensures every `alloc()` has a corresponding `free()`
+- **Double-Free Detection**: Prevents freeing the same pointer multiple times
+- **Memory Leaks**: Identifies allocated memory that's never freed
+- **Variable-Level Tracking**: Associates allocations with specific variable names
+- **Cross-Function Analysis**: Tracks memory through function calls and returns
 
-## Safety Features
+#### Example: Static Analysis in Action
 
-*[This section would cover additional safety features like bounds checking, null pointer prevention, and compile-time guarantees]*
-
----
-
-## Quick Start Example
-
-```Luma
-const Point = struct {
-    x: int,
-    y: int,
+```luma
+const good_memory_usage = fn () {
+    let ptr: *int = cast<*int>(alloc(sizeof(int)));
+    defer free(ptr);  // ✅ Analyzer sees this will always execute
     
-    distance_to = fn (other: Point) float {
-        let dx: int = other.x - x;
-        let dy: int = other.y - y;
-        return sqrt(cast<float>(dx * dx + dy * dy));
+    *ptr = 42;
+    outputln("Value: ", *ptr);
+    // ✅ Analyzer confirms ptr is freed on function exit
+}
+
+const problematic_memory_usage = fn () {
+    let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+    
+    if some_condition {
+        free(buffer);
+        return;  // ✅ Early return is fine, buffer was freed
     }
-};
-
-const main = fn () int {
-    let origin: Point = Point { x: 0, y: 0 };
-    let destination: Point = Point { x: 3, y: 4 };
     
-    outputln("Distance: ", origin.distance_to(destination));
-    return 0;
+    process_data(buffer);
+    // ❌ Compiler error: potential memory leak
+    //     buffer not freed on all code paths
+}
+
+const double_free_example = fn () {
+    let data: *int = cast<*int>(alloc(sizeof(int)));
+    *data = 42;
+    
+    free(data);
+    if error_condition {
+        free(data);  // ❌ Compiler error: double free detected
+                     //     Variable 'data' already freed at line X
+    }
 }
 ```
+
+#### Memory Analysis Features
+
+**Variable-level tracking**: The analyzer associates each allocation with the specific variable that holds the pointer, enabling precise error reporting.
+
+**Flow-sensitive analysis**: The analyzer understands control flow and can track memory state through branches, loops, and function calls.
+
+**Integration with `defer`**: The analyzer recognizes that `defer` statements provide guaranteed cleanup, making them the preferred pattern for memory management.
+
+**Precise error reporting**: Memory issues are reported with exact line numbers, variable names, and helpful suggestions for fixes.
+
+#### Compiler Messages
+
+The analyzer provides clear, actionable error messages with precise source locations:
+
+```
+Error: Memory leak detected
+  --> main.luma:15:5
+   |
+15 |     let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+   |         ^^^^^^ allocated here
+...
+23 |     return;
+   |     ^^^^^^ buffer not freed on this path
+   |
+Note: This allocation has no corresponding free()
+Help: Add a free() call before the variable goes out of scope
+
+Error: Double free detected
+  --> main.luma:18:5
+   |
+18 |     free(data);
+   |     ^^^^^^^^^^ double free detected here
+   |
+Note: Memory was already freed previously
+Help: Remove the duplicate free() call or check your control flow
+```
+
+#### Best Practices for Static Analysis
+
+1. **Use `defer` for cleanup**: This guarantees the analyzer can verify proper cleanup
+2. **Keep allocation scope small**: Allocate and free in the same function when possible  
+3. **Explicit null checks**: Use explicit null checks rather than assuming validity
+4. **Document ownership**: Use clear variable names and comments about ownership transfer
+
+```luma
+const recommended_pattern = fn () {
+    let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+    defer free(buffer);  // Guaranteed cleanup - analyzer approves ✅
+    
+    if buffer == null {  // Explicit null check
+        outputln("Allocation failed");
+        return;  // defer still runs, no leak
+    }
+    
+    // Use buffer safely...
+    process_data(buffer);
+    // Analyzer tracks that buffer will be freed via defer
+}
+
+const tracking_example = fn () {
+    // Analyzer associates allocation with variable 'data'
+    let data: *int = cast<*int>(alloc(sizeof(int)));
+    *data = 42;
+    
+    if should_cleanup {
+        free(data);  // Analyzer marks 'data' as freed
+        data = null; // Good practice: nullify freed pointer
+    }
+    // If should_cleanup is false, analyzer will report leak for 'data'
+}
+```
+
+This static analysis system makes manual memory management in Luma much safer than traditional C, while still giving you full control over allocation patterns and performance characteristics.
 
 ## Error Handling
 
@@ -321,6 +622,6 @@ const main = fn () int {
 
 *[This section would contain information about Luma's performance characteristics - to be documented]*
 
-## Safety
+## Safety Features
 
 *[This section would contain information about Luma's safety features - to be documented]*
