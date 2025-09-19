@@ -193,14 +193,18 @@ Expr *prefix_expr(Parser *parser, Expr *left, BindingPower bp) {
     p_consume(parser, TOK_RBRACKET, "Expected ']' to close index expression");
     return create_index_expr(parser->arena, left, index, line, col);
   case TOK_DOT:
-    p_advance(parser); // Consume the '.' token
+  case TOK_RESOLVE:
+    bool is_compiletime =
+        (p_current(parser).type_ == TOK_RESOLVE) ? true : false;
+    p_advance(parser); // Consume the '.' or '::' token
     if (p_current(parser).type_ != TOK_IDENTIFIER) {
       fprintf(stderr, "Expected identifier after '.' for member access\n");
       return NULL;
     }
     char *member = get_name(parser);
     p_advance(parser); // Consume the identifier token
-    return create_member_expr(parser->arena, left, member, line, col);
+    return create_member_expr(parser->arena, left, is_compiletime, member, line,
+                              col);
   case TOK_PLUSPLUS:
   case TOK_MINUSMINUS: {
     UnaryOp op =

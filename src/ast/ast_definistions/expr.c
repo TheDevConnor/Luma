@@ -102,8 +102,10 @@ AstNode *create_ternary_expr(ArenaAllocator *arena, AstNode *condition,
 }
 
 AstNode *create_member_expr(ArenaAllocator *arena, AstNode *object,
-                            const char *member, size_t line, size_t column) {
+                            bool is_compiletime, const char *member,
+                            size_t line, size_t column) {
   AstNode *node = create_expr(arena, AST_EXPR_MEMBER, line, column);
+  node->expr.member.is_compiletime = is_compiletime;
   node->expr.member.object = object;
   node->expr.member.member = arena_strdup(arena, member);
   return node;

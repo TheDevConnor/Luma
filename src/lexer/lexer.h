@@ -109,6 +109,7 @@ typedef enum {
   TOK_SHIFT_LEFT,  /**< << */
   TOK_SHIFT_RIGHT, /**< >> */
   TOK_RANGE,       /**< .. */
+  TOK_RIGHT_ARROW, /**< => */
   TOK_WHITESPACE,  /**< whitespace */
   TOK_COMMENT      /**< comment */
 } LumaTokenType;

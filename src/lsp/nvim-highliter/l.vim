@@ -8,7 +8,7 @@ endif
 " =====================
 " COMMENTS (Top Priority)
 " =====================
-syn match luxComment "::.*$" contains=NONE containedin=ALL
+syn match luxComment "//.*$" contains=NONE containedin=ALL
 syn region luxComment start="/\*" end="\*/" contains=NONE containedin=ALL
 hi def luxComment guifg=#928374 gui=italic
 

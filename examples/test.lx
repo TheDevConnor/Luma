@@ -1,36 +1,31 @@
 @module "main"
 
-:: const WeekDay = enum {
-::     Sunday,
-::     Monday,
-::     Tuesday,
-::     Wednesday,
-::     Thursday,
-::     Friday,
-::     Saturday,
-:: };
+@use "fib" as fib
 
-:: ?NOTE: Module importing currently does not work i have to look into the codegen_member_expr
-/* 
- * LLVM IRError: Case values must be compile-time constants
- * Error: Case value must be a compile-time constant
- * Basic Block in function 'main' does not have terminator!
- * label %switch_end
- * LLVM ERROR: Broken module found, compilation aborted!
-*/
+const WeekDay = enum {
+    Sunday,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+};
 
 pub const main = fn () int {
-    :: let x: WeekDay = 10;
+    let x: WeekDay;
 
-    :: switch (x) {
-    ::     WeekDay.Monday, WeekDay.Tuesday, WeekDay.Wednesday, 
-    ::     WeekDay.Thursday: 
-    ::         output(x, "\n");
-    ::     WeekDay.Friday, WeekDay.Saturday, 
-    ::     WeekDay.Sunday: 
-    ::         output(x, "\n");
-    ::     :: _ : output("Weekday was not found.\n");
-    :: }
+    switch (x) {
+        WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
+        WeekDay::Thursday => {
+            output("Here ", fib.fib(x, 0, 1), "\n");
+        }
+        WeekDay::Friday, WeekDay::Saturday, 
+        WeekDay::Sunday => {
+            output(x, "\n");
+        }
+        // _ => output("Weekday was not found.\n");
+    }
 
     return 0;
 }

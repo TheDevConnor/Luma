@@ -28,19 +28,19 @@
 
 /** @internal Symbol to token type mapping */
 static const SymbolEntry symbols[] = {
-    {"(", TOK_LPAREN},      {")", TOK_RPAREN},      {"{", TOK_LBRACE},
-    {"}", TOK_RBRACE},      {"[", TOK_LBRACKET},    {"]", TOK_RBRACKET},
-    {"..", TOK_RANGE},      {";", TOK_SEMICOLON},   {",", TOK_COMMA},
-    {".", TOK_DOT},         {"==", TOK_EQEQ},       {"!=", TOK_NEQ},
-    {"<=", TOK_LE},         {">=", TOK_GE},         {"&&", TOK_AND},
-    {"||", TOK_OR},         {"=", TOK_EQUAL},       {"+", TOK_PLUS},
-    {"-", TOK_MINUS},       {"*", TOK_STAR},        {"/", TOK_SLASH},
-    {"<", TOK_LT},          {">", TOK_GT},          {"&", TOK_AMP},
-    {"|", TOK_PIPE},        {"^", TOK_CARET},       {"~", TOK_TILDE},
-    {"!", TOK_BANG},        {"?", TOK_QUESTION},    {"::", TOK_RESOLVE},
-    {":", TOK_COLON},       {"_", TOK_SYMBOL},      {"++", TOK_PLUSPLUS},
-    {"--", TOK_MINUSMINUS}, {"<<", TOK_SHIFT_LEFT}, {">>", TOK_SHIFT_RIGHT},
-    {"@", TOK_AT},
+    {"(", TOK_LPAREN},       {")", TOK_RPAREN},       {"{", TOK_LBRACE},
+    {"}", TOK_RBRACE},       {"[", TOK_LBRACKET},     {"]", TOK_RBRACKET},
+    {"..", TOK_RANGE},       {";", TOK_SEMICOLON},    {",", TOK_COMMA},
+    {".", TOK_DOT},          {"=>", TOK_RIGHT_ARROW}, {"==", TOK_EQEQ},
+    {"!=", TOK_NEQ},         {"<=", TOK_LE},          {">=", TOK_GE},
+    {"&&", TOK_AND},         {"||", TOK_OR},          {"=", TOK_EQUAL},
+    {"+", TOK_PLUS},         {"-", TOK_MINUS},        {"*", TOK_STAR},
+    {"/", TOK_SLASH},        {"<", TOK_LT},           {">", TOK_GT},
+    {"&", TOK_AMP},          {"|", TOK_PIPE},         {"^", TOK_CARET},
+    {"~", TOK_TILDE},        {"!", TOK_BANG},         {"?", TOK_QUESTION},
+    {"::", TOK_RESOLVE},     {":", TOK_COLON},        {"_", TOK_SYMBOL},
+    {"++", TOK_PLUSPLUS},    {"--", TOK_MINUSMINUS},  {"<<", TOK_SHIFT_LEFT},
+    {">>", TOK_SHIFT_RIGHT}, {"@", TOK_AT},
 };
 
 /** @internal Keyword text to token type mapping */
@@ -318,7 +318,7 @@ int skip_whitespace(Lexer *lx) {
       // the current line
       advance(lx);
       whitespace_count = 0; // Reset because we're on a new line
-    } else if (c == ':' && peek(lx, 1) == ':') {
+    } else if (c == '/' && peek(lx, 1) == '/') {
       // Skip single-line comment
       while (!is_at_end(lx) && peek(lx, 0) != '\n') {
         advance(lx);

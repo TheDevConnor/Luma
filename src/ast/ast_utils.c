@@ -457,6 +457,9 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
   case AST_EXPR_MEMBER:
     print_prefix(next_prefix, true);
     printf(BOLD_CYAN("Member Access: \n"));
+    print_prefix(next_prefix, true);
+    printf(BOLD_MAGENTA("Is Compiletime: %d\n"),
+           node->expr.member.is_compiletime);
     if (node->expr.member.object) {
       print_ast(node->expr.member.object, next_prefix, true, false);
     } else {

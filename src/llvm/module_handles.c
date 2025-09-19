@@ -223,53 +223,29 @@ LLVMValueRef codegen_expr_member_access(CodeGenContext *ctx, AstNode *node) {
 
   const char *object_name = object->expr.identifier.name;
 
-  // First, try enum member access (EnumName.MemberName)
-  char enum_member_name[256];
-  snprintf(enum_member_name, sizeof(enum_member_name), "%s.%s", object_name,
-           member);
+  // Create the qualified name once
+  char qualified_name[256];
+  snprintf(qualified_name, sizeof(qualified_name), "%s.%s", object_name, member);
 
-  // Look for the qualified enum member first
-  LLVM_Symbol *enum_sym =
-      find_symbol_in_module(ctx->current_module, enum_member_name);
-  if (enum_sym) {
-    // Found an enum member - return the constant value directly
-    if (is_enum_constant(enum_sym)) {
-      return LLVMGetInitializer(enum_sym->value);
+  // Look up the qualified symbol (could be enum member OR module member)
+  LLVM_Symbol *sym = find_symbol_in_module(ctx->current_module, qualified_name);
+  if (sym) {
+    if (sym->is_function) {
+      return sym->value;
+    } else if (is_enum_constant(sym)) {
+      // Enum constant - return the constant value directly
+      return LLVMGetInitializer(sym->value);
     } else {
-      // It's a regular variable with qualified name
-      return LLVMBuildLoad2(ctx->builder, enum_sym->type, enum_sym->value,
-                            "load");
+      // Regular variable - load its value
+      return LLVMBuildLoad2(ctx->builder, sym->type, sym->value, "load");
     }
   }
 
-  // If not found as enum member, try module member access
-  // (ModuleAlias.SymbolName)
-  char module_member_name[256];
-  snprintf(module_member_name, sizeof(module_member_name), "%s.%s", object_name,
-           member);
-
-  // Look up the imported module symbol
-  LLVM_Symbol *module_sym =
-      find_symbol_in_module(ctx->current_module, module_member_name);
-  if (module_sym) {
-    if (module_sym->is_function) {
-      return module_sym->value;
-    } else if (is_enum_constant(module_sym)) {
-      // Imported enum constant
-      return LLVMGetInitializer(module_sym->value);
-    } else {
-      // Load variable value
-      return LLVMBuildLoad2(ctx->builder, module_sym->type, module_sym->value,
-                            "load");
-    }
-  }
-
-  // Check if object_name is an enum type (namespace symbol)
+  // Check if object_name is an enum type (namespace symbol) for better error reporting
   LLVM_Symbol *enum_type_sym = find_symbol(ctx, object_name);
   if (enum_type_sym && enum_type_sym->value == NULL) {
     // This is an enum namespace, but the member wasn't found
-    fprintf(stderr, "Error: Enum member '%s' not found in enum '%s'\n", member,
-            object_name);
+    fprintf(stderr, "Error: Enum member '%s' not found in enum '%s'\n", member, object_name);
   } else {
     // Neither enum nor module member found
     fprintf(stderr, "Error: Symbol '%s.%s' not found\n", object_name, member);

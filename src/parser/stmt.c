@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../ast/ast_utils.h"
+// #include "../ast/ast_utils.h"
 #include "../ast/ast.h"
 #include "parser.h"
 
@@ -920,7 +920,8 @@ Stmt *switch_stmt(Parser *parser) {
         strcmp(get_name(parser), "_") == 0) {
       // Handle default case: _: { ... }
       p_advance(parser); // consume '_'
-      p_consume(parser, TOK_COLON, "Expected ':' after default case '_'");
+      p_consume(parser, TOK_RIGHT_ARROW,
+                "Expected '=>' after default case '_'");
 
       Stmt *default_body;
       if (p_current(parser).type_ == TOK_LBRACE) {
@@ -929,7 +930,8 @@ Stmt *switch_stmt(Parser *parser) {
         default_body = parse_stmt(parser);
       }
 
-      default_case = create_default_stmt(parser->arena, default_body, case_line, case_col);
+      default_case =
+          create_default_stmt(parser->arena, default_body, case_line, case_col);
       continue;
     }
 
@@ -972,7 +974,7 @@ Stmt *switch_stmt(Parser *parser) {
       *additional_slot = additional_case;
     }
 
-    p_consume(parser, TOK_COLON, "Expected ':' after case value(s)");
+    p_consume(parser, TOK_RIGHT_ARROW, "Expected '=>' after case value(s)");
 
     // Parse case body (either block or single statement)
     Stmt *case_body;

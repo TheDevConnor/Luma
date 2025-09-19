@@ -202,6 +202,7 @@ struct AstNode {
 
         // Member access expression
         struct {
+          bool is_compiletime;
           AstNode *object; // Changed from Expr* to AstNode*
           char *member;
         } member;
@@ -491,7 +492,8 @@ AstNode *create_ternary_expr(ArenaAllocator *arena, Expr *condition,
                              Expr *then_expr, Expr *else_expr, size_t line,
                              size_t column);
 AstNode *create_member_expr(ArenaAllocator *arena, Expr *object,
-                            const char *member, size_t line, size_t column);
+                            bool is_compiletime, const char *member,
+                            size_t line, size_t column);
 AstNode *create_index_expr(ArenaAllocator *arena, Expr *object, Expr *index,
                            size_t line, size_t column);
 AstNode *create_grouping_expr(ArenaAllocator *arena, Expr *expr, size_t line,

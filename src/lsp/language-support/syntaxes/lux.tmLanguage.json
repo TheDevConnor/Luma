@@ -36,7 +36,7 @@
       "patterns": [
         {
           "name": "comment.line.double-colon.lux",
-          "begin": "::",
+          "begin": "//",
           "end": "$"
         },
         {
@@ -232,8 +232,12 @@
           "match": "\\*|&"
         },
         {
-          "name": "keyword.operator.member.lux",
+          "name": "keyword.operator.runtime-member.lux",
           "match": "\\."
+        },
+        {
+          "name": "keyword.operator.compiletime-const.lux",
+          "match": "::"
         }
       ]
     },
