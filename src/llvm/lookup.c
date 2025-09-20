@@ -32,14 +32,18 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
     return codegen_expr_deref(ctx, node);
   case AST_EXPR_ADDR:
     return codegen_expr_addr(ctx, node);
-  case AST_EXPR_MEMBER: // NEW: Handle module.symbol syntax
-    return codegen_expr_member_access(ctx, node);
+  case AST_EXPR_MEMBER:
+    // Enhanced member access that handles both module.symbol and struct.field
+    return codegen_expr_member_access_enhanced(ctx, node);
   default:
+    fprintf(stderr, "Error: Unknown expression type: %d\n", node->type);
     return NULL;
   }
 }
 
 LLVMValueRef codegen_stmt(CodeGenContext *ctx, AstNode *node) {
+  if (!node) return NULL;
+  
   switch (node->type) {
   case AST_PROGRAM:
     // Use the new multi-module handler instead of the old one
@@ -59,6 +63,10 @@ LLVMValueRef codegen_stmt(CodeGenContext *ctx, AstNode *node) {
     return codegen_stmt_var_decl(ctx, node);
   case AST_STMT_FUNCTION:
     return codegen_stmt_function(ctx, node);
+  case AST_STMT_STRUCT:
+    return codegen_stmt_struct(ctx, node);
+  case AST_STMT_FIELD_DECL:
+    return codegen_stmt_field(ctx, node);
   case AST_STMT_ENUM:
     return codegen_stmt_enum(ctx, node);
   case AST_STMT_RETURN:
@@ -82,6 +90,7 @@ LLVMValueRef codegen_stmt(CodeGenContext *ctx, AstNode *node) {
   case AST_STMT_DEFAULT:
     return codegen_stmt_default(ctx, node);
   default:
+    fprintf(stderr, "Error: Unknown statement type: %d\n", node->type);
     return NULL;
   }
 }
@@ -101,6 +110,7 @@ LLVMTypeRef codegen_type(CodeGenContext *ctx, AstNode *node) {
   case AST_TYPE_FUNCTION:
     return codegen_type_function(ctx, node);
   default:
+    fprintf(stderr, "Error: Unknown type: %d\n", node->type);
     return NULL;
   }
 }

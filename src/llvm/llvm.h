@@ -48,6 +48,17 @@ typedef struct DeferredStatement {
   struct DeferredStatement *next;
 } DeferredStatement;
 
+typedef struct StructInfo {
+    char *name;
+    LLVMTypeRef llvm_type;
+    char **field_names;
+    LLVMTypeRef *field_types;
+    bool *field_is_public;
+    size_t field_count;
+    bool is_public;
+    struct StructInfo *next;
+} StructInfo;
+
 // Code generation context
 struct CodeGenContext {
   // LLVM Core Components
@@ -70,6 +81,8 @@ struct CodeGenContext {
   LLVMValueRef current_function;
   LLVMBasicBlockRef loop_continue_block;
   LLVMBasicBlockRef loop_break_block;
+
+  StructInfo *struct_types;
 
   // Memory Management
   ArenaAllocator *arena;
@@ -168,6 +181,47 @@ bool generate_object_file(CodeGenContext *ctx, const char *object_filename);
 bool generate_assembly_file(CodeGenContext *ctx, const char *asm_filename);
 char *process_escape_sequences(const char *input);
 LLVMLinkage get_function_linkage(AstNode *node);
+
+// =============================================================================
+// ENHANCED STRUCT SUPPORT FUNCTIONS
+// =============================================================================
+
+// Core struct management
+StructInfo *find_struct_type(CodeGenContext *ctx, const char *name);
+void add_struct_type(CodeGenContext *ctx, StructInfo *struct_info);
+int get_field_index(StructInfo *struct_info, const char *field_name);
+bool is_field_access_allowed(CodeGenContext *ctx, StructInfo *struct_info, int field_index);
+
+// Enhanced member access (handles both struct.field and module.symbol)
+LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx, AstNode *node);
+
+// Struct literal/initializer support
+LLVMValueRef codegen_struct_literal(CodeGenContext *ctx, const char *struct_name, 
+                                   LLVMValueRef *field_values, size_t field_count);
+
+// =============================================================================
+// STRUCT TYPE SYSTEM INTEGRATION
+// =============================================================================
+
+// Enhanced type checking for structs
+bool is_struct_type(CodeGenContext *ctx, LLVMTypeRef type);
+const char *get_struct_name_from_type(CodeGenContext *ctx, LLVMTypeRef type);
+
+// Struct construction helpers
+LLVMValueRef create_struct_zero_initializer(CodeGenContext *ctx, const char *struct_name);
+LLVMValueRef create_struct_copy(CodeGenContext *ctx, LLVMValueRef src_struct, 
+                               StructInfo *struct_info);
+
+// Struct debugging and introspection
+void print_struct_info(CodeGenContext *ctx, const char *struct_name);
+void debug_struct_layout(CodeGenContext *ctx, const char *struct_name);
+
+StructInfo *find_struct_type(CodeGenContext *ctx, const char *name);
+void add_struct_type(CodeGenContext *ctx, StructInfo *struct_info);
+LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_stmt_field(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node);
+LLVMTypeRef codegen_type_struct(CodeGenContext *ctx, const char *struct_name);
 
 // =============================================================================
 // AST NODE HANDLERS - PUBLIC INTERFACE

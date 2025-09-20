@@ -323,21 +323,21 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
     // Handle pointer dereference: if we have a pointer to struct, automatically
     // dereference it
     if (base_type->type == AST_TYPE_POINTER) {
-      printf("DEBUG: Base type is pointer, checking pointee\n");
+      // printf("DEBUG: Base type is pointer, checking pointee\n");
       AstNode *pointee = base_type->type_data.pointer.pointee_type;
       if (pointee && pointee->type == AST_TYPE_BASIC) {
-        printf("DEBUG: Pointee is basic type: '%s'\n",
-               pointee->type_data.basic.name);
+        // printf("DEBUG: Pointee is basic type: '%s'\n",
+        //        pointee->type_data.basic.name);
         // Check if the pointee is a struct type name
         Symbol *struct_symbol =
             scope_lookup(scope, pointee->type_data.basic.name);
         if (struct_symbol && struct_symbol->type &&
             struct_symbol->type->type == AST_TYPE_STRUCT) {
-          printf("DEBUG: Found struct type through pointer\n");
+          // printf("DEBUG: Found struct type through pointer\n");
           base_type = struct_symbol->type; // Use the struct type
         }
       } else if (pointee && pointee->type == AST_TYPE_STRUCT) {
-        printf("DEBUG: Pointee is direct struct type\n");
+        // printf("DEBUG: Pointee is direct struct type\n");
         base_type = pointee;
       }
     }
@@ -351,19 +351,19 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
           scope_lookup(scope, base_type->type_data.basic.name);
       if (struct_symbol && struct_symbol->type &&
           struct_symbol->type->type == AST_TYPE_STRUCT) {
-        printf("DEBUG: Found struct type by name lookup\n");
+        // printf("DEBUG: Found struct type by name lookup\n");
         base_type = struct_symbol->type; // Use the actual struct type
       }
     }
 
     // Now check if it's a struct type and get the member
     if (base_type->type == AST_TYPE_STRUCT) {
-      printf("DEBUG: Checking struct '%s' for member '%s'\n",
-             base_type->type_data.struct_type.name, member_name);
+      // printf("DEBUG: Checking struct '%s' for member '%s'\n",
+      //        base_type->type_data.struct_type.name, member_name);
 
       AstNode *member_type = get_struct_member_type(base_type, member_name);
       if (member_type) {
-        printf("DEBUG: Found member type: %p\n", (void *)member_type);
+        // printf("DEBUG: Found member type: %p\n", (void *)member_type);
         return member_type;
       }
 

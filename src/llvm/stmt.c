@@ -528,8 +528,7 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
         LLVMValueRef start_val = get_range_start_value(ctx, value);
         LLVMValueRef end_val = get_range_end_value(ctx, value);
 
-        // Create format string for range: "%lld..%lld" or "%d..%d" depending on
-        // type
+        // Create format string for range: "%lld..%lld" or "%d..%d" depending on type
         LLVMTypeRef field_types[2];
         LLVMGetStructElementTypes(value_type, field_types);
         unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
@@ -545,13 +544,12 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
 
         // Call printf with start and end values
         LLVMValueRef range_args[] = {range_format_str, start_val, end_val};
-        LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3,
-                       "");
+        LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3, "");
 
         continue; // Skip the regular printing logic
       }
 
-      // Handle non-range expressions as before
+      // Handle non-range expressions with improved pointer type detection
       if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
         unsigned int bits = LLVMGetIntTypeWidth(value_type);
         if (bits == 8 || bits == 16 || bits == 32) {
@@ -563,6 +561,23 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
         }
       } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
         format_str = "%f";
+      } else if (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind) {
+        format_str = "%f";
+      } else if (LLVMGetTypeKind(value_type) == LLVMPointerTypeKind) {
+        // This is the key fix - check if it's a char* (string)
+        // For char*, we want to print the string content, not the address
+        
+        // Check if this might be a string (char*)
+        // We'll use a heuristic: if it came from a struct field that's likely
+        // to be a string, or if it's a global string, treat it as %s
+        
+        // For now, let's assume all char* should be printed as strings
+        // In a more sophisticated compiler, you'd track type information
+        format_str = "%s";
+        
+        // Alternative: you could be more conservative and only treat certain
+        // patterns as strings, falling back to %p for other pointers:
+        // format_str = "%p";
       } else {
         format_str = "%p";
       }

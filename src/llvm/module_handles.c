@@ -204,6 +204,106 @@ void import_variable_symbol(CodeGenContext *ctx, LLVM_Symbol *source_symbol,
 // MEMBER ACCESS HANDLER (for module.symbol syntax)
 // =============================================================================
 
+// Enhanced member access handler that distinguishes between different access patterns
+LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx, AstNode *node) {
+  if (!node || node->type != AST_EXPR_MEMBER) {
+    return NULL;
+  }
+
+  AstNode *object = node->expr.member.object;
+  const char *member = node->expr.member.member;
+
+  if (object->type != AST_EXPR_IDENTIFIER) {
+    // Handle complex expressions like function_call().field or (*ptr).field
+    return codegen_expr_struct_access(ctx, node);
+  }
+
+  const char *object_name = object->expr.identifier.name;
+
+  // Strategy: Try different interpretations in order of likelihood
+  
+  // 1. First, check if this is a struct field access (obj.field or ptr->field)
+  LLVM_Symbol *obj_sym = find_symbol(ctx, object_name);
+  if (obj_sym && !obj_sym->is_function) {
+    // Check if the object is a direct struct type
+    for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+      if (info->llvm_type == obj_sym->type) {
+        // This is a direct struct field access
+        return codegen_expr_struct_access(ctx, node);
+      }
+    }
+    
+    // Check if the object is a pointer to a struct type
+    // For pointers, we need to check what they point to
+    LLVMTypeRef obj_type = obj_sym->type;
+    if (LLVMGetTypeKind(obj_type) == LLVMPointerTypeKind) {
+      // This could be a pointer to struct - let struct access handler deal with it
+      return codegen_expr_struct_access(ctx, node);
+    }
+  }
+
+  // 2. Check if this is a module/namespace access (module.symbol or enum.member)
+  char qualified_name[256];
+  snprintf(qualified_name, sizeof(qualified_name), "%s.%s", object_name, member);
+  
+  LLVM_Symbol *qualified_sym = find_symbol_in_module(ctx->current_module, qualified_name);
+  if (qualified_sym) {
+    if (qualified_sym->is_function) {
+      return qualified_sym->value;
+    } else if (is_enum_constant(qualified_sym)) {
+      // Enum constant - return the constant value directly
+      return LLVMGetInitializer(qualified_sym->value);
+    } else {
+      // Regular variable - load its value
+      return LLVMBuildLoad2(ctx->builder, qualified_sym->type, qualified_sym->value, "load");
+    }
+  }
+
+  // 3. If not found in current module, check other modules (for imported symbols)
+  for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
+    if (unit == ctx->current_module) continue;
+    
+    qualified_sym = find_symbol_in_module(unit, qualified_name);
+    if (qualified_sym && qualified_sym->is_function) {
+      // Check if function has external linkage (is public)
+      LLVMValueRef func = LLVMGetNamedFunction(unit->module, qualified_sym->name);
+      if (func && LLVMGetLinkage(func) == LLVMExternalLinkage) {
+        // Create external declaration in current module if not exists
+        LLVMModuleRef current_llvm_module =
+            ctx->current_module ? ctx->current_module->module : ctx->module;
+        
+        LLVMValueRef existing = LLVMGetNamedFunction(current_llvm_module, qualified_sym->name);
+        if (!existing) {
+          LLVMTypeRef func_type = LLVMGlobalGetValueType(qualified_sym->value);
+          existing = LLVMAddFunction(current_llvm_module, qualified_sym->name, func_type);
+          LLVMSetLinkage(existing, LLVMExternalLinkage);
+          add_symbol(ctx, qualified_name, existing, func_type, true);
+        }
+        return qualified_sym->value;
+      }
+    }
+  }
+
+  // 4. Check if object_name is an enum type namespace
+  LLVM_Symbol *enum_type_sym = find_symbol(ctx, object_name);
+  if (enum_type_sym && enum_type_sym->value == NULL) {
+    // This is an enum namespace, but the member wasn't found
+    fprintf(stderr, "Error: Enum member '%s' not found in enum '%s'\n", member, object_name);
+    return NULL;
+  }
+
+  // 5. Finally, check if this might be a struct access with a variable that wasn't found
+  if (!obj_sym) {
+    fprintf(stderr, "Error: Undefined variable '%s' in member access '%s.%s'\n", 
+           object_name, object_name, member);
+  } else {
+    fprintf(stderr, "Error: Symbol '%s.%s' not found and '%s' is not a struct\n", 
+           object_name, member, object_name);
+  }
+
+  return NULL;
+}
+
 LLVMValueRef codegen_expr_member_access(CodeGenContext *ctx, AstNode *node) {
   if (!node || node->type != AST_EXPR_MEMBER) {
     return NULL;

@@ -1,31 +1,18 @@
 @module "main"
 
-@use "fib" as fib
-
-const WeekDay = enum {
-    Sunday,
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
+const Person = struct {
+    name: *char,
+    age: int,
 };
 
 pub const main = fn () int {
-    let x: WeekDay = WeekDay::Saturday;
+    let x: *Person = cast<*Person>(alloc(sizeof<Person>));
+    defer { free(x); }
 
-    switch (x) {
-        WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
-        WeekDay::Thursday => {
-            output("Here ", fib::fib(x, 0, 1), "\n");
-        }
-        WeekDay::Friday, WeekDay::Saturday, 
-        WeekDay::Sunday => {
-            output(x, "\n");
-        }
-        // _ => output("Weekday was not found.\n");
-    }
+    x.name = "Connor";
+    x.age = 20;
+
+    output("name: ", x.name, " age: ", x.age, "\n");
 
     return 0;
 }

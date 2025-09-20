@@ -58,7 +58,13 @@ LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
   } else if (strcmp(type_name, "char") == 0) {
     return LLVMInt8TypeInContext(ctx->context);
   } else {
-    // Check if this is an enum type
+    // Check if this is a struct type
+    LLVMTypeRef struct_type = codegen_type_struct(ctx, type_name);
+    if (struct_type) {
+      return struct_type;
+    }
+    
+    // Check if this is an enum type (existing code)
     return get_enum_type(ctx, type_name);
   }
 

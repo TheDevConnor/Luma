@@ -228,9 +228,9 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   size_t private_count = node->stmt.struct_decl.private_count;
   bool is_public = node->stmt.struct_decl.is_public;
 
-  printf("DEBUG: Processing struct '%s' with %zu public members, %zu private "
-         "members\n",
-         struct_name, public_count, private_count);
+  // printf("DEBUG: Processing struct '%s' with %zu public members, %zu private "
+  //        "members\n",
+  //        struct_name, public_count, private_count);
 
   // Validate struct name
   if (!struct_name) {
@@ -261,7 +261,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   // Process public members
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = public_members[i];
-    printf("DEBUG: Processing public member %zu: %p\n", i, (void *)member);
+    // printf("DEBUG: Processing public member %zu: %p\n", i, (void *)member);
 
     if (!member) {
       tc_error(node, "Struct Error", "Public member %zu is NULL in struct '%s'",
@@ -269,8 +269,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       return false;
     }
 
-    printf("DEBUG: Member type: %d (expected AST_STMT_FIELD_DECL)\n",
-           member->type);
+    // printf("DEBUG: Member type: %d (expected AST_STMT_FIELD_DECL)\n",
+    //        member->type);
 
     if (member->type != AST_STMT_FIELD_DECL) {
       tc_error(node, "Struct Error",
@@ -283,19 +283,19 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     AstNode *field_type = member->stmt.field_decl.type;
     AstNode *field_function = member->stmt.field_decl.function;
 
-    printf("DEBUG: Field name: '%s', type: %p, function: %p\n",
-           field_name ? field_name : "NULL", (void *)field_type,
-           (void *)field_function);
+    // printf("DEBUG: Field name: '%s', type: %p, function: %p\n",
+    //        field_name ? field_name : "NULL", (void *)field_type,
+    //        (void *)field_function);
 
     // Additional debugging for the type
-    if (field_type) {
-      printf("DEBUG: Field type category: %d, type: %d\n", field_type->category,
-             field_type->type);
-      if (field_type->type == AST_TYPE_BASIC) {
-        printf("DEBUG: Basic type name: '%s'\n",
-               field_type->type_data.basic.name);
-      }
-    }
+    // if (field_type) {
+    //   printf("DEBUG: Field type category: %d, type: %d\n", field_type->category,
+    //          field_type->type);
+    //   if (field_type->type == AST_TYPE_BASIC) {
+    //     printf("DEBUG: Basic type name: '%s'\n",
+    //            field_type->type_data.basic.name);
+    //   }
+    // }
 
     // Validate field name
     if (!field_name) {
@@ -322,7 +322,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
     // Handle method vs data field
     if (field_function) {
-      printf("DEBUG: Processing method '%s'\n", field_name);
+      // printf("DEBUG: Processing method '%s'\n", field_name);
       // This is a method - validate the function
       if (!typecheck_statement(field_function, scope, arena)) {
         tc_error(node, "Struct Method Error",
@@ -335,7 +335,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       Symbol *method_symbol = scope_lookup_current_only(scope, field_name);
       if (method_symbol && method_symbol->type) {
         all_member_types[member_index] = method_symbol->type;
-        printf("DEBUG: Method type found: %p\n", (void *)method_symbol->type);
+        // printf("DEBUG: Method type found: %p\n", (void *)method_symbol->type);
       } else {
         tc_error(node, "Struct Method Error",
                  "Could not find type for method '%s' in struct '%s'",
@@ -343,7 +343,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         return false;
       }
     } else if (field_type) {
-      printf("DEBUG: Processing data field '%s'\n", field_name);
+      // printf("DEBUG: Processing data field '%s'\n", field_name);
       // This is a data field - validate the type
       if (field_type->category != Node_Category_TYPE) {
         tc_error(node, "Struct Field Error",
@@ -354,7 +354,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         return false;
       }
       all_member_types[member_index] = field_type;
-      printf("DEBUG: Data field type assigned: %p\n", (void *)field_type);
+      // printf("DEBUG: Data field type assigned: %p\n", (void *)field_type);
     } else {
       tc_error(node, "Struct Field Error",
                "Field '%s' in struct '%s' has neither type nor function",
@@ -370,8 +370,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       return false;
     }
 
-    printf("DEBUG: Final type for member %zu ('%s'): %p\n", member_index,
-           field_name, (void *)all_member_types[member_index]);
+    // printf("DEBUG: Final type for member %zu ('%s'): %p\n", member_index,
+    //        field_name, (void *)all_member_types[member_index]);
 
     all_member_names[member_index] = field_name;
     member_index++;
@@ -384,10 +384,10 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     // (You can add the same debug logic here)
   }
 
-  printf("DEBUG: Creating struct type with %zu members\n", total_members);
+  // printf("DEBUG: Creating struct type with %zu members\n", total_members);
   for (size_t i = 0; i < total_members; i++) {
-    printf("DEBUG: Member %zu: '%s' -> type %p\n", i, all_member_names[i],
-           (void *)all_member_types[i]);
+    // printf("DEBUG: Member %zu: '%s' -> type %p\n", i, all_member_names[i],
+          //  (void *)all_member_types[i]);
   }
 
   // Create struct type
@@ -401,7 +401,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     return false;
   }
 
-  printf("DEBUG: Struct type created: %p\n", (void *)struct_type);
+  // printf("DEBUG: Struct type created: %p\n", (void *)struct_type);
 
   // Add struct type to scope
   if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false,
@@ -411,8 +411,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     return false;
   }
 
-  printf("DEBUG: About to print struct type:\n");
-  debug_print_struct_type(struct_type, 0);
+  // printf("DEBUG: About to print struct type:\n");
+  // debug_print_struct_type(struct_type, 0);
 
   return true;
 }

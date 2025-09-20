@@ -93,11 +93,16 @@ LLVMValueRef codegen_expr_identifier(CodeGenContext *ctx, AstNode *node) {
   if (sym) {
     if (sym->is_function) {
       return sym->value;
+    } else if (is_enum_constant(sym)) {
+      // Enum constant - return the constant value directly
+      return LLVMGetInitializer(sym->value);
     } else {
       // Load variable value
       return LLVMBuildLoad2(ctx->builder, sym->type, sym->value, "load");
     }
   }
+
+  fprintf(stderr, "Error: Undefined symbol '%s'\n", node->expr.identifier.name);
   return NULL;
 }
 
@@ -156,6 +161,11 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
     return LLVMBuildNot(ctx->builder, operand, "not");
   case UNOP_PRE_INC:
   case UNOP_POST_INC: {
+    if (node->expr.unary.operand->type != AST_EXPR_IDENTIFIER) {
+      fprintf(stderr, "Error: Increment/decrement requires an lvalue\n");
+      return NULL;
+    }
+
     LLVM_Symbol *sym =
         find_symbol(ctx, node->expr.unary.operand->expr.identifier.name);
     if (!sym || sym->is_function) {
@@ -173,6 +183,11 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
   }
   case UNOP_PRE_DEC:
   case UNOP_POST_DEC: {
+    if (node->expr.unary.operand->type != AST_EXPR_IDENTIFIER) {
+      fprintf(stderr, "Error: Increment/decrement requires an lvalue\n");
+      return NULL;
+    }
+
     LLVM_Symbol *sym =
         find_symbol(ctx, node->expr.unary.operand->expr.identifier.name);
     if (!sym || sym->is_function) {
@@ -228,27 +243,87 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       return value;
     }
   }
-
   // Handle pointer dereference assignment: *ptr = value
   else if (target->type == AST_EXPR_DEREF) {
     LLVMValueRef ptr = codegen_expr(ctx, target->expr.deref.object);
     if (!ptr) {
       return NULL;
     }
-
-    // Store the value at the address pointed to by ptr
     LLVMBuildStore(ctx->builder, value, ptr);
     return value;
   }
+  // Handle struct member assignment: obj.field = value
+  else if (target->type == AST_EXPR_MEMBER) {
+    const char *field_name = target->expr.member.member;
+    AstNode *object = target->expr.member.object;
 
-  // Handle other lvalue types (array indexing, struct members, etc.)
-  // Add more cases as needed for your language
+    if (object->type == AST_EXPR_IDENTIFIER) {
+      const char *var_name = object->expr.identifier.name;
+      LLVM_Symbol *sym = find_symbol(ctx, var_name);
+      if (!sym || sym->is_function) {
+        fprintf(stderr, "Error: Variable %s not found or is a function\n",
+                var_name);
+        return NULL;
+      }
+
+      // Find the struct info by checking which struct has this field
+      StructInfo *struct_info = NULL;
+      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+        int field_idx = get_field_index(info, field_name);
+        if (field_idx >= 0) {
+          struct_info = info;
+          break;
+        }
+      }
+
+      if (!struct_info) {
+        fprintf(stderr, "Error: Could not find struct with field '%s'\n",
+                field_name);
+        return NULL;
+      }
+
+      // Find field index and check permissions
+      int field_index = get_field_index(struct_info, field_name);
+      if (!is_field_access_allowed(ctx, struct_info, field_index)) {
+        fprintf(stderr, "Error: Cannot assign to private field '%s'\n",
+                field_name);
+        return NULL;
+      }
+
+      // Handle the different cases for assignment
+      LLVMTypeRef symbol_type = sym->type;
+      LLVMValueRef struct_ptr;
+
+      if (LLVMGetTypeKind(symbol_type) == LLVMPointerTypeKind) {
+        // Pointer to struct - load the pointer value
+        LLVMTypeRef ptr_to_struct_type =
+            LLVMPointerType(struct_info->llvm_type, 0);
+        struct_ptr = LLVMBuildLoad2(ctx->builder, ptr_to_struct_type,
+                                    sym->value, "load_struct_ptr");
+      } else if (symbol_type == struct_info->llvm_type) {
+        // Direct struct variable
+        struct_ptr = sym->value;
+      } else {
+        fprintf(stderr,
+                "Error: Variable '%s' is not a struct or pointer to struct\n",
+                var_name);
+        return NULL;
+      }
+
+      // Use GEP to get the field address and store the value
+      LLVMValueRef field_ptr =
+          LLVMBuildStructGEP2(ctx->builder, struct_info->llvm_type, struct_ptr,
+                              field_index, "field_ptr");
+
+      LLVMBuildStore(ctx->builder, value, field_ptr);
+      return value;
+    }
+  }
 
   fprintf(stderr, "Error: Invalid assignment target\n");
   return NULL;
 }
 
-// cast<type>(value)
 // cast<type>(value)
 LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node) {
   LLVMTypeRef target_type = codegen_type(ctx, node->expr.cast.type);
@@ -355,7 +430,11 @@ LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node) {
     return NULL;
 
   // Get or declare malloc function
-  LLVMValueRef malloc_func = LLVMGetNamedFunction(ctx->module, "malloc");
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+  LLVMValueRef malloc_func =
+      LLVMGetNamedFunction(current_llvm_module, "malloc");
+
   if (!malloc_func) {
     // Declare malloc: void* malloc(size_t size)
     LLVMTypeRef size_t_type = LLVMInt64TypeInContext(ctx->context);
@@ -363,7 +442,7 @@ LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node) {
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
     LLVMTypeRef malloc_type =
         LLVMFunctionType(void_ptr_type, &size_t_type, 1, 0);
-    malloc_func = LLVMAddFunction(ctx->module, "malloc", malloc_type);
+    malloc_func = LLVMAddFunction(current_llvm_module, "malloc", malloc_type);
 
     // Set malloc as external linkage
     LLVMSetLinkage(malloc_func, LLVMExternalLinkage);
@@ -382,14 +461,17 @@ LLVMValueRef codegen_expr_free(CodeGenContext *ctx, AstNode *node) {
     return NULL;
 
   // Get or declare free function
-  LLVMValueRef free_func = LLVMGetNamedFunction(ctx->module, "free");
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+  LLVMValueRef free_func = LLVMGetNamedFunction(current_llvm_module, "free");
+
   if (!free_func) {
     // Declare free: void free(void* ptr)
     LLVMTypeRef void_type = LLVMVoidTypeInContext(ctx->context);
     LLVMTypeRef ptr_type =
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
     LLVMTypeRef free_type = LLVMFunctionType(void_type, &ptr_type, 1, 0);
-    free_func = LLVMAddFunction(ctx->module, "free", free_type);
+    free_func = LLVMAddFunction(current_llvm_module, "free", free_type);
     LLVMSetLinkage(free_func, LLVMExternalLinkage);
   }
 
@@ -454,10 +536,36 @@ LLVMValueRef codegen_expr_addr(CodeGenContext *ctx, AstNode *node) {
   } else if (target->type == AST_EXPR_DEREF) {
     // &(*ptr) == ptr
     return codegen_expr(ctx, target->expr.deref.object);
+  } else if (target->type == AST_EXPR_MEMBER) {
+    // Handle address of struct member: &obj.field
+    const char *field_name = target->expr.member.member;
+    AstNode *object = target->expr.member.object;
+
+    if (object->type == AST_EXPR_IDENTIFIER) {
+      LLVM_Symbol *sym = find_symbol(ctx, object->expr.identifier.name);
+      if (sym && !sym->is_function) {
+        // Find the struct type
+        StructInfo *struct_info = NULL;
+        for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+          if (info->llvm_type == sym->type) {
+            struct_info = info;
+            break;
+          }
+        }
+
+        if (struct_info) {
+          int field_index = get_field_index(struct_info, field_name);
+          if (field_index >= 0 &&
+              is_field_access_allowed(ctx, struct_info, field_index)) {
+            // Return pointer to the field
+            return LLVMBuildStructGEP2(ctx->builder, sym->type, sym->value,
+                                       field_index, "field_addr");
+          }
+        }
+      }
+    }
   }
 
-  // For other expressions, we'd need to create a temporary
-  // This is a simplified implementation
   fprintf(stderr, "Error: Cannot take address of this expression type\n");
   return NULL;
 }

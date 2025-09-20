@@ -383,7 +383,7 @@ const main = fn () int {
 ### Example: Math Module
 
 ```luma
-// File: math.luma
+// File: math.lx
 @module "math"
 
 pub const PI: float = 3.14159265359;
@@ -400,7 +400,7 @@ pub const pow = fn (base: float, exp: float) float {
 ```
 
 ```luma
-// File: main.luma
+// File: main.lx
 @module "main"
 @use "math" as math
 
@@ -556,7 +556,7 @@ The analyzer provides clear, actionable error messages with precise source locat
 
 ```
 Error: Memory leak detected
-  --> main.luma:15:5
+  --> main.lx:15:5
    |
 15 |     let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
    |         ^^^^^^ allocated here
@@ -568,7 +568,7 @@ Note: This allocation has no corresponding free()
 Help: Add a free() call before the variable goes out of scope
 
 Error: Double free detected
-  --> main.luma:18:5
+  --> main.lx:18:5
    |
 18 |     free(data);
    |     ^^^^^^^^^^ double free detected here

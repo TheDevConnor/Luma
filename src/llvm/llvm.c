@@ -230,6 +230,7 @@ CodeGenContext *init_codegen_context(ArenaAllocator *arena) {
   ctx->current_function = NULL;
   ctx->loop_continue_block = NULL;
   ctx->loop_break_block = NULL;
+  ctx->struct_types = NULL;
   ctx->arena = arena;
 
   return ctx;
