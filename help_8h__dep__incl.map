@@ -1,0 +1,23 @@
+<map id="src/helper/help.h" name="src/helper/help.h">
+<area shape="rect" id="Node000001" title="Declarations for command&#45;line parsing, file reading, and build configuration." alt="" coords="169,5,300,31"/>
+<area shape="rect" id="Node000002" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="17,79,146,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="199,39,108,81,105,76,197,34"/>
+<area shape="rect" id="Node000003" href="$run_8c.html" title=" " alt="" coords="5,152,128,177"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="219,44,192,74,159,106,123,133,89,154,86,150,120,129,156,102,188,71,215,40"/>
+<area shape="rect" id="Node000004" href="$main_8c.html" title="Entry point for the Lux compiler/interpreter build process." alt="" coords="465,79,554,104"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="293,32,466,76,464,81,291,37"/>
+<area shape="rect" id="Node000005" href="$parser_8c.html" title="Implementation of the parser module for the programming language compiler." alt="" coords="152,152,293,177"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="235,45,226,152,221,152,230,44"/>
+<area shape="rect" id="Node000006" href="$parser_8h.html" title="Recursive descent and Pratt parser for the Zura language." alt="" coords="298,79,441,104"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="270,35,349,76,346,81,267,39"/>
+<area shape="poly" id="edge6_Node000006_Node000003" title=" " alt="" coords="308,110,116,154,115,149,307,104"/>
+<area shape="poly" id="edge8_Node000006_Node000005" title=" " alt="" coords="335,112,248,154,246,149,333,107"/>
+<area shape="rect" id="Node000007" href="$parser_2expr_8c.html" title="Expression parsing implementation for the programming language compiler." alt="" coords="627,152,757,177"/>
+<area shape="poly" id="edge7_Node000006_Node000007" title=" " alt="" coords="435,104,640,149,639,154,434,110"/>
+<area shape="rect" id="Node000008" href="$parser__utils_8c.html" title="Utility functions for the parser module." alt="" coords="781,152,958,177"/>
+<area shape="poly" id="edge9_Node000006_Node000008" title=" " alt="" coords="455,102,790,149,789,155,454,107"/>
+<area shape="rect" id="Node000009" href="$parser_2stmt_8c.html" title="Statement parsing implementation for the programming language compiler." alt="" coords="317,152,448,177"/>
+<area shape="poly" id="edge10_Node000006_Node000009" title=" " alt="" coords="377,117,383,151,378,152,371,118"/>
+<area shape="rect" id="Node000010" href="$parser_2type_8c.html" title=" " alt="" coords="472,152,603,177"/>
+<area shape="poly" id="edge11_Node000006_Node000010" title=" " alt="" coords="410,107,511,149,509,154,408,112"/>
+</map>
