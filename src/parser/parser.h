@@ -179,6 +179,7 @@ Expr *call_expr(Parser *parser, Expr *left, BindingPower bp);
 Expr *assign_expr(Parser *parser, Expr *left, BindingPower bp);
 Expr *prefix_expr(Parser *parser, Expr *left, BindingPower bp);
 Expr *array_expr(Parser *parser);
+Expr *index_expr(Parser *parser);
 // pointer and memory related
 Expr *deref_expr(Parser *parser);
 Expr *addr_expr(Parser *parser);

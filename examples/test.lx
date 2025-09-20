@@ -1,18 +1,22 @@
 @module "main"
 
-const Person = struct {
-    name: *char,
-    age: int,
-};
+@use "stdstr" as s 
 
 pub const main = fn () int {
-    let x: *Person = cast<*Person>(alloc(sizeof<Person>));
-    defer { free(x); }
+    let x: *char = "Hello, World!";
+    let y: *char = "Hello, There!";
+    output(s::strcmp(x, y), "\n");
+    output(s::cat(x, y), "\n");
 
-    x.name = "Connor";
-    x.age = 20;
+    let z: *char = cast<*char>(alloc(100));
+    defer { free(z); }
+    s::n_copy(z, x, 5);
+    output(z, "\n");
 
-    output("name: ", x.name, " age: ", x.age, "\n");
+    let msg: *char = "Hello, World!";
+    let p: char;
+    p = s::s_char(msg, 87);
+    output(p, "\n");
 
     return 0;
 }

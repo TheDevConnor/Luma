@@ -121,11 +121,11 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
 
   // printf("Linking modules into executable: %s\n", exe_file);
   if (!link_object_files(output_dir, exe_file)) {
-    fprintf(stderr, "Failed to link object files\n");
+    // fprintf(stderr, "Failed to link object files\n");
 
     // Try to provide more helpful error information
-    printf("\nTrying to diagnose linking issues...\n");
-    debug_object_files(output_dir);
+    // printf("\nTrying to diagnose linking issues...\n");
+    // debug_object_files(output_dir);
 
     cleanup_codegen_context(ctx);
     return false;
@@ -245,8 +245,7 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   }
 
   config->tokens = tokens;
-  config->token_count =
-      tokens.count;
+  config->token_count = tokens.count;
 
   // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator, config);
@@ -369,7 +368,8 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
-  tc_error_init(config.tokens.data, config.token_count, config.filepath, allocator);
+  tc_error_init(config.tokens.data, config.token_count, config.filepath,
+                allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
   error_report();
   // debug_print_scope(&root_scope, 0);
@@ -385,7 +385,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
         int memory_issues = static_memory_check_and_report(
             analyzer,
             allocator,          // Your arena allocator
-            config.tokens.data,      // Your token array
+            config.tokens.data, // Your token array
             config.token_count, // Number of tokens
             config.filepath);   // Source file path
 

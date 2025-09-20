@@ -1,0 +1,70 @@
+@module "stdstr"
+
+pub const strlen = fn (s: *char) int {
+  let length: int = 0;
+  loop (s[length] != cast<char>(0)) : (++length) {}
+  return length;
+}
+
+pub const strcmp = fn (s1: *char, s2: *char) int {
+  let ls1: int = strlen(s1);
+  let ls2: int = strlen(s2);
+
+  if (ls1 != ls2) { return -1; }
+
+  loop[i: int = 0](i < ls1) : (++i) {
+    if (s1[i] != s2[i]) { return 1; }
+  }
+
+  return 0;
+}
+
+pub const s_char = fn (s: *char, c: int) char{
+  loop [i: int = 0](s[i] != cast<char>(0)) : (++i) {
+    if (s[i] == cast<char>(c)) {
+      return s[i];
+    }
+  }
+
+  return cast<char>(0);
+}
+
+pub const copy = fn (dest: *char, src: *char) *char {
+  let i: int = 0;
+  loop((dest[i] = src[i]) != cast<char>(0)) : (++i) {}
+  return dest;
+}
+
+pub const n_copy = fn (dest: *char, src: *char, n: int) *char {
+  let i: int = 0;
+  loop(i < n && src[i] != cast<char>(0)) : (++i) {
+    dest[i] = src[i]; 
+  }
+  return dest;
+}
+
+// NOTE: There is a memory leak here. Until i can find a better way of doing this.
+pub const cat = fn (dest: *char, src: *char) *char {
+  let ls1: int = strlen(dest);
+  let ls2: int = strlen(src);
+  let lt: int = ls1 + ls2 + 1; // +1 for null terminator
+  let result: *char = cast<*char>(alloc(lt));
+
+  // copy dest
+  let i: int = 0;
+  loop (i < ls1) : (i++) {
+    result[i] = dest[i];
+  }
+
+  // copy src starting at ls1
+  let j: int = 0;
+  loop (j < ls2) : (j++) {
+    result[ls1 + j] = src[j];
+  }
+
+  // null terminator
+  result[lt - 1] = cast<char>(0);
+
+  return result;
+}
+

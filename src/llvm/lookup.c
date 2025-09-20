@@ -20,6 +20,8 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
     return codegen_expr_assignment(ctx, node);
   case AST_EXPR_GROUPING:
     return codegen_expr(ctx, node->expr.grouping.expr);
+  case AST_EXPR_INDEX:
+    return codegen_expr_index(ctx, node);
   case AST_EXPR_CAST:
     return codegen_expr_cast(ctx, node);
   case AST_EXPR_SIZEOF:
@@ -42,8 +44,9 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
 }
 
 LLVMValueRef codegen_stmt(CodeGenContext *ctx, AstNode *node) {
-  if (!node) return NULL;
-  
+  if (!node)
+    return NULL;
+
   switch (node->type) {
   case AST_PROGRAM:
     // Use the new multi-module handler instead of the old one

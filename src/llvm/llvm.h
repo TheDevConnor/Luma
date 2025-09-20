@@ -49,14 +49,14 @@ typedef struct DeferredStatement {
 } DeferredStatement;
 
 typedef struct StructInfo {
-    char *name;
-    LLVMTypeRef llvm_type;
-    char **field_names;
-    LLVMTypeRef *field_types;
-    bool *field_is_public;
-    size_t field_count;
-    bool is_public;
-    struct StructInfo *next;
+  char *name;
+  LLVMTypeRef llvm_type;
+  char **field_names;
+  LLVMTypeRef *field_types;
+  bool *field_is_public;
+  size_t field_count;
+  bool is_public;
+  struct StructInfo *next;
 } StructInfo;
 
 // Code generation context
@@ -190,14 +190,18 @@ LLVMLinkage get_function_linkage(AstNode *node);
 StructInfo *find_struct_type(CodeGenContext *ctx, const char *name);
 void add_struct_type(CodeGenContext *ctx, StructInfo *struct_info);
 int get_field_index(StructInfo *struct_info, const char *field_name);
-bool is_field_access_allowed(CodeGenContext *ctx, StructInfo *struct_info, int field_index);
+bool is_field_access_allowed(CodeGenContext *ctx, StructInfo *struct_info,
+                             int field_index);
 
 // Enhanced member access (handles both struct.field and module.symbol)
-LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
+                                                 AstNode *node);
 
 // Struct literal/initializer support
-LLVMValueRef codegen_struct_literal(CodeGenContext *ctx, const char *struct_name, 
-                                   LLVMValueRef *field_values, size_t field_count);
+LLVMValueRef codegen_struct_literal(CodeGenContext *ctx,
+                                    const char *struct_name,
+                                    LLVMValueRef *field_values,
+                                    size_t field_count);
 
 // =============================================================================
 // STRUCT TYPE SYSTEM INTEGRATION
@@ -208,9 +212,10 @@ bool is_struct_type(CodeGenContext *ctx, LLVMTypeRef type);
 const char *get_struct_name_from_type(CodeGenContext *ctx, LLVMTypeRef type);
 
 // Struct construction helpers
-LLVMValueRef create_struct_zero_initializer(CodeGenContext *ctx, const char *struct_name);
-LLVMValueRef create_struct_copy(CodeGenContext *ctx, LLVMValueRef src_struct, 
-                               StructInfo *struct_info);
+LLVMValueRef create_struct_zero_initializer(CodeGenContext *ctx,
+                                            const char *struct_name);
+LLVMValueRef create_struct_copy(CodeGenContext *ctx, LLVMValueRef src_struct,
+                                StructInfo *struct_info);
 
 // Struct debugging and introspection
 void print_struct_info(CodeGenContext *ctx, const char *struct_name);
@@ -249,6 +254,7 @@ LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node);
@@ -283,10 +289,11 @@ LLVMValueRef codegen_loop(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_break_continue(CodeGenContext *ctx, AstNode *node);
 
 LLVMValueRef codegen_stmt_switch(CodeGenContext *ctx, AstNode *node);
-LLVMValueRef codegen_stmt_case(CodeGenContext *ctx, AstNode *node);  
+LLVMValueRef codegen_stmt_case(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_stmt_default(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_case_value(CodeGenContext *ctx, AstNode *case_value);
-LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx, AstNode *member_expr);
+LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx,
+                                      AstNode *member_expr);
 
 // =============================================================================
 // DEFER MANAGEMENT FUNCTIONS

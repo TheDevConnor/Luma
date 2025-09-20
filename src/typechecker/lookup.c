@@ -12,8 +12,6 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
       }
     }
     return true;
-
-  // ... rest of your existing cases ...
   case AST_STMT_VAR_DECL:
     return typecheck_var_decl(stmt, scope, arena);
   case AST_STMT_FUNCTION:
@@ -28,7 +26,6 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     return typecheck_return_decl(stmt, scope, arena);
   case AST_STMT_IF:
     return typecheck_if_decl(stmt, scope, arena);
-
   case AST_STMT_BLOCK: {
     // Create new scope for block
     Scope *block_scope = create_child_scope(scope, "block", arena);
@@ -39,7 +36,6 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     }
     return true;
   }
-
   case AST_STMT_PRINT: {
     // Typecheck each argument expression
     for (size_t i = 0; i < stmt->stmt.print_stmt.expr_count; i++) {
@@ -50,19 +46,18 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     }
     return true;
   }
-
   case AST_STMT_DEFER:
     return typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
   case AST_STMT_LOOP:
     return typecheck_loop_decl(stmt, scope, arena);
   case AST_STMT_BREAK_CONTINUE:
     return true; // Nothing to typecheck
-
   case AST_STMT_SWITCH:
     return typecheck_switch_stmt(stmt, scope, arena);
 
   default:
-    tc_error(stmt, "Unsupported Statement", "Warning: Unhandled statement type %d", stmt->type);
+    tc_error(stmt, "Unsupported Statement",
+             "Warning: Unhandled statement type %d", stmt->type);
     return true; // Don't fail on unimplemented statements yet
   }
 }
@@ -89,25 +84,22 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
       return NULL;
     }
   }
-
   case AST_EXPR_IDENTIFIER: {
     Symbol *symbol = scope_lookup(scope, expr->expr.identifier.name);
     if (!symbol) {
-      tc_error(expr, "Undefined Identifier", "Undefined identifier '%s' at line %zu",
+      tc_error(expr, "Undefined Identifier",
+               "Undefined identifier '%s' at line %zu",
                expr->expr.identifier.name, expr->line);
       return NULL;
     }
     return symbol->type;
   }
-
   case AST_EXPR_BINARY:
     return typecheck_binary_expr(expr, scope, arena);
   case AST_EXPR_UNARY:
     return typecheck_unary_expr(expr, scope, arena);
-
   case AST_EXPR_CALL:
     return typecheck_call_expr(expr, scope, arena);
-
   case AST_EXPR_ASSIGNMENT: {
     AstNode *target_type =
         typecheck_expression(expr->expr.assignment.target, scope, arena);
@@ -120,42 +112,36 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     // Check if target is assignable (not just type compatible)
     TypeMatchResult match = types_match(target_type, value_type);
     if (match == TYPE_MATCH_NONE) {
-      tc_error(expr, "Type Mismatch", "Type mismatch in assignment at line %zu", expr->line, expr->column);
+      tc_error(expr, "Type Mismatch", "Type mismatch in assignment at line %zu",
+               expr->line, expr->column);
       return NULL;
     }
 
     return target_type;
   }
-
   case AST_EXPR_GROUPING:
     return typecheck_expression(expr->expr.grouping.expr, scope, arena);
-
+  case AST_EXPR_INDEX:
+    return typecheck_index_expr(expr, scope, arena);
   case AST_EXPR_MEMBER:
     return typecheck_member_expr(expr, scope, arena);
-
   case AST_EXPR_DEREF:
     return typecheck_deref_expr(expr, scope, arena);
-
   case AST_EXPR_ADDR:
     return typecheck_addr_expr(expr, scope, arena);
-
   case AST_EXPR_CAST:
     return typecheck_cast_expr(expr, scope, arena);
-
   case AST_EXPR_ALLOC:
     return typecheck_alloc_expr(expr, scope, arena);
-
   case AST_EXPR_FREE:
     return typecheck_free_expr(expr, scope, arena);
-
   case AST_EXPR_MEMCPY:
     return typecheck_memcpy_expr(expr, scope, arena);
-
   case AST_EXPR_SIZEOF:
     return typecheck_sizeof_expr(expr, scope, arena);
-
   default:
-    tc_error(expr, "Unsupported Expression", "Unsupported expression type %d", expr->type);
+    tc_error(expr, "Unsupported Expression", "Unsupported expression type %d",
+             expr->type);
     return create_basic_type(arena, "unknown", expr->line, expr->column);
   }
 }
