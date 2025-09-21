@@ -1,19 +1,19 @@
 @module "main"
 
-@use "stdstr" as s 
+@use "memory" as mem
 
 pub const main = fn () int {
-    let x: *char = "Hello, World!";
-    let y: *char = "Hello, There!";
-    let dest: *char = cast<*char>(alloc(100));
-    let z: *char = cast<*char>(alloc(100));
-    defer { free(dest); free(z); }
+    let p: *void = mem::alligned_alloc(64, 100);
+    defer { free(p); }
 
-    output(s::strcmp(x, y), "\n");
-    output(s::cat(dest, x, y), "\n");
-    s::n_copy(z, x, 5);
-    output(z, "\n");
-    output(s::s_char(x, 87), "\n");
+    output("Pointer: ", *p, "\n");
+    output("Aligned? ");
+
+    if ((cast<int>(p) / 64) * 64 == cast<int>(p)) {
+        output("yes\n");
+    } else {
+        output("no\n");
+    }
 
     return 0;
 }

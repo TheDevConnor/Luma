@@ -80,7 +80,7 @@ static size_t calculate_next_buffer_size(size_t current_size,
  * Allocates memory for a Buffer struct plus usable space aligned according to
  * the alignment.
  *
- * @param s Size of usable memory requested.
+ * @param s Size of usable memory requested.s
  * @param alignment Alignment requirement for the usable memory.
  * @return Pointer to the new Buffer on success, or NULL on failure.
  */

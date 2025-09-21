@@ -96,6 +96,7 @@ static const BinaryOp TOKEN_TO_BINOP_MAP[] = {
     [TOK_AND] = BINOP_AND,       [TOK_OR] = BINOP_OR,
     [TOK_AMP] = BINOP_BIT_AND,   [TOK_PIPE] = BINOP_BIT_OR,
     [TOK_CARET] = BINOP_BIT_XOR, [TOK_RANGE] = BINOP_RANGE,
+    [TOK_MODULOS] = BINOP_MOD,
 };
 
 /**

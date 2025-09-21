@@ -40,7 +40,7 @@ static const SymbolEntry symbols[] = {
     {"~", TOK_TILDE},        {"!", TOK_BANG},         {"?", TOK_QUESTION},
     {"::", TOK_RESOLVE},     {":", TOK_COLON},        {"_", TOK_SYMBOL},
     {"++", TOK_PLUSPLUS},    {"--", TOK_MINUSMINUS},  {"<<", TOK_SHIFT_LEFT},
-    {">>", TOK_SHIFT_RIGHT}, {"@", TOK_AT},
+    {">>", TOK_SHIFT_RIGHT}, {"@", TOK_AT},           {"%", TOK_MODULOS},
 };
 
 /** @internal Keyword text to token type mapping */

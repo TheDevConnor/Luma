@@ -328,6 +328,7 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_MINUS:
   case TOK_STAR:
   case TOK_SLASH:
+  case TOK_MODULOS:
   case TOK_EQEQ:
   case TOK_NEQ:
   case TOK_LT:

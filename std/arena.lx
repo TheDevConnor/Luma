@@ -1,1 +1,21 @@
 @module "arena"
+
+@use "math" as math
+
+const Buffer = struct {
+    size: int,
+    next: *void,
+    ptr:  *char
+};
+
+pub const Allocator = struct {
+    offset:           int,
+    buffer:           *Buffer,
+    head:             *Buffer,
+    next_buffer_size: int,
+    total_allocated:  int
+};
+
+// const buffer_create = fn (s: int, alignment: int) *Buffer {
+//     if (alignment == 0) { alignment = 1024; }
+// }

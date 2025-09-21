@@ -1,0 +1,11 @@
+@module "math"
+
+pub const max_size = fn (a: int, b: int) int {
+    if (a > b) { return a; }
+    return b; 
+}
+
+pub const min_size = fn (a: int, b: int) int {
+    if (a < b) { return a; }
+    return b; 
+}

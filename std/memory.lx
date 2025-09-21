@@ -1,0 +1,17 @@
+@module "memory"
+
+pub const alligned_alloc = fn (alignment: int, size: int) *void {
+    if (alignment < sizeof<*void>) {
+        alignment = sizeof<*void>;
+    }
+
+    let raw: *void = alloc(size + alignment - 1 + sizeof<*void>);
+
+    let raw_addr: int = cast<int>(raw) + sizeof<*void>;
+    let aligned_addr: int = ((raw_addr + alignment - 1) / alignment) * alignment;
+
+    let aligned_ptr: **void = cast<**void>(aligned_addr);
+    aligned_ptr[-1] = raw;
+
+    return cast<*void>(aligned_addr);
+}
