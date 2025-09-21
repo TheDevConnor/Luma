@@ -5,18 +5,15 @@
 pub const main = fn () int {
     let x: *char = "Hello, World!";
     let y: *char = "Hello, There!";
-    output(s::strcmp(x, y), "\n");
-    output(s::cat(x, y), "\n");
-
+    let dest: *char = cast<*char>(alloc(100));
     let z: *char = cast<*char>(alloc(100));
-    defer { free(z); }
+    defer { free(dest); free(z); }
+
+    output(s::strcmp(x, y), "\n");
+    output(s::cat(dest, x, y), "\n");
     s::n_copy(z, x, 5);
     output(z, "\n");
-
-    let msg: *char = "Hello, World!";
-    let p: char;
-    p = s::s_char(msg, 87);
-    output(p, "\n");
+    output(s::s_char(x, 87), "\n");
 
     return 0;
 }

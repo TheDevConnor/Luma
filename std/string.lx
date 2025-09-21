@@ -43,28 +43,21 @@ pub const n_copy = fn (dest: *char, src: *char, n: int) *char {
   return dest;
 }
 
-// NOTE: There is a memory leak here. Until i can find a better way of doing this.
-pub const cat = fn (dest: *char, src: *char) *char {
-  let ls1: int = strlen(dest);
-  let ls2: int = strlen(src);
-  let lt: int = ls1 + ls2 + 1; // +1 for null terminator
-  let result: *char = cast<*char>(alloc(lt));
+pub const cat = fn (dest: *char, s1: *char, s2: *char) *char {
+  let ls1: int = strlen(s1);
+  let lt: int = ls1 + strlen(s2) + 1;
 
-  // copy dest
-  let i: int = 0;
-  loop (i < ls1) : (i++) {
-    result[i] = dest[i];
-  }
-
-  // copy src starting at ls1
-  let j: int = 0;
-  loop (j < ls2) : (j++) {
-    result[ls1 + j] = src[j];
+  loop [i: int = 0](i < lt) : (++i) {
+    if (i < ls1) {
+      dest[i] = s1[i];
+    } else {
+      dest[i] = s2[i - ls1];
+    }
   }
 
   // null terminator
-  result[lt - 1] = cast<char>(0);
+  dest[lt - 1] = cast<char>(0);
 
-  return result;
+  return dest;
 }
 
