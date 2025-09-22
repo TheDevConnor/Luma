@@ -117,10 +117,10 @@ const Point = struct {
 
 // With explicit access modifiers
 const Player = struct {
-public:
+pub:
     name: str,
     score: int,
-private:
+priv:
     internal_id: uint,
     
     // Methods can be defined inside structs

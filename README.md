@@ -42,7 +42,7 @@ Modern systems programming often involves a trade-off between performance, safet
 **Current Phase:** Early Development
 
 Luma is currently in active development. Core language features are being implemented and the compiler architecture is being established. 
-Check out the [todo](todo) to see what is being worked on or that is done.
+Check out the [todo](todo.md) to see what is being worked on or that is done.
 
 ## Getting Started
 

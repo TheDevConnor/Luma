@@ -1,6 +1,7 @@
 @module "arena"
 
 @use "math" as math
+@use "arena" as arena
 
 const Buffer = struct {
     size: int,

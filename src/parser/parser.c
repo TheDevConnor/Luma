@@ -218,6 +218,7 @@ BindingPower get_bp(LumaTokenType kind) {
     return BP_SUM;
   case TOK_STAR:
   case TOK_SLASH:
+  case TOK_MODL:
     return BP_PRODUCT;
 
   // Postfix
@@ -328,7 +329,7 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_MINUS:
   case TOK_STAR:
   case TOK_SLASH:
-  case TOK_MODULOS:
+  case TOK_MODL:
   case TOK_EQEQ:
   case TOK_NEQ:
   case TOK_LT:

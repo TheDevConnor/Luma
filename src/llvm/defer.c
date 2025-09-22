@@ -17,6 +17,7 @@ void push_defer_statement(CodeGenContext *ctx, AstNode *statement) {
   ctx->deferred_count++;
 }
 
+// Execute deferred statements inline (for nested contexts)
 void execute_deferred_statements_inline(CodeGenContext *ctx,
                                         DeferredStatement *defers) {
   if (!defers)
@@ -34,7 +35,7 @@ void execute_deferred_statements_inline(CodeGenContext *ctx,
     current = next;
   }
 
-  // Execute all deferred statements WITHOUT handling nested defers
+  // Execute all deferred statements
   current = reversed_list;
   while (current) {
     // Save the current defer context
@@ -48,8 +49,10 @@ void execute_deferred_statements_inline(CodeGenContext *ctx,
     // Execute the deferred statement
     codegen_stmt(ctx, current->statement);
 
-    // DON'T execute nested deferred statements - this prevents recursion
-    // Nested defers should be handled by the appropriate scope
+    // Execute any nested deferred statements that were created
+    if (ctx->deferred_statements) {
+      execute_deferred_statements_inline(ctx, ctx->deferred_statements);
+    }
 
     // Restore the defer context
     ctx->deferred_statements = saved_defers;

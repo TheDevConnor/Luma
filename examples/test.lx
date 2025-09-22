@@ -1,19 +1,17 @@
 @module "main"
 
-@use "memory" as mem
+@use "stdstr" as str_
 
 pub const main = fn () int {
-    let p: *void = mem::alligned_alloc(64, 100);
-    defer { free(p); }
+    let a: *char = "Hello,";
+    let b: *char = " World!";
 
-    output("Pointer: ", *p, "\n");
-    output("Aligned? ");
+    let result: *char = cast<*char>(alloc(100));
+    defer { free(result); }
+    
+    result = str_::cat(result, a, b);  
 
-    if ((cast<int>(p) / 64) * 64 == cast<int>(p)) {
-        output("yes\n");
-    } else {
-        output("no\n");
-    }
-
+    output(result, "\n");
+    
     return 0;
 }

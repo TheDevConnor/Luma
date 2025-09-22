@@ -1,5 +1,31 @@
 @module "math"
 
+pub const add = fn (x: int, y: int) int {
+    return x + y;
+}
+
+pub const subtract = fn (x: int, y: int) int {
+    return x - y;
+}
+
+pub const multiply = fn (x: int, y: int) int {
+    return x * y;
+}
+
+pub const divide = fn (x: int, y: int) int { 
+    if (y == 0) {
+        output("(Division by zero error) ");
+        return 0;
+    }
+    return x / y;
+}
+
+pub const fib = fn (n: int, a: int, b: int) int {
+    if (n == 0) { return a; }
+    if (n == 1) { return b; }
+    return fib(n - 1, b, a + b);
+}
+
 pub const max_size = fn (a: int, b: int) int {
     if (a > b) { return a; }
     return b; 
