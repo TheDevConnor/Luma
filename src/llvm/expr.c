@@ -106,7 +106,7 @@ LLVMValueRef codegen_expr_identifier(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
-// Expression binary operation handler
+// Enhanced codegen_expr_binary function with float arithmetic support
 LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef left = codegen_expr(ctx, node->expr.binary.left);
   LLVMValueRef right = codegen_expr(ctx, node->expr.binary.right);
@@ -114,51 +114,213 @@ LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node) {
   if (!left || !right)
     return NULL;
 
+  // Get the types of both operands
+  LLVMTypeRef left_type = LLVMTypeOf(left);
+  LLVMTypeRef right_type = LLVMTypeOf(right);
+  LLVMTypeKind left_kind = LLVMGetTypeKind(left_type);
+  LLVMTypeKind right_kind = LLVMGetTypeKind(right_type);
+
+  // Determine if we're dealing with floating point operations
+  bool is_float_op =
+      (left_kind == LLVMFloatTypeKind || left_kind == LLVMDoubleTypeKind ||
+       right_kind == LLVMFloatTypeKind || right_kind == LLVMDoubleTypeKind);
+
+  // Handle type promotion if needed
+  if (is_float_op) {
+    // Promote integers to floats if mixing int and float
+    if (left_kind == LLVMIntegerTypeKind &&
+        (right_kind == LLVMFloatTypeKind || right_kind == LLVMDoubleTypeKind)) {
+      left = LLVMBuildSIToFP(ctx->builder, left, right_type, "int_to_float");
+      left_type = right_type;
+    } else if (right_kind == LLVMIntegerTypeKind &&
+               (left_kind == LLVMFloatTypeKind ||
+                left_kind == LLVMDoubleTypeKind)) {
+      right = LLVMBuildSIToFP(ctx->builder, right, left_type, "int_to_float");
+      right_type = left_type;
+    }
+
+    // Promote float to double if mixing float and double
+    if (left_kind == LLVMFloatTypeKind && right_kind == LLVMDoubleTypeKind) {
+      left = LLVMBuildFPExt(ctx->builder, left, right_type, "float_to_double");
+    } else if (right_kind == LLVMFloatTypeKind &&
+               left_kind == LLVMDoubleTypeKind) {
+      right = LLVMBuildFPExt(ctx->builder, right, left_type, "float_to_double");
+    }
+  }
+
   switch (node->expr.binary.op) {
   case BINOP_ADD:
-    return LLVMBuildAdd(ctx->builder, left, right, "add");
+    if (is_float_op) {
+      return LLVMBuildFAdd(ctx->builder, left, right, "fadd");
+    } else {
+      return LLVMBuildAdd(ctx->builder, left, right, "add");
+    }
+
   case BINOP_SUB:
-    return LLVMBuildSub(ctx->builder, left, right, "sub");
+    if (is_float_op) {
+      return LLVMBuildFSub(ctx->builder, left, right, "fsub");
+    } else {
+      return LLVMBuildSub(ctx->builder, left, right, "sub");
+    }
+
   case BINOP_MUL:
-    return LLVMBuildMul(ctx->builder, left, right, "mul");
+    if (is_float_op) {
+      return LLVMBuildFMul(ctx->builder, left, right, "fmul");
+    } else {
+      return LLVMBuildMul(ctx->builder, left, right, "mul");
+    }
+
   case BINOP_DIV:
-    return LLVMBuildSDiv(ctx->builder, left, right, "div");
+    if (is_float_op) {
+      return LLVMBuildFDiv(ctx->builder, left, right, "fdiv");
+    } else {
+      return LLVMBuildSDiv(ctx->builder, left, right, "div");
+    }
+
   case BINOP_MOD:
-    return LLVMBuildSRem(ctx->builder, left, right, "mod");
+    if (is_float_op) {
+      // Option 2: Implement modulo as a - (b * floor(a/b)) using LLVM
+      // intrinsics
+      LLVMModuleRef current_module =
+          ctx->current_module ? ctx->current_module->module : ctx->module;
+
+      // Declare floor intrinsic if needed
+      LLVMTypeRef floor_type;
+      LLVMValueRef floor_func;
+
+      if (LLVMGetTypeKind(left_type) == LLVMDoubleTypeKind) {
+        floor_type = LLVMFunctionType(LLVMDoubleTypeInContext(ctx->context),
+                                      &left_type, 1, false);
+        floor_func = LLVMGetNamedFunction(current_module, "llvm.floor.f64");
+        if (!floor_func) {
+          floor_func =
+              LLVMAddFunction(current_module, "llvm.floor.f64", floor_type);
+        }
+      } else {
+        floor_type = LLVMFunctionType(LLVMFloatTypeInContext(ctx->context),
+                                      &left_type, 1, false);
+        floor_func = LLVMGetNamedFunction(current_module, "llvm.floor.f32");
+        if (!floor_func) {
+          floor_func =
+              LLVMAddFunction(current_module, "llvm.floor.f32", floor_type);
+        }
+      }
+
+      // Calculate a / b
+      LLVMValueRef division =
+          LLVMBuildFDiv(ctx->builder, left, right, "fdiv_for_mod");
+
+      // Calculate floor(a / b)
+      LLVMValueRef floor_result = LLVMBuildCall2(
+          ctx->builder, floor_type, floor_func, &division, 1, "floor_result");
+
+      // Calculate b * floor(a / b)
+      LLVMValueRef multiply =
+          LLVMBuildFMul(ctx->builder, right, floor_result, "fmul_for_mod");
+
+      // Calculate a - (b * floor(a / b))
+      return LLVMBuildFSub(ctx->builder, left, multiply, "fmod_result");
+    } else {
+      return LLVMBuildSRem(ctx->builder, left, right, "mod");
+    }
+    break;
+
+  // Comparison operations
   case BINOP_EQ:
-    return LLVMBuildICmp(ctx->builder, LLVMIntEQ, left, right, "eq");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealOEQ, left, right, "feq");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntEQ, left, right, "eq");
+    }
+
   case BINOP_NE:
-    return LLVMBuildICmp(ctx->builder, LLVMIntNE, left, right, "ne");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealONE, left, right, "fne");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntNE, left, right, "ne");
+    }
+
   case BINOP_LT:
-    return LLVMBuildICmp(ctx->builder, LLVMIntSLT, left, right, "lt");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealOLT, left, right, "flt");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntSLT, left, right, "lt");
+    }
+
   case BINOP_LE:
-    return LLVMBuildICmp(ctx->builder, LLVMIntSLE, left, right, "le");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealOLE, left, right, "fle");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntSLE, left, right, "le");
+    }
+
   case BINOP_GT:
-    return LLVMBuildICmp(ctx->builder, LLVMIntSGT, left, right, "gt");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealOGT, left, right, "fgt");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntSGT, left, right, "gt");
+    }
+
   case BINOP_GE:
-    return LLVMBuildICmp(ctx->builder, LLVMIntSGE, left, right, "ge");
+    if (is_float_op) {
+      return LLVMBuildFCmp(ctx->builder, LLVMRealOGE, left, right, "fge");
+    } else {
+      return LLVMBuildICmp(ctx->builder, LLVMIntSGE, left, right, "ge");
+    }
+
+  // Logical operations (only for integers and booleans)
   case BINOP_AND:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Logical AND not supported for floating point values\n");
+      return NULL;
+    }
     return LLVMBuildAnd(ctx->builder, left, right, "and");
+
   case BINOP_OR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Logical OR not supported for floating point values\n");
+      return NULL;
+    }
     return LLVMBuildOr(ctx->builder, left, right, "or");
+
   case BINOP_RANGE:
+    // Range operations work with both integers and floats
     return create_range_struct(ctx, left, right);
+
   default:
     return NULL;
   }
 }
 
-// Expression unary operation handler
+// Enhanced codegen_expr_unary function with float support
 LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef operand = codegen_expr(ctx, node->expr.unary.operand);
   if (!operand)
     return NULL;
 
+  LLVMTypeRef operand_type = LLVMTypeOf(operand);
+  LLVMTypeKind operand_kind = LLVMGetTypeKind(operand_type);
+  bool is_float =
+      (operand_kind == LLVMFloatTypeKind || operand_kind == LLVMDoubleTypeKind);
+
   switch (node->expr.unary.op) {
   case UNOP_NEG:
-    return LLVMBuildNeg(ctx->builder, operand, "neg");
+    if (is_float) {
+      return LLVMBuildFNeg(ctx->builder, operand, "fneg");
+    } else {
+      return LLVMBuildNeg(ctx->builder, operand, "neg");
+    }
+
   case UNOP_NOT:
+    if (is_float) {
+      fprintf(stderr,
+              "Error: Logical NOT not supported for floating point values\n");
+      return NULL;
+    }
     return LLVMBuildNot(ctx->builder, operand, "not");
+
   case UNOP_PRE_INC:
   case UNOP_POST_INC: {
     if (node->expr.unary.operand->type != AST_EXPR_IDENTIFIER) {
@@ -175,12 +337,21 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
 
     LLVMValueRef loaded_val =
         LLVMBuildLoad2(ctx->builder, sym->type, sym->value, "load");
-    LLVMValueRef one = LLVMConstInt(LLVMTypeOf(loaded_val), 1, false);
-    LLVMValueRef incremented =
-        LLVMBuildAdd(ctx->builder, loaded_val, one, "inc");
+    LLVMValueRef one;
+    LLVMValueRef incremented;
+
+    if (is_float) {
+      one = LLVMConstReal(LLVMTypeOf(loaded_val), 1.0);
+      incremented = LLVMBuildFAdd(ctx->builder, loaded_val, one, "finc");
+    } else {
+      one = LLVMConstInt(LLVMTypeOf(loaded_val), 1, false);
+      incremented = LLVMBuildAdd(ctx->builder, loaded_val, one, "inc");
+    }
+
     LLVMBuildStore(ctx->builder, incremented, sym->value);
     return (node->expr.unary.op == UNOP_PRE_INC) ? incremented : loaded_val;
   }
+
   case UNOP_PRE_DEC:
   case UNOP_POST_DEC: {
     if (node->expr.unary.operand->type != AST_EXPR_IDENTIFIER) {
@@ -194,14 +365,24 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
       fprintf(stderr, "Error: Undefined variable for decrement\n");
       return NULL;
     }
+
     LLVMValueRef loaded_val =
         LLVMBuildLoad2(ctx->builder, sym->type, sym->value, "load");
-    LLVMValueRef one = LLVMConstInt(LLVMTypeOf(loaded_val), 1, false);
-    LLVMValueRef decremented =
-        LLVMBuildSub(ctx->builder, loaded_val, one, "dec");
+    LLVMValueRef one;
+    LLVMValueRef decremented;
+
+    if (is_float) {
+      one = LLVMConstReal(LLVMTypeOf(loaded_val), 1.0);
+      decremented = LLVMBuildFSub(ctx->builder, loaded_val, one, "fdec");
+    } else {
+      one = LLVMConstInt(LLVMTypeOf(loaded_val), 1, false);
+      decremented = LLVMBuildSub(ctx->builder, loaded_val, one, "dec");
+    }
+
     LLVMBuildStore(ctx->builder, decremented, sym->value);
     return (node->expr.unary.op == UNOP_PRE_DEC) ? decremented : loaded_val;
   }
+
   default:
     return NULL;
   }
@@ -598,21 +779,21 @@ LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
 
   // For other types, try to use LLVMSizeOf but with safety checks
   LLVMTypeKind kind = LLVMGetTypeKind(type);
-  
+
   switch (kind) {
-    case LLVMIntegerTypeKind: {
-      unsigned width = LLVMGetIntTypeWidth(type);
-      return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), width / 8, false);
-    }
-    case LLVMFloatTypeKind:
-      return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 4, false);
-    case LLVMDoubleTypeKind:
-      return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
-    case LLVMPointerTypeKind:
-      return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
-    default:
-      // For complex types, return 8 as a safe default
-      return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
+  case LLVMIntegerTypeKind: {
+    unsigned width = LLVMGetIntTypeWidth(type);
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), width / 8, false);
+  }
+  case LLVMFloatTypeKind:
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 4, false);
+  case LLVMDoubleTypeKind:
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
+  case LLVMPointerTypeKind:
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
+  default:
+    // For complex types, return 8 as a safe default
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   }
 }
 
@@ -697,25 +878,28 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
 
   // Try to infer the element type from the variable's symbol information
   LLVMTypeRef element_type = NULL;
-  
-  // If the dereference target is an identifier, try to get type info from symbol table
+
+  // If the dereference target is an identifier, try to get type info from
+  // symbol table
   if (node->expr.deref.object->type == AST_EXPR_IDENTIFIER) {
     const char *var_name = node->expr.deref.object->expr.identifier.name;
     LLVM_Symbol *sym = find_symbol(ctx, var_name);
-    
+
     if (sym && !sym->is_function) {
       LLVMTypeRef sym_type = sym->type;
-      
+
       // If the symbol is a pointer type, we need to determine what it points to
       if (LLVMGetTypeKind(sym_type) == LLVMPointerTypeKind) {
         // For opaque pointers (newer LLVM), we need to infer the pointee type
-        // This is a simplified approach - in a real compiler you'd track this through your type system
-        
+        // This is a simplified approach - in a real compiler you'd track this
+        // through your type system
+
         // Try to infer based on variable name patterns
         if (strstr(var_name, "ptr") || strstr(var_name, "aligned_ptr")) {
           // Check if this looks like a void** -> void* case
           if (strstr(var_name, "aligned")) {
-            element_type = LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0); // void*
+            element_type = LLVMPointerType(LLVMInt8TypeInContext(ctx->context),
+                                           0); // void*
           } else if (strstr(var_name, "char") || strstr(var_name, "str")) {
             element_type = LLVMInt8TypeInContext(ctx->context); // char
           } else if (strstr(var_name, "int")) {
@@ -724,7 +908,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
             element_type = LLVMFloatTypeInContext(ctx->context); // float
           } else {
             // Default for void** -> void*
-            element_type = LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
+            element_type =
+                LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
           }
         } else {
           // Generic pointer dereference - assume int64 for safety

@@ -1,5 +1,16 @@
 @module "memory"
 
+pub const memcpy = fn (dest: *void, src: *void, n: int) *void {
+    let d: *char = cast<*char>(dest);
+    let s: *char = cast<*char>(src);
+
+    loop [i: int = 0](i < n) : (++i) {
+        d[i] = s[i];
+    }
+
+    return dest;
+} 
+
 pub const alligned_alloc = fn (alignment: int, size: int) *void {
     if (alignment < sizeof<*void>) {
         alignment = sizeof<*void>;

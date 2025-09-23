@@ -481,6 +481,7 @@ LLVMValueRef get_range_end_value(CodeGenContext *ctx,
   return LLVMBuildLoad2(ctx->builder, field_types[1], end_ptr, "range_end");
 }
 
+// Enhanced codegen_stmt_print function with better float support
 LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
   // Use current module instead of legacy ctx->module
   LLVMModuleRef current_llvm_module =
@@ -529,15 +530,25 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
         LLVMValueRef start_val = get_range_start_value(ctx, value);
         LLVMValueRef end_val = get_range_end_value(ctx, value);
 
-        // Create format string for range: "%lld..%lld" or "%d..%d" depending on type
+        // Determine the format based on the range element type
         LLVMTypeRef field_types[2];
         LLVMGetStructElementTypes(value_type, field_types);
-        unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
-
-        const char *int_format = (bits == 64) ? "%lld" : "%d";
-        char range_format[32];
-        snprintf(range_format, sizeof(range_format), "%s..%s", int_format,
-                 int_format);
+        LLVMTypeKind element_kind = LLVMGetTypeKind(field_types[0]);
+        
+        const char *element_format;
+        if (element_kind == LLVMFloatTypeKind) {
+          element_format = "%.6f";
+        } else if (element_kind == LLVMDoubleTypeKind) {
+          element_format = "%.6lf";
+        } else if (element_kind == LLVMIntegerTypeKind) {
+          unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
+          element_format = (bits == 64) ? "%lld" : "%d";
+        } else {
+          element_format = "%d";
+        }
+        
+        char range_format[64];
+        snprintf(range_format, sizeof(range_format), "%s..%s", element_format, element_format);
 
         // Create format string value
         LLVMValueRef range_format_str =
@@ -550,35 +561,45 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
         continue; // Skip the regular printing logic
       }
 
-      // Handle non-range expressions with improved pointer type detection
-      if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
+      // Handle different value types with improved float support
+      LLVMTypeKind value_kind = LLVMGetTypeKind(value_type);
+      
+      if (value_kind == LLVMIntegerTypeKind) {
         unsigned int bits = LLVMGetIntTypeWidth(value_type);
-        if (bits == 8 || bits == 16 || bits == 32) {
+        if (bits == 1) {
+          // Boolean values - convert to readable format
+          format_str = "%s";
+          
+          // Create conditional to print "true" or "false"
+          LLVMValueRef true_str = LLVMBuildGlobalStringPtr(ctx->builder, "true", "true_str");
+          LLVMValueRef false_str = LLVMBuildGlobalStringPtr(ctx->builder, "false", "false_str");
+          
+          value = LLVMBuildSelect(ctx->builder, value, true_str, false_str, "bool_str");
+          
+        } else if (bits == 8 || bits == 16 || bits == 32) {
           format_str = "%d";
         } else if (bits == 64) {
           format_str = "%lld";
         } else {
           format_str = "%d";
         }
-      } else if (LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind) {
-        format_str = "%f";
-      } else if (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind) {
-        format_str = "%f";
-      } else if (LLVMGetTypeKind(value_type) == LLVMPointerTypeKind) {
-        // This is the key fix - check if it's a char* (string)
-        // For char*, we want to print the string content, not the address
         
-        // Check if this might be a string (char*)
-        // We'll use a heuristic: if it came from a struct field that's likely
-        // to be a string, or if it's a global string, treat it as %s
+      } else if (value_kind == LLVMFloatTypeKind) {
+        format_str = "%.6f";
+        // LLVM printf requires double for variadic functions, so promote float to double
+        value = LLVMBuildFPExt(ctx->builder, value, LLVMDoubleTypeInContext(ctx->context), "float_to_double");
         
-        // For now, let's assume all char* should be printed as strings
-        // In a more sophisticated compiler, you'd track type information
+      } else if (value_kind == LLVMDoubleTypeKind) {
+        format_str = "%.6lf";
+        
+      } else if (value_kind == LLVMPointerTypeKind) {
+        // Handle string pointers vs other pointers
         format_str = "%s";
         
         // Alternative: you could be more conservative and only treat certain
         // patterns as strings, falling back to %p for other pointers:
         // format_str = "%p";
+        
       } else {
         format_str = "%p";
       }

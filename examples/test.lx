@@ -1,18 +1,12 @@
 @module "main"
 
-@use "stdstr" as str_
+@use "math" as math
 
 pub const main = fn () int {
-    let a: *char = "Hello,";
-    let b: *char = " World!";
+   loop [i: int = 0](i <= 100000000) : (++i) {
+    math::sin((cast<float>(i) * 2 * math::PI) / cast<float>(100));
+   }
 
-    let result: *char = cast<*char>(alloc(100));
-    let t: *char = result;
-    defer { free(t); }
-    
-    result = str_::cat(t, a, b);  
-
-    output(t, "\n");
-    
-    return 0;
+   return 0;
 }
+// time 2.725

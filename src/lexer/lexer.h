@@ -61,7 +61,6 @@ typedef enum {
   TOK_FREE,     /**< free(void *ptr, size_t size) */
   TOK_CAST,     /**< cast<Type>(value you want to cast too) */
   TOK_SIZE_OF,  /**< size_of<TYPE> */
-  TOK_MEMCPY,   /**< memcpy(void *to, void *from, int size) */
   TOK_AS,       /**< as keyword (for use in modules) */
   TOK_DEFER,    /**< defer keyword */
   TOK_IN,       /**< in keyword */

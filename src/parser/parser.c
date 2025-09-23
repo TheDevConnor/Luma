@@ -283,8 +283,6 @@ Expr *nud(Parser *parser) {
     return addr_expr(parser);
   case TOK_ALLOC:
     return alloc_expr(parser);
-  case TOK_MEMCPY:
-    return memcpy_expr(parser);
   case TOK_FREE:
     return free_expr(parser);
   case TOK_CAST:

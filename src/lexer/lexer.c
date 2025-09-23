@@ -75,7 +75,6 @@ static const KeywordEntry keywords[] = {
     {"alloc", TOK_ALLOC},
     {"free", TOK_FREE},
     {"cast", TOK_CAST},
-    {"memcpy", TOK_MEMCPY},
     {"sizeof", TOK_SIZE_OF},
     {"as", TOK_AS},
     {"defer", TOK_DEFER},

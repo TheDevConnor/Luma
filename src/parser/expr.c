@@ -290,27 +290,6 @@ Expr *alloc_expr(Parser *parser) {
   return create_alloc_expr(parser->arena, size, line, col);
 }
 
-// void *memcpy(void *to, void *from, size_t size);
-Expr *memcpy_expr(Parser *parser) {
-  p_advance(parser); // Advance past the memcpy
-  int line = p_current(parser).line;
-  int col = p_current(parser).col;
-
-  p_consume(parser, TOK_LPAREN,
-            "Expected an '(' before you define your params for memcpy.");
-  Expr *to = parse_expr(parser, BP_NONE);
-  p_consume(parser, TOK_COMMA,
-            "Expected an ',' after you define your 'to' param for memcpy.");
-  Expr *from = parse_expr(parser, BP_NONE);
-  p_consume(parser, TOK_COMMA,
-            "Expected an ',' after you define your 'from' param for memcpy.");
-  Expr *size = parse_expr(parser, BP_NONE);
-  p_consume(parser, TOK_RPAREN,
-            "Expected an ')' after you define your params for memcpy.");
-
-  return create_memcpy_expr(parser->arena, to, from, size, line, col);
-}
-
 // void free(void *ptr)
 Expr *free_expr(Parser *parser) {
   p_advance(parser); // Advance past the memcpy

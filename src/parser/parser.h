@@ -185,7 +185,6 @@ Expr *index_expr(Parser *parser);
 Expr *deref_expr(Parser *parser);
 Expr *addr_expr(Parser *parser);
 Expr *alloc_expr(Parser *parser);
-Expr *memcpy_expr(Parser *parser);
 Expr *free_expr(Parser *parser);
 Expr *cast_expr(Parser *parser);
 Expr *sizeof_expr(Parser *parser);

@@ -1,5 +1,7 @@
 @module "math"
 
+pub const PI: float = 3.14159265358979323;
+
 pub const add = fn (x: int, y: int) int {
     return x + y;
 }
@@ -26,6 +28,24 @@ pub const fib = fn (n: int, a: int, b: int) int {
     return fib(n - 1, b, a + b);
 }
 
+pub const power = fn (base: float, exponent: int) float {
+    if (exponent == 0) { return 1.0; } 
+
+    let result: float = 1.0;
+    let e: int = exponent;
+
+    if (e<0) {
+        base = 1.0;
+        e = -e;
+    }
+
+    loop (e > 0) : (--e) {
+        result = result * base;
+    }
+
+    return result;
+} 
+
 pub const max_size = fn (a: int, b: int) int {
     if (a > b) { return a; }
     return b; 
@@ -34,4 +54,13 @@ pub const max_size = fn (a: int, b: int) int {
 pub const min_size = fn (a: int, b: int) int {
     if (a < b) { return a; }
     return b; 
+}
+
+// x = modulus(x+(pi/2),pi*2)-(pi/2)
+// sinx = x- ((x^3)/6)+((x^5)/(120))-((x^7)/(5040))
+// Taylor series
+pub const sin = fn (a: float) float {
+    let pi2: float = PI / 2;
+    let x: float = (a + pi2) % (PI * 2) - pi2;
+    return x - (power(x, 3)/6) + (power(x, 5)/120) - (power(x, 7)/5040) + (power(x, 9)/362880); 
 }
