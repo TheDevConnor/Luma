@@ -30,9 +30,12 @@ static ArenaAllocator *g_arena = NULL;
 typedef struct {
   size_t line;
   size_t column;
-  const char *variable_name; // Variable that holds the allocated pointer
+  const char *variable_name;     // Current owner of the allocated pointer
+  const char *original_variable; // Original allocator (for tracking)
   bool has_matching_free;
-  int free_count; // NEW: Track how many times freed
+  int free_count;
+  GrowableArray
+      aliases; // Array of const char* - variables that alias this allocation
 } StaticAllocation;
 
 typedef struct {
@@ -118,6 +121,11 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
                                    int token_count, const char *file_path);
 StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
 const char *extract_variable_name_from_free(AstNode *free_expr);
+void static_memory_track_alias(StaticMemoryAnalyzer *analyzer,
+                               const char *new_var, const char *source_var);
+void static_memory_invalidate_alias(StaticMemoryAnalyzer *analyzer,
+                                    const char *var_name);
+bool is_pointer_assignment(AstNode *assignment);
 
 // ============================================================================
 // Scope Management
@@ -193,6 +201,7 @@ bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena);
 AstNode *typecheck_expression(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena);
 bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena);
+const char *extract_variable_name(AstNode *expr);
 
 // Declarations
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena);
@@ -249,6 +258,8 @@ AstNode *typecheck_cast_expr(AstNode *expr, Scope *scope,
                              ArenaAllocator *arena);
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena);
+AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
+                                   ArenaAllocator *arena);
 
 AstNode *get_enclosing_function_return_type(Scope *scope);
 

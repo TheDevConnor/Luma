@@ -100,25 +100,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_unary_expr(expr, scope, arena);
   case AST_EXPR_CALL:
     return typecheck_call_expr(expr, scope, arena);
-  case AST_EXPR_ASSIGNMENT: {
-    AstNode *target_type =
-        typecheck_expression(expr->expr.assignment.target, scope, arena);
-    AstNode *value_type =
-        typecheck_expression(expr->expr.assignment.value, scope, arena);
-
-    if (!target_type || !value_type)
-      return NULL;
-
-    // Check if target is assignable (not just type compatible)
-    TypeMatchResult match = types_match(target_type, value_type);
-    if (match == TYPE_MATCH_NONE) {
-      tc_error(expr, "Type Mismatch", "Type mismatch in assignment at line %zu",
-               expr->line, expr->column);
-      return NULL;
-    }
-
-    return target_type;
-  }
+  case AST_EXPR_ASSIGNMENT:
+    return typecheck_assignment_expr(expr, scope, arena);
   case AST_EXPR_GROUPING:
     return typecheck_expression(expr->expr.grouping.expr, scope, arena);
   case AST_EXPR_INDEX:

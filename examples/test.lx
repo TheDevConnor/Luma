@@ -7,11 +7,12 @@ pub const main = fn () int {
     let b: *char = " World!";
 
     let result: *char = cast<*char>(alloc(100));
-    defer { free(result); }
+    let t: *char = result;
+    defer { free(t); }
     
-    result = str_::cat(result, a, b);  
+    result = str_::cat(t, a, b);  
 
-    output(result, "\n");
+    output(t, "\n");
     
     return 0;
 }

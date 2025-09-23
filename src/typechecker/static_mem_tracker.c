@@ -171,6 +171,125 @@ void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
 }
 
 /**
+ * @brief Track when a pointer is aliased/assigned to another variable
+ * This transfers ownership from source_var to new_var
+ */
+void static_memory_track_alias(StaticMemoryAnalyzer *analyzer,
+                               const char *new_var, const char *source_var) {
+  if (!new_var || !source_var || strcmp(new_var, source_var) == 0) {
+    return;
+  }
+
+  // Find the allocation that source_var currently owns
+  StaticAllocation *source_alloc = NULL;
+  for (size_t i = 0; i < analyzer->allocations.count; i++) {
+    StaticAllocation *alloc =
+        (StaticAllocation *)((char *)analyzer->allocations.data +
+                             i * sizeof(StaticAllocation));
+    if (alloc->variable_name && strcmp(alloc->variable_name, source_var) == 0) {
+      source_alloc = alloc;
+      break;
+    }
+  }
+
+  if (!source_alloc) {
+    // printf("DEBUG: No allocation found for source variable '%s'\n",
+    // source_var);
+    return;
+  }
+
+  // Check if new_var is already tracking an allocation (potential leak)
+  for (size_t i = 0; i < analyzer->allocations.count; i++) {
+    StaticAllocation *alloc =
+        (StaticAllocation *)((char *)analyzer->allocations.data +
+                             i * sizeof(StaticAllocation));
+    if (alloc->variable_name && strcmp(alloc->variable_name, new_var) == 0 &&
+        !alloc->has_matching_free) {
+      // printf("Warning: Variable '%s' may be leaking previous allocation when
+      // "
+      //        "assigned new pointer\n",
+      //        new_var);
+      break;
+    }
+  }
+
+  // Add new_var to the aliases array
+  if (!source_alloc->aliases.data) {
+    growable_array_init(&source_alloc->aliases, analyzer->arena, 4,
+                        sizeof(char *));
+  }
+
+  char **alias_slot = (char **)growable_array_push(&source_alloc->aliases);
+  if (alias_slot) {
+    *alias_slot = arena_strdup(analyzer->arena, new_var);
+  }
+
+  // Transfer primary ownership to new_var
+  source_alloc->variable_name = arena_strdup(analyzer->arena, new_var);
+
+  printf("DEBUG: Transferred ownership from '%s' to '%s' (allocation at line "
+         "%zu)\n",
+         source_var, new_var, source_alloc->line);
+}
+
+/**
+ * @brief Invalidate a variable alias (e.g., when variable goes out of scope)
+ */
+void static_memory_invalidate_alias(StaticMemoryAnalyzer *analyzer,
+                                    const char *var_name) {
+  if (!var_name)
+    return;
+
+  for (size_t i = 0; i < analyzer->allocations.count; i++) {
+    StaticAllocation *alloc =
+        (StaticAllocation *)((char *)analyzer->allocations.data +
+                             i * sizeof(StaticAllocation));
+
+    // Check if this is the current owner
+    if (alloc->variable_name && strcmp(alloc->variable_name, var_name) == 0) {
+      // Try to find another valid alias to transfer ownership to
+      bool found_replacement = false;
+
+      if (alloc->aliases.data) {
+        for (size_t j = 0; j < alloc->aliases.count; j++) {
+          char **alias =
+              (char **)((char *)alloc->aliases.data + j * sizeof(char *));
+          if (*alias && strcmp(*alias, var_name) != 0) {
+            // Transfer ownership to this alias
+            alloc->variable_name = *alias;
+            found_replacement = true;
+            // printf("DEBUG: Transferred ownership from invalidated '%s' to
+            // alias '%s'\n",
+            //        var_name, *alias);
+            break;
+          }
+        }
+      }
+
+      if (!found_replacement && !alloc->has_matching_free) {
+        // No valid aliases left - this becomes an orphaned allocation
+        printf("Warning: Variable '%s' going out of scope with unfreed "
+               "allocation (line %zu)\n",
+               var_name, alloc->line);
+      }
+      return;
+    }
+
+    // Remove from aliases list if present
+    if (alloc->aliases.data) {
+      for (size_t j = 0; j < alloc->aliases.count; j++) {
+        char **alias =
+            (char **)((char *)alloc->aliases.data + j * sizeof(char *));
+        if (*alias && strcmp(*alias, var_name) == 0) {
+          *alias = NULL; // Mark as invalid
+          break;
+        }
+      }
+    }
+  }
+}
+
+/**
  * @brief Alternative version that only reports errors without summary
  *
  * @param analyzer The static memory analyzer containing allocation data

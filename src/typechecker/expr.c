@@ -137,6 +137,40 @@ AstNode *typecheck_unary_expr(AstNode *expr, Scope *scope,
   return NULL;
 }
 
+AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
+                                   ArenaAllocator *arena) {
+  AstNode *target_type =
+      typecheck_expression(expr->expr.assignment.target, scope, arena);
+  AstNode *value_type =
+      typecheck_expression(expr->expr.assignment.value, scope, arena);
+
+  if (!target_type || !value_type)
+    return NULL;
+
+  // Check for pointer assignment that might transfer ownership
+  if (is_pointer_type(target_type) && is_pointer_type(value_type)) {
+    // Extract variable names from both sides
+    const char *target_var =
+        extract_variable_name(expr->expr.assignment.target);
+    const char *source_var = extract_variable_name(expr->expr.assignment.value);
+
+    if (target_var && source_var) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+      if (analyzer) {
+        static_memory_track_alias(analyzer, target_var, source_var);
+      }
+    }
+  }
+
+  TypeMatchResult match = types_match(target_type, value_type);
+  if (match == TYPE_MATCH_NONE) {
+    tc_error(expr, "Type Mismatch", "Type mismatch in assignment");
+    return NULL;
+  }
+
+  return target_type;
+}
+
 AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
                              ArenaAllocator *arena) {
   AstNode *callee = expr->expr.call.callee;
