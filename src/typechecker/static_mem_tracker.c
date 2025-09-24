@@ -54,8 +54,8 @@ void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
   }
 
   if (!found) {
-    printf("Warning: free() called on variable '%s' without matching alloc()\n",
-           var_name);
+    // printf("Warning: free() called on variable '%s' without matching alloc()\n",
+    //        var_name);
     return;
   }
 

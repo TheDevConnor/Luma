@@ -656,39 +656,49 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     }
 
   } else if (object_kind == LLVMPointerTypeKind) {
-    // This is the critical part - we need to determine the correct pointee type
-    LLVMTypeRef pointee_type = NULL;
+    // For pointer indexing, we need to determine the element type
+    LLVMTypeRef element_type = NULL;
 
-    // Check what kind of indexing this is
+    // Try to get type information from the symbol table if this is an
+    // identifier
     if (node->expr.index.object->type == AST_EXPR_IDENTIFIER) {
-      // First-level indexing: hp[c] where hp is **double
       const char *var_name = node->expr.index.object->expr.identifier.name;
       LLVM_Symbol *sym = find_symbol(ctx, var_name);
 
       if (sym && !sym->is_function) {
-        // For **double (pointer to array of double pointers),
-        // the first index should return *double (pointer to double)
-        if (strstr(var_name, "hp") || strstr(var_name, "double")) {
-          pointee_type =
-              LLVMPointerType(LLVMDoubleTypeInContext(ctx->context), 0);
+        LLVMTypeRef sym_type = sym->type;
+
+        // Check if the symbol type gives us element type information
+        // For *char, *int, etc., we can infer the element type
+
+        // Use heuristics based on variable name patterns
+        if (strstr(var_name, "char") || strstr(var_name, "_buf")) {
+          element_type = LLVMInt8TypeInContext(ctx->context);
+        } else if (strstr(var_name, "int") && !strstr(var_name, "char")) {
+          element_type = LLVMInt64TypeInContext(ctx->context);
         } else if (strstr(var_name, "float")) {
-          pointee_type =
-              LLVMPointerType(LLVMFloatTypeInContext(ctx->context), 0);
-        } else if (strstr(var_name, "int")) {
-          pointee_type =
-              LLVMPointerType(LLVMInt64TypeInContext(ctx->context), 0);
-        } else {
-          // Default fallback
-          pointee_type =
-              LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
+          element_type = LLVMFloatTypeInContext(ctx->context);
+        } else if (strstr(var_name, "double")) {
+          element_type = LLVMDoubleTypeInContext(ctx->context);
         }
       }
-    } else if (node->expr.index.object->type == AST_EXPR_INDEX) {
-      // Second-level indexing: hp[c][0]
-      // The object here is the result of hp[c], which should be *double
-      // So we want to index into that to get double
+    }
 
-      // Trace back to find the original variable
+    // Handle cast expressions specially
+    if (node->expr.index.object->type == AST_EXPR_CAST) {
+      AstNode *cast_node = node->expr.index.object;
+      if (cast_node->expr.cast.type->type == AST_TYPE_POINTER) {
+        // Get the pointee type from the cast target type
+        AstNode *pointee_node =
+            cast_node->expr.cast.type->type_data.pointer.pointee_type;
+        element_type = codegen_type(ctx, pointee_node);
+      }
+    }
+
+    // Handle nested indexing (e.g., ptr[i][j])
+    if (node->expr.index.object->type == AST_EXPR_INDEX) {
+      // This is second-level indexing - the element type depends on what the
+      // first level returns For now, try to trace back to the base type
       AstNode *base_node = node->expr.index.object;
       while (base_node->type == AST_EXPR_INDEX) {
         base_node = base_node->expr.index.object;
@@ -697,30 +707,41 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
       if (base_node->type == AST_EXPR_IDENTIFIER) {
         const char *base_var_name = base_node->expr.identifier.name;
 
-        if (strstr(base_var_name, "hp") || strstr(base_var_name, "double")) {
-          pointee_type = LLVMDoubleTypeInContext(ctx->context);
+        if (strstr(base_var_name, "double")) {
+          element_type = LLVMDoubleTypeInContext(ctx->context);
         } else if (strstr(base_var_name, "float")) {
-          pointee_type = LLVMFloatTypeInContext(ctx->context);
+          element_type = LLVMFloatTypeInContext(ctx->context);
         } else if (strstr(base_var_name, "int")) {
-          pointee_type = LLVMInt64TypeInContext(ctx->context);
+          element_type = LLVMInt64TypeInContext(ctx->context);
         } else {
-          pointee_type = LLVMInt8TypeInContext(ctx->context);
+          element_type = LLVMInt8TypeInContext(ctx->context);
         }
       }
     }
 
-    // Fallback
-    if (!pointee_type) {
-      pointee_type = LLVMInt8TypeInContext(ctx->context);
+    // Final fallback
+    if (!element_type) {
+      element_type = LLVMInt8TypeInContext(ctx->context);
     }
 
-    // Build GEP for pointer arithmetic
-    LLVMValueRef element_ptr = LLVMBuildGEP2(ctx->builder, pointee_type, object,
+    // Build GEP for pointer arithmetic and load the value
+    LLVMValueRef element_ptr = LLVMBuildGEP2(ctx->builder, element_type, object,
                                              &index, 1, "ptr_element_ptr");
 
-    // Always load the final value (no more chaining needed at pointer level)
-    return LLVMBuildLoad2(ctx->builder, pointee_type, element_ptr,
-                          "ptr_element");
+    // Load the actual value - this should return the element type, not a
+    // pointer
+    LLVMValueRef result = LLVMBuildLoad2(ctx->builder, element_type,
+                                         element_ptr, "ptr_element_val");
+
+// Debug: Print the types to understand what's happening
+#ifdef DEBUG_TYPES
+    fprintf(stderr, "Debug: object_type kind = %d, element_type kind = %d\n",
+            LLVMGetTypeKind(object_type), LLVMGetTypeKind(element_type));
+    fprintf(stderr, "Debug: result type kind = %d\n",
+            LLVMGetTypeKind(LLVMTypeOf(result)));
+#endif
+
+    return result;
 
   } else {
     fprintf(stderr, "Error: Cannot index expression of type kind %d\n",

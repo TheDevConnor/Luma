@@ -9,8 +9,146 @@ pub const memcpy = fn (dest: *void, src: *void, n: int) *void {
     }
 
     return dest;
-} 
+}
 
+pub const memcmp = fn (a: *void, b: *void, n: int) int {
+    let x: *char = cast<*char>(a);
+    let y: *char = cast<*char>(b);
+    loop [i: int = 0](i < n) : (++i) {
+        if (x[i] != y[i]) {
+            return cast<int>(x[i]) - cast<int>(y[i]);
+        }
+    }
+    return 0;
+}
+
+pub const memset = fn (dest: *void, value: int, n: int) *void {
+    let d: *char = cast<*char>(dest);
+    loop [i: int = 0](i < n) : (++i) {
+        d[i] = cast<char>(value);
+    }
+    return dest;
+}
+
+// Move memory regions (handles overlapping regions correctly)
+pub const memmove = fn (dest: *void, src: *void, n: int) *void {
+    let d: *char = cast<*char>(dest);
+    let s: *char = cast<*char>(src);
+    
+    if (d < s) {
+        // Copy forward
+        loop [i: int = 0](i < n) : (++i) {
+            d[i] = s[i];
+        }
+    } else {
+        // Copy backward to handle overlap
+        loop [i: int = n - 1](i >= 0) : (--i) {
+            d[i] = s[i];
+        }
+    }
+    
+    return dest;
+}
+
+// Find first occurrence of byte in memory
+pub const memchr = fn (ptr: *void, value: int, n: int) *void {
+    let p: *char = cast<*char>(ptr);
+    let target: char = cast<char>(value);
+    
+    loop [i: int = 0](i < n) : (++i) {
+        if (p[i] == target) {
+            return cast<*void>(cast<int>(p) + i);
+        }
+    }
+    
+    return cast<*void>(0); // NULL
+}
+
+// Zero out memory (common operation)
+pub const memzero = fn (dest: *void, n: int) *void {
+    return memset(dest, 0, n);
+}
+
+// Allocate and zero memory (calloc equivalent)
+pub const calloc = fn (count: int, size: int) *void {
+    let total_size: int = count * size;
+    let ptr: *void = alloc(total_size);
+    
+    if (ptr != cast<*void>(0)) {
+        memzero(ptr, total_size);
+    }
+    
+    return ptr;
+}
+
+// Reallocate memory (simplified version - allocates new and copies)
+pub const realloc = fn (ptr: *void, old_size: int, new_size: int) *void {
+    if (ptr == cast<*void>(0)) {
+        return alloc(new_size);
+    }
+    
+    if (new_size == 0) {
+        free(ptr);
+        return cast<*void>(0);
+    }
+    
+    let new_ptr: *void = alloc(new_size);
+    if (new_ptr != cast<*void>(0)) {
+        let copy_size: int = old_size;
+        if (new_size < old_size) {
+            copy_size = new_size;
+        }
+        memcpy(new_ptr, ptr, copy_size);
+        free(ptr);
+    }
+    
+    return new_ptr;
+}
+
+// Memory swap (swap contents of two memory regions)
+pub const memswap = fn (a: *void, b: *void, n: int) void {
+    let p1: *char = cast<*char>(a);
+    let p2: *char = cast<*char>(b);
+    
+    loop [i: int = 0](i < n) : (++i) {
+        let temp: char = p1[i];
+        p1[i] = p2[i];
+        p2[i] = temp;
+    }
+}
+
+// Reverse bytes in memory region
+pub const memrev = fn (ptr: *void, n: int) *void {
+    let p: *char = cast<*char>(ptr);
+    let start: int = 0;
+    let end: int = n - 1;
+    
+    loop (start < end) : (++start) {
+        let temp: char = p[start];
+        p[start] = p[end];
+        p[end] = temp;
+        --end;
+    }
+    
+    return ptr;
+}
+
+// Count occurrences of a byte in memory
+pub const memcount = fn (ptr: *void, value: int, n: int) int {
+    let p: *char = cast<*char>(ptr);
+    let target: char = cast<char>(value);
+    let count: int = 0;
+    
+    loop [i: int = 0](i < n) : (++i) {
+        if (p[i] == target) {
+            ++count;
+        }
+    }
+    
+    return count;
+}
+
+// Existing aligned allocation functions
 pub const aligned_alloc = fn (alignment: int, size: int) *void {
     if (alignment < sizeof<*void>) {
         alignment = sizeof<*void>;
@@ -35,5 +173,4 @@ pub const aligned_free = fn (ptr: *void) void {
     let aligned_ptr: **void = cast<**void>(cast<int>(ptr));
     let raw: *void = aligned_ptr[-1];
     free(raw);
-    free(ptr);
 }

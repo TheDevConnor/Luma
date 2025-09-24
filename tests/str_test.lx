@@ -1,0 +1,269 @@
+@module "main"
+
+// Compile this with the following command
+// ./luma tests/str_test.lx -name t -l std/string.lx std/memory.lx -no-sanitize
+
+@use "stdstr" as string
+@use "memory" as mem
+
+const test_strlen = fn () void {
+    let empty_str: *char = cast<*char>(mem::calloc(1, sizeof<char>));
+    defer { free(empty_str); }
+    
+    if (string::strlen(empty_str) != 0) {
+        output("strlen failed: empty string should be 0\n");
+        return;
+    }
+
+    // Test normal string "Hello"
+    let hello: *char = cast<*char>(mem::calloc(1, sizeof<char>));
+    defer { free(hello); }
+    
+    hello[0] = cast<char>(72); // 'H'
+    hello[1] = cast<char>(101); // 'e'
+    hello[2] = cast<char>(108); // 'l'
+    hello[3] = cast<char>(108); // 'l'
+    hello[4] = cast<char>(111); // 'o'
+    hello[5] = cast<char>(0);   // null terminator
+    
+    if (string::strlen(hello) != 5) {
+        output("strlen failed: 'Hello' should be length 5, got ", string::strlen(hello), "\n");
+        return;
+    }
+
+    output("strlen passed!\n");
+}
+
+const test_strcmp = fn () void {
+    // Create test strings
+    let str1: *char = cast<*char>(mem::calloc(6, sizeof<char>));
+    let str2: *char = cast<*char>(mem::calloc(6, sizeof<char>));
+    let str3: *char = cast<*char>(mem::calloc(4, sizeof<char>));
+    defer { free(str1); free(str2); free(str3); }
+
+    // str1 = "Hello"
+    str1[0] = cast<char>(72); str1[1] = cast<char>(101); str1[2] = cast<char>(108);
+    str1[3] = cast<char>(108); str1[4] = cast<char>(111); str1[5] = cast<char>(0);
+    
+    // str2 = "Hello" (same as str1)
+    str2[0] = cast<char>(72); str2[1] = cast<char>(101); str2[2] = cast<char>(108);
+    str2[3] = cast<char>(108); str2[4] = cast<char>(111); str2[5] = cast<char>(0);
+    
+    // str3 = "Hi" (different length)
+    str3[0] = cast<char>(72); str3[1] = cast<char>(105); str3[2] = cast<char>(0);
+
+    // Test equal strings
+    if (string::strcmp(str1, str2) != 0) {
+        output("strcmp failed: equal strings should return 0\n");
+        return;
+    }
+
+    // Test different length strings
+    if (string::strcmp(str1, str3) != -1) {
+        output("strcmp failed: different length strings should return -1\n");
+        return;
+    }
+
+    // Test different content (same length)
+    str2[1] = cast<char>(97); // Change 'e' to 'a' -> "Hallo"
+    if (string::strcmp(str1, str2) != 1) {
+        output("strcmp failed: different content should return 1\n");
+        return;
+    }
+
+    output("strcmp passed!\n");
+}
+
+const test_s_char = fn () void {
+    // Create test string "Hello World"
+    let test_str: *char = cast<*char>(mem::calloc(12, sizeof<char>));
+    defer { free(test_str); }
+    
+    test_str[0] = cast<char>(72);  // 'H'
+    test_str[1] = cast<char>(101); // 'e'
+    test_str[2] = cast<char>(108); // 'l'
+    test_str[3] = cast<char>(108); // 'l'
+    test_str[4] = cast<char>(111); // 'o'
+    test_str[5] = cast<char>(32);  // ' '
+    test_str[6] = cast<char>(87);  // 'W'
+    test_str[7] = cast<char>(111); // 'o'
+    test_str[8] = cast<char>(114); // 'r'
+    test_str[9] = cast<char>(108); // 'l'
+    test_str[10] = cast<char>(100); // 'd'
+    test_str[11] = cast<char>(0);   // null terminator
+
+    // Test finding existing character
+    let found_char: char = string::s_char(test_str, 87); // Looking for 'W'
+    if (found_char != cast<char>(87)) {
+        output("s_char failed: should find 'W'\n");
+        return;
+    }
+
+    // Test finding non-existing character
+    let not_found: char = string::s_char(test_str, 120); // Looking for 'x'
+    if (not_found != cast<char>(0)) {
+        output("s_char failed: should return null char for 'x'\n");
+        return;
+    }
+
+    output("s_char passed!\n");
+}
+
+const test_copy = fn () void {
+    // Create source string "Test"
+    let src: *char = cast<*char>(mem::calloc(5, sizeof<char>));
+    let dest: *char = cast<*char>(mem::calloc(10, sizeof<char>));
+    defer { free(src); free(dest); }
+    
+    src[0] = cast<char>(84);  // 'T'
+    src[1] = cast<char>(101); // 'e'
+    src[2] = cast<char>(115); // 's'
+    src[3] = cast<char>(116); // 't'
+    src[4] = cast<char>(0);   // null terminator
+
+    // Copy string
+    string::copy(dest, src);
+
+    // Verify copy
+    loop [i: int = 0](i < 5) : (++i) {
+        if (dest[i] != src[i]) {
+            output("copy failed at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("copy passed!\n");
+}
+
+const test_n_copy = fn () void {
+    // Create source string "Testing"
+    let src: *char = cast<*char>(mem::calloc(8, sizeof<char>));
+    let dest: *char = cast<*char>(mem::calloc(10, sizeof<char>));
+    defer { free(src); free(dest); }
+    
+    src[0] = cast<char>(84);  // 'T'
+    src[1] = cast<char>(101); // 'e'
+    src[2] = cast<char>(115); // 's'
+    src[3] = cast<char>(116); // 't'
+    src[4] = cast<char>(105); // 'i'
+    src[5] = cast<char>(110); // 'n'
+    src[6] = cast<char>(103); // 'g'
+    src[7] = cast<char>(0);   // null terminator
+
+    // Initialize dest with garbage
+    mem::memset(cast<*void>(dest), 65, 10); // Fill with 'A'
+
+    // Copy only first 4 characters
+    string::n_copy(dest, src, 4);
+
+    // Verify first 4 characters copied
+    loop [i: int = 0](i < 4) : (++i) {
+        if (dest[i] != src[i]) {
+            output("n_copy failed at index ", i, "\n");
+            return;
+        }
+    }
+
+    // Verify rest of destination unchanged (should still be 'A')
+    if (dest[4] != cast<char>(65)) {
+        output("n_copy failed: overwrote beyond n characters\n");
+        return;
+    }
+
+    output("n_copy passed!\n");
+}
+
+const test_cat = fn () void {
+    // Create strings "Hello" and " World"
+    let s1: *char = cast<*char>(mem::calloc(6, sizeof<char>));
+    let s2: *char = cast<*char>(mem::calloc(7, sizeof<char>));
+    let dest: *char = cast<*char>(mem::calloc(20, sizeof<char>));
+    defer { free(s1); free(s2); free(dest); }
+    
+    // s1 = "Hello"
+    s1[0] = cast<char>(72); s1[1] = cast<char>(101); s1[2] = cast<char>(108);
+    s1[3] = cast<char>(108); s1[4] = cast<char>(111); s1[5] = cast<char>(0);
+    
+    // s2 = " World"
+    s2[0] = cast<char>(32); s2[1] = cast<char>(87); s2[2] = cast<char>(111);
+    s2[3] = cast<char>(114); s2[4] = cast<char>(108); s2[5] = cast<char>(100);
+    s2[6] = cast<char>(0);
+
+    // Concatenate
+    string::cat(dest, s1, s2);
+
+    // Expected result: "Hello World" (11 characters + null terminator)
+    let expected: *char = cast<*char>(mem::calloc(12, sizeof<char>));
+    defer { free(expected); }
+    
+    expected[0] = cast<char>(72);  // 'H'
+    expected[1] = cast<char>(101); // 'e'
+    expected[2] = cast<char>(108); // 'l'
+    expected[3] = cast<char>(108); // 'l'
+    expected[4] = cast<char>(111); // 'o'
+    expected[5] = cast<char>(32);  // ' '
+    expected[6] = cast<char>(87);  // 'W'
+    expected[7] = cast<char>(111); // 'o'
+    expected[8] = cast<char>(114); // 'r'
+    expected[9] = cast<char>(108); // 'l'
+    expected[10] = cast<char>(100); // 'd'
+    expected[11] = cast<char>(0);   // null terminator
+
+    // Verify concatenation
+    loop [i: int = 0](i < 12) : (++i) {
+        if (dest[i] != expected[i]) {
+            output("cat failed at index ", i, " expected ", cast<int>(expected[i]), 
+                   " got ", cast<int>(dest[i]), "\n");
+            return;
+        }
+    }
+
+    output("cat passed!\n");
+}
+
+const test_edge_cases = fn () void {
+    // Test strlen with single character
+    let single_char: *char = cast<*char>(mem::calloc(2, sizeof<char>));
+    defer { free(single_char); }
+    single_char[0] = cast<char>(65); // 'A'
+    single_char[1] = cast<char>(0);
+    
+    if (string::strlen(single_char) != 1) {
+        output("edge case failed: single char length\n");
+        return;
+    }
+
+    // Test copy with empty string
+    let empty_src: *char = cast<*char>(mem::calloc(1, sizeof<char>));
+    let empty_dest: *char = cast<*char>(mem::calloc(5, sizeof<char>));
+    defer { free(empty_src); free(empty_dest); }
+    
+    mem::memset(cast<*void>(empty_dest), 88, 5); // Fill with 'X'
+    string::copy(empty_dest, empty_src);
+    
+    if (empty_dest[0] != cast<char>(0)) {
+        output("edge case failed: empty string copy\n");
+        return;
+    }
+
+    output("edge cases passed!\n");
+}
+
+const run_all_string_tests = fn () void {
+    output("=== String Function Tests ===\n");
+    
+    test_strlen();
+    test_strcmp();
+    test_s_char();
+    test_copy();
+    test_n_copy();
+    test_cat();
+    test_edge_cases();
+    
+    output("=== All String Tests Complete ===\n");
+}
+
+pub const main = fn () int {
+    run_all_string_tests();
+    return 0;
+}

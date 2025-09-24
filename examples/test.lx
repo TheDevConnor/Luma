@@ -1,20 +1,61 @@
 @module "main"
 
-@use "memory" as mem
+@use "math" as math
 
-pub const main = fn () int {
-    let p: *void = mem::aligned_alloc(64, 100);
-    defer { mem::aligned_free(p); } 
+const DEPTH: int = 3;
+const DT: double = 0.005525661; // 0.000034339 - 0.0055 - 0.00007;
 
-    output("Pointer: ", cast<int>(p), "\n");  
-    output("Aligned? ");
-
-    if ((cast<int>(p) / 64) * 64 == cast<int>(p)) {
-        output("yes\n");
-    } else {
-        output("no\n");
-    }
-
-    return 0;
+const f = fn (x: double) double {
+    return math::sin(x); 
 }
 
+const d = fn (x: double) double {
+   return math::cos(x);
+}
+
+// NOTE: Credit to 'Drake Rochelle' for the derivative algorithm
+// https://github.com/Drake-Rochelle/
+const pDerivative = fn (x: double) double {
+    let hp: **double = cast<**double>(alloc((DEPTH - 1) * sizeof<*double>));
+    defer { 
+      loop [c: int = 0](c < DEPTH - 1) : (++c) {
+        free(hp[c]);
+      }
+      free(hp); 
+    }
+
+    loop [c: int = 0](c < DEPTH - 1) : (++c) {
+      let size: int = DEPTH - c;
+      hp[c] = cast<*double>(alloc(size * sizeof<double>));
+    }
+
+    loop [c: int = 0, b: int = 0](c < DEPTH - 1) : (++c) {
+      let size: int = DEPTH - c;
+      loop (b < size) : (++b) {
+        if (c == 0) {                                                                    
+          hp[0][b] = f(x + (DT * b)) - ((f(x + (DT * b)) + f(x + (DT * (b + 1)))) / 2.0);
+        } else {                                                                         
+          hp[c][b] = hp[c - 1][b] - ((hp[c - 1][b] + hp[c - 1][b + 1]) / 2.0);           
+        } 
+      }
+    } 
+
+    // initial derivative
+    let d1: double = (f(x) - f(x + DT)) / DT;
+
+    loop [c: int = 0](c < DEPTH - 1) : (++c) {
+        d1 = d1 + ((hp[c][0] - hp[c][1]) / DT);
+    }
+    
+    return -d1;
+}
+
+const pError = fn (x: double) double {
+    return d(x) - pDerivative(x);
+}
+
+pub const main = fn () int {
+    let x: double = 14436356.0;
+    output("pError = ", pError(x), "\n");
+    return 0;
+}

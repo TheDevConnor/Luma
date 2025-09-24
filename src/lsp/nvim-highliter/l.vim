@@ -47,7 +47,7 @@ syn match luxFunctionName /\w\+\ze\s*[(]/ contained
 " =====================
 " BUILT-IN FUNCTIONS
 " =====================
-syn keyword luxBuiltinFunction output outputln alloc free sizeof cast memcpy
+syn keyword luxBuiltinFunction output outputln alloc free sizeof cast
 
 " =====================
 " OPERATORS
