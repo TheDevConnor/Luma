@@ -120,6 +120,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_expression(expr->expr.grouping.expr, scope, arena);
   case AST_EXPR_INDEX:
     return typecheck_index_expr(expr, scope, arena);
+  case AST_EXPR_ARRAY:
+    return typecheck_array_expr(expr, scope, arena);
   case AST_EXPR_MEMBER:
     return typecheck_member_expr(expr, scope, arena);
   case AST_EXPR_DEREF:

@@ -745,3 +745,61 @@ AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
 
   return create_basic_type(arena, "int", expr->line, expr->column);
 }
+
+AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
+                              ArenaAllocator *arena) {
+  if (expr->type != AST_EXPR_ARRAY) {
+    tc_error(expr, "Internal Error", "Expected array expression node");
+    return NULL;
+  }
+
+  AstNode **elements = expr->expr.array.elements;
+  size_t element_count = expr->expr.array.element_count;
+
+  // Empty array - cannot infer type
+  if (element_count == 0) {
+    tc_error(expr, "Array Type Error",
+             "Cannot infer type of empty array literal - provide explicit type "
+             "annotation");
+    return NULL;
+  }
+
+  // Type check the first element to establish the array's element type
+  AstNode *first_element_type = typecheck_expression(elements[0], scope, arena);
+  if (!first_element_type) {
+    tc_error(expr, "Array Type Error",
+             "Failed to determine type of first array element");
+    return NULL;
+  }
+
+  // Check all remaining elements match the first element's type
+  for (size_t i = 1; i < element_count; i++) {
+    AstNode *element_type = typecheck_expression(elements[i], scope, arena);
+    if (!element_type) {
+      tc_error(expr, "Array Type Error",
+               "Failed to determine type of array element %zu", i);
+      return NULL;
+    }
+
+    TypeMatchResult match = types_match(first_element_type, element_type);
+    if (match == TYPE_MATCH_NONE) {
+      tc_error_help(
+          expr, "Array Element Type Mismatch",
+          "All array elements must have the same type",
+          "Element %zu has type '%s', but first element has type '%s'", i,
+          type_to_string(element_type, arena),
+          type_to_string(first_element_type, arena));
+      return NULL;
+    }
+  }
+
+  // Create array size literal
+  long long size_val = (long long)element_count;
+  AstNode *size_expr = create_literal_expr(arena, LITERAL_INT, &size_val,
+                                           expr->line, expr->column);
+
+  // Create and return array type
+  AstNode *array_type = create_array_type(arena, first_element_type, size_expr,
+                                          expr->line, expr->column);
+  return array_type;
+}

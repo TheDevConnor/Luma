@@ -260,8 +260,21 @@ AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena);
 AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
                                    ArenaAllocator *arena);
+AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
+                              ArenaAllocator *arena);
 
 AstNode *get_enclosing_function_return_type(Scope *scope);
+
+bool validate_array_type(AstNode *array_type, Scope *scope,
+                         ArenaAllocator *arena);
+bool check_array_bounds(AstNode *array_type, AstNode *index_expr,
+                        ArenaAllocator *arena);
+AstNode *typecheck_multidim_array_access(AstNode *base_type, AstNode **indices,
+                                         size_t index_count,
+                                         ArenaAllocator *arena);
+TypeMatchResult check_array_compatibility(AstNode *type1, AstNode *type2);
+bool validate_array_initializer(AstNode *declared_type, AstNode *initializer,
+                                Scope *scope, ArenaAllocator *arena);
 
 // ============================================================================
 // Error Handling

@@ -86,53 +86,14 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       TypeMatchResult match = types_match(declared_type, init_type);
       if (match == TYPE_MATCH_NONE) {
         // Provide specific error messages based on type categories
-        if (declared_type->type == AST_TYPE_ARRAY &&
-            init_type->type == AST_TYPE_ARRAY) {
-          // Special handling for array type mismatches
-          TypeMatchResult element_match =
-              types_match(declared_type->type_data.array.element_type,
-                          init_type->type_data.array.element_type);
+        if (declared_type && declared_type->type == AST_TYPE_ARRAY) {
+          if (!validate_array_type(declared_type, scope, arena)) {
+            return false;
+          }
 
-          if (element_match != TYPE_MATCH_NONE) {
-            // Element types match, so it's a size mismatch
-            AstNode *declared_size = declared_type->type_data.array.size;
-            AstNode *init_size = init_type->type_data.array.size;
-
-            if (declared_size && init_size &&
-                declared_size->type == AST_EXPR_LITERAL &&
-                init_size->type == AST_EXPR_LITERAL &&
-                declared_size->expr.literal.lit_type == LITERAL_INT &&
-                init_size->expr.literal.lit_type == LITERAL_INT) {
-
-              long long declared_val =
-                  declared_size->expr.literal.value.int_val;
-              long long init_val = init_size->expr.literal.value.int_val;
-
-              tc_error_help(node, "Array Size Mismatch",
-                            "Ensure the array size matches the number of "
-                            "elements in the initializer",
-                            "Cannot assign array of size %lld to variable '%s' "
-                            "declared as array of size %lld",
-                            init_val, name, declared_val);
-            } else {
-              tc_error_help(
-                  node, "Array Size Mismatch",
-                  "Array sizes must match between declaration and initializer",
-                  "Variable '%s' declared and initialized with incompatible "
-                  "array sizes",
-                  name);
-            }
-          } else {
-            // Element types don't match
-            tc_error_help(
-                node, "Array Element Type Mismatch",
-                "Array element types must be compatible",
-                "Cannot assign array of '%s' elements to variable '%s' "
-                "declared as array of '%s' elements",
-                type_to_string(init_type->type_data.array.element_type, arena),
-                name,
-                type_to_string(declared_type->type_data.array.element_type,
-                               arena));
+          if (initializer && !validate_array_initializer(
+                                 declared_type, initializer, scope, arena)) {
+            return false;
           }
         } else {
           // General type mismatch

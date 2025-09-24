@@ -129,8 +129,6 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
 
   // Enhanced array type matching - check both element types AND sizes
   if (type1->type == AST_TYPE_ARRAY && type2->type == AST_TYPE_ARRAY) {
-    printf("DEBUG: Comparing array types\n");
-
     // First check if element types match
     TypeMatchResult element_match =
         types_match(type1->type_data.array.element_type,
