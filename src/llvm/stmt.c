@@ -38,60 +38,42 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
   if (node->stmt.var_decl.initializer) {
     LLVMValueRef init_val = codegen_expr(ctx, node->stmt.var_decl.initializer);
     if (init_val) {
+      // CRITICAL: Handle type conversions between float and double
       LLVMTypeRef init_type = LLVMTypeOf(init_val);
-      LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
-      LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
-
-      // Handle array initialization specially
-      if (var_kind == LLVMArrayTypeKind && init_kind == LLVMArrayTypeKind) {
-        // Array-to-array assignment
-        if (var_type == init_type) {
-          // Same array type - direct assignment
-          if (ctx->current_function == NULL) {
-            // Global array - must be constant
-            if (LLVMIsConstant(init_val)) {
-              LLVMSetInitializer(var_ref, init_val);
-            } else {
-              fprintf(stderr,
-                      "Error: Global array initializer must be constant\n");
-              LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
-            }
-          } else {
-            // Local array - copy elements
-            copy_array_elements(ctx, var_ref, var_type, init_val, init_type);
-          }
-        } else {
-          fprintf(stderr, "Error: Array type mismatch in initialization\n");
-          return NULL;
+      
+      if (var_type != init_type) {
+        // Handle float/double conversions
+        LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
+        LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
+        
+        if (var_kind == LLVMDoubleTypeKind && init_kind == LLVMFloatTypeKind) {
+          // Convert float to double
+          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type, "float_to_double");
+        } else if (var_kind == LLVMFloatTypeKind && init_kind == LLVMDoubleTypeKind) {
+          // Convert double to float
+          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type, "double_to_float");
+        } else if (var_kind == LLVMIntegerTypeKind && 
+                  (init_kind == LLVMFloatTypeKind || init_kind == LLVMDoubleTypeKind)) {
+          // Convert float/double to integer
+          init_val = LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
+        } else if ((var_kind == LLVMFloatTypeKind || var_kind == LLVMDoubleTypeKind) && 
+                   init_kind == LLVMIntegerTypeKind) {
+          // Convert integer to float/double
+          init_val = LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
         }
-      } else if (var_kind == LLVMArrayTypeKind &&
-                 init_kind != LLVMArrayTypeKind) {
-        // Trying to initialize array with non-array
-        fprintf(stderr,
-                "Error: Cannot initialize array with non-array value\n");
-        return NULL;
+      }
+      
+      if (ctx->current_function == NULL) {
+        // For globals, the initializer must be a constant
+        if (LLVMIsConstant(init_val)) {
+          LLVMSetInitializer(var_ref, init_val);
+        } else {
+          fprintf(stderr, "Error: Global variable initializer must be constant\n");
+          // Set a default constant initializer
+          LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
+        }
       } else {
-        // Regular scalar initialization with type conversion
-        if (var_type != init_type) {
-          init_val = convert_value_to_type(ctx, init_val, init_type, var_type);
-          if (!init_val) {
-            fprintf(stderr,
-                    "Error: Cannot convert initializer to variable type\n");
-            return NULL;
-          }
-        }
-
-        if (ctx->current_function == NULL) {
-          if (LLVMIsConstant(init_val)) {
-            LLVMSetInitializer(var_ref, init_val);
-          } else {
-            fprintf(stderr,
-                    "Error: Global variable initializer must be constant\n");
-            LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
-          }
-        } else {
-          LLVMBuildStore(ctx->builder, init_val, var_ref);
-        }
+        LLVMBuildStore(ctx->builder, init_val, var_ref);
       }
     } else {
       // No initializer - set to zero/null
