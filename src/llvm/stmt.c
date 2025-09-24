@@ -19,8 +19,6 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     return NULL;
 
   LLVMValueRef var_ref;
-
-  // Use current module instead of legacy ctx->module
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
@@ -28,7 +26,6 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     var_ref =
         LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
 
-    // Set linkage based on whether this is a public declaration
     if (node->stmt.var_decl.is_public) {
       LLVMSetLinkage(var_ref, LLVMExternalLinkage);
     } else {
@@ -40,12 +37,54 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
 
   if (node->stmt.var_decl.initializer) {
     LLVMValueRef init_val = codegen_expr(ctx, node->stmt.var_decl.initializer);
-    if (init_val && ctx->current_function == NULL) {
-      LLVMSetInitializer(var_ref, init_val);
-    } else if (!init_val && ctx->current_function == NULL) {
-      LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
+    if (init_val) {
+      // CRITICAL: Handle type conversions between float and double
+      LLVMTypeRef init_type = LLVMTypeOf(init_val);
+      
+      if (var_type != init_type) {
+        // Handle float/double conversions
+        LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
+        LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
+        
+        if (var_kind == LLVMDoubleTypeKind && init_kind == LLVMFloatTypeKind) {
+          // Convert float to double
+          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type, "float_to_double");
+        } else if (var_kind == LLVMFloatTypeKind && init_kind == LLVMDoubleTypeKind) {
+          // Convert double to float
+          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type, "double_to_float");
+        } else if (var_kind == LLVMIntegerTypeKind && 
+                  (init_kind == LLVMFloatTypeKind || init_kind == LLVMDoubleTypeKind)) {
+          // Convert float/double to integer
+          init_val = LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
+        } else if ((var_kind == LLVMFloatTypeKind || var_kind == LLVMDoubleTypeKind) && 
+                   init_kind == LLVMIntegerTypeKind) {
+          // Convert integer to float/double
+          init_val = LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
+        }
+      }
+      
+      if (ctx->current_function == NULL) {
+        // For globals, the initializer must be a constant
+        if (LLVMIsConstant(init_val)) {
+          LLVMSetInitializer(var_ref, init_val);
+        } else {
+          fprintf(stderr, "Error: Global variable initializer must be constant\n");
+          // Set a default constant initializer
+          LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
+        }
+      } else {
+        LLVMBuildStore(ctx->builder, init_val, var_ref);
+      }
     } else {
-      LLVMBuildStore(ctx->builder, init_val, var_ref);
+      // No initializer - set to zero/null
+      if (ctx->current_function == NULL) {
+        LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
+      }
+    }
+  } else {
+    // No initializer provided
+    if (ctx->current_function == NULL) {
+      LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
     }
   }
 
@@ -228,7 +267,6 @@ LLVMValueRef codegen_stmt_enum(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
-
 LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef ret_val = NULL;
 
@@ -236,26 +274,47 @@ LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node) {
     ret_val = codegen_expr(ctx, node->stmt.return_stmt.value);
     if (!ret_val)
       return NULL;
+      
+    // CRITICAL: Ensure return value matches function return type
+    if (ctx->current_function) {
+      LLVMTypeRef func_type = LLVMGlobalGetValueType(ctx->current_function);
+      LLVMTypeRef expected_return_type = LLVMGetReturnType(func_type);
+      LLVMTypeRef actual_return_type = LLVMTypeOf(ret_val);
+      
+      if (expected_return_type != actual_return_type) {
+        // Handle type conversions
+        LLVMTypeKind expected_kind = LLVMGetTypeKind(expected_return_type);
+        LLVMTypeKind actual_kind = LLVMGetTypeKind(actual_return_type);
+        
+        if (expected_kind == LLVMDoubleTypeKind && actual_kind == LLVMFloatTypeKind) {
+          ret_val = LLVMBuildFPExt(ctx->builder, ret_val, expected_return_type, "ret_float_to_double");
+        } else if (expected_kind == LLVMFloatTypeKind && actual_kind == LLVMDoubleTypeKind) {
+          ret_val = LLVMBuildFPTrunc(ctx->builder, ret_val, expected_return_type, "ret_double_to_float");
+        } else if (expected_kind == LLVMIntegerTypeKind && 
+                  (actual_kind == LLVMFloatTypeKind || actual_kind == LLVMDoubleTypeKind)) {
+          ret_val = LLVMBuildFPToSI(ctx->builder, ret_val, expected_return_type, "ret_float_to_int");
+        } else if ((expected_kind == LLVMFloatTypeKind || expected_kind == LLVMDoubleTypeKind) && 
+                   actual_kind == LLVMIntegerTypeKind) {
+          ret_val = LLVMBuildSIToFP(ctx->builder, ret_val, expected_return_type, "ret_int_to_float");
+        }
+        // Add more conversion cases as needed
+      }
+    }
   }
 
-  // If we have deferred statements at function level, we need to branch to
-  // cleanup blocks But first, execute any local scope deferred statements
-  // inline
+  // Handle deferred statements as before...
   if (ctx->deferred_statements) {
     LLVMValueRef return_val_storage = NULL;
 
     if (ret_val) {
-      // Allocate storage for return value
       LLVMTypeRef ret_type = LLVMTypeOf(ret_val);
       return_val_storage =
           LLVMBuildAlloca(ctx->builder, ret_type, "return_val_storage");
       LLVMBuildStore(ctx->builder, ret_val, return_val_storage);
     }
 
-    // Execute deferred statements inline (these will be from local scopes)
     execute_deferred_statements_inline(ctx, ctx->deferred_statements);
 
-    // Return the stored value or void
     if (return_val_storage) {
       LLVMValueRef final_ret_val =
           LLVMBuildLoad2(ctx->builder, LLVMTypeOf(ret_val), return_val_storage,
@@ -265,7 +324,6 @@ LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node) {
       return LLVMBuildRetVoid(ctx->builder);
     }
   } else {
-    // No deferred statements, return normally
     if (ret_val) {
       return LLVMBuildRet(ctx->builder, ret_val);
     } else {
@@ -483,11 +541,10 @@ LLVMValueRef get_range_end_value(CodeGenContext *ctx,
 
 // Enhanced codegen_stmt_print function with better float support
 LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
-  // Use current module instead of legacy ctx->module
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
-  // Declare printf once (check if it already exists first)
+  // Declare printf once
   LLVMValueRef printf_func =
       LLVMGetNamedFunction(current_llvm_module, "printf");
   LLVMTypeRef printf_type = NULL;
@@ -505,114 +562,102 @@ LLVMValueRef codegen_stmt_print(CodeGenContext *ctx, AstNode *node) {
 
   for (size_t i = 0; i < node->stmt.print_stmt.expr_count; i++) {
     AstNode *expr = node->stmt.print_stmt.expressions[i];
-    LLVMValueRef value = NULL;
-    const char *format_str = NULL;
+    
+    // Check if this is a nested indexing expression that might fail
+    if (expr->type == AST_EXPR_INDEX) {
+      // Validate the indexing chain before attempting to generate
+      AstNode *current = expr;
+      int depth = 0;
+      
+      while (current->type == AST_EXPR_INDEX) {
+        depth++;
+        current = current->expr.index.object;
+      }
+      
+      if (depth > 1) {
+        // This is nested indexing - add debug info
+        printf("Debug: Processing nested indexing with depth %d\n", depth);
+      }
+    }
+    
+    LLVMValueRef value = codegen_expr(ctx, expr);
+    if (!value) {
+      fprintf(stderr, "Error: Failed to generate expression for printing\n");
+      continue; // Skip this expression but continue with others
+    }
 
+    const char *format_str = NULL;
+    LLVMTypeRef value_type = LLVMTypeOf(value);
+    LLVMTypeKind value_kind = LLVMGetTypeKind(value_type);
+
+    // Handle string literals specially
     if (expr->type == AST_EXPR_LITERAL &&
         expr->expr.literal.lit_type == LITERAL_STRING) {
-      // Handle string literals as before
       char *processed_str =
           process_escape_sequences(expr->expr.literal.value.string_val);
       value = LLVMBuildGlobalStringPtr(ctx->builder, processed_str, "str");
       format_str = "%s";
       free(processed_str);
     } else {
-      // Generate the expression value
-      value = codegen_expr(ctx, expr);
-      if (!value)
-        return NULL;
-
-      LLVMTypeRef value_type = LLVMTypeOf(value);
-
-      // Check if this is a range type
+      // Handle different value types
       if (is_range_type(value_type)) {
-        // Handle range printing: format as "start..end"
+        // Handle range printing
         LLVMValueRef start_val = get_range_start_value(ctx, value);
         LLVMValueRef end_val = get_range_end_value(ctx, value);
 
-        // Determine the format based on the range element type
         LLVMTypeRef field_types[2];
         LLVMGetStructElementTypes(value_type, field_types);
         LLVMTypeKind element_kind = LLVMGetTypeKind(field_types[0]);
         
-        const char *element_format;
-        if (element_kind == LLVMFloatTypeKind) {
-          element_format = "%.6f";
-        } else if (element_kind == LLVMDoubleTypeKind) {
-          element_format = "%.6lf";
-        } else if (element_kind == LLVMIntegerTypeKind) {
-          unsigned int bits = LLVMGetIntTypeWidth(field_types[0]);
-          element_format = (bits == 64) ? "%lld" : "%d";
-        } else {
-          element_format = "%d";
-        }
+        const char *element_format = (element_kind == LLVMFloatTypeKind) ? "%.6f" :
+                                   (element_kind == LLVMDoubleTypeKind) ? "%.6lf" :
+                                   (element_kind == LLVMIntegerTypeKind && 
+                                    LLVMGetIntTypeWidth(field_types[0]) == 64) ? "%lld" : "%d";
         
         char range_format[64];
         snprintf(range_format, sizeof(range_format), "%s..%s", element_format, element_format);
 
-        // Create format string value
         LLVMValueRef range_format_str =
             LLVMBuildGlobalStringPtr(ctx->builder, range_format, "range_fmt");
 
-        // Call printf with start and end values
         LLVMValueRef range_args[] = {range_format_str, start_val, end_val};
         LLVMBuildCall2(ctx->builder, printf_type, printf_func, range_args, 3, "");
-
-        continue; // Skip the regular printing logic
+        continue;
       }
 
-      // Handle different value types with improved float support
-      LLVMTypeKind value_kind = LLVMGetTypeKind(value_type);
-      
+      // Regular value type handling
       if (value_kind == LLVMIntegerTypeKind) {
         unsigned int bits = LLVMGetIntTypeWidth(value_type);
         if (bits == 1) {
-          // Boolean values - convert to readable format
           format_str = "%s";
-          
-          // Create conditional to print "true" or "false"
           LLVMValueRef true_str = LLVMBuildGlobalStringPtr(ctx->builder, "true", "true_str");
           LLVMValueRef false_str = LLVMBuildGlobalStringPtr(ctx->builder, "false", "false_str");
-          
           value = LLVMBuildSelect(ctx->builder, value, true_str, false_str, "bool_str");
-          
-        } else if (bits == 8 || bits == 16 || bits == 32) {
+        } else if (bits <= 32) {
           format_str = "%d";
-        } else if (bits == 64) {
-          format_str = "%lld";
         } else {
-          format_str = "%d";
+          format_str = "%lld";
         }
-        
       } else if (value_kind == LLVMFloatTypeKind) {
         format_str = "%.6f";
-        // LLVM printf requires double for variadic functions, so promote float to double
         value = LLVMBuildFPExt(ctx->builder, value, LLVMDoubleTypeInContext(ctx->context), "float_to_double");
-        
       } else if (value_kind == LLVMDoubleTypeKind) {
         format_str = "%.6lf";
-        
       } else if (value_kind == LLVMPointerTypeKind) {
-        // Handle string pointers vs other pointers
-        format_str = "%s";
-        
-        // Alternative: you could be more conservative and only treat certain
-        // patterns as strings, falling back to %p for other pointers:
-        // format_str = "%p";
-        
+        format_str = "%s"; // Assume string pointer
       } else {
-        format_str = "%p";
+        format_str = "%p"; // Fallback for unknown types
       }
     }
 
-    // Create format string and call printf (for non-range values)
+    // Print the value
     if (format_str) {
       LLVMValueRef format_str_val =
           LLVMBuildGlobalStringPtr(ctx->builder, format_str, "fmt");
       LLVMValueRef args[] = {format_str_val, value};
       LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 2, "");
     }
-  }
+  } 
   return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
 }
 

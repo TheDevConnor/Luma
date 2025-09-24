@@ -12,8 +12,8 @@ Type *pointer(Parser *parser) {
     return NULL;
   }
 
-  return create_pointer_type(parser->arena, pointee_type, p_current(parser).line,
-                             p_current(parser).col);
+  return create_pointer_type(parser->arena, pointee_type,
+                             p_current(parser).line, p_current(parser).col);
 }
 
 // [Type; Size]
@@ -23,12 +23,12 @@ Type *array_type(Parser *parser) {
 
   p_consume(parser, TOK_SEMICOLON, "Expected ';' after array element type");
   Expr *size_expr = parse_expr(parser, BP_LOWEST);
-  
+
   if (p_current(parser).type_ != TOK_RBRACKET) {
     parser_error(parser, "SyntaxError", "Unknown",
-                "Expected ']' to close array type declaration",
-                p_current(parser).line, p_current(parser).col,
-                CURRENT_TOKEN_LENGTH(parser));
+                 "Expected ']' to close array type declaration",
+                 p_current(parser).line, p_current(parser).col,
+                 CURRENT_TOKEN_LENGTH(parser));
     return NULL; // Error, return NULL
   }
 
@@ -43,6 +43,9 @@ Type *tnud(Parser *parser) {
                              p_current(parser).col);
   case TOK_UINT:
     return create_basic_type(parser->arena, "uint", p_current(parser).line,
+                             p_current(parser).col);
+  case TOK_DOUBLE:
+    return create_basic_type(parser->arena, "double", p_current(parser).line,
                              p_current(parser).col);
   case TOK_FLOAT:
     return create_basic_type(parser->arena, "float", p_current(parser).line,
@@ -62,7 +65,7 @@ Type *tnud(Parser *parser) {
   case TOK_STAR:       // Pointer type
     p_advance(parser); // Consume the '*' token
     return pointer(parser);
-  case TOK_LBRACKET: // Array type
+  case TOK_LBRACKET:   // Array type
     p_advance(parser); // Consume the '[' token
     return array_type(parser);
   default:
@@ -72,7 +75,8 @@ Type *tnud(Parser *parser) {
 }
 
 Type *tled(Parser *parser, Type *left, BindingPower bp) {
-  (void)left; (void)bp; // Suppress unused variable warnings
+  (void)left;
+  (void)bp; // Suppress unused variable warnings
   fprintf(stderr, "Parsing type led: %.*s\n", CURRENT_TOKEN_LENGTH(parser),
           CURRENT_TOKEN_VALUE(parser));
   return NULL; // No valid type found

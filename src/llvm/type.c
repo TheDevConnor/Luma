@@ -53,7 +53,8 @@ LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
     return LLVMInt1TypeInContext(ctx->context);
   } else if (strcmp(type_name, "void") == 0) {
     return LLVMVoidTypeInContext(ctx->context);
-  } else if (strcmp(type_name, "str") == 0) {
+  } else if (strcmp(type_name, "str") == 0 ||
+             strcmp(type_name, "string") == 0) {
     return LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
   } else if (strcmp(type_name, "char") == 0) {
     return LLVMInt8TypeInContext(ctx->context);
@@ -63,8 +64,8 @@ LLVMTypeRef codegen_type_basic(CodeGenContext *ctx, AstNode *node) {
     if (struct_type) {
       return struct_type;
     }
-    
-    // Check if this is an enum type (existing code)
+
+    // Check if this is an enum type
     return get_enum_type(ctx, type_name);
   }
 

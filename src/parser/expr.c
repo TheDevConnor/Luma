@@ -28,6 +28,7 @@
  * @version 1.0
  */
 
+#include <stdalign.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

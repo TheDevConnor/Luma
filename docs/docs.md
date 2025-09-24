@@ -85,7 +85,8 @@ Luma provides a straightforward type system with both primitive and compound typ
 |------|-------------|------|
 | `int` | Signed integer | 64-bit |
 | `uint` | Unsigned integer | 64-bit |
-| `float` | Floating point | 64-bit |
+| `float` | Floating point | 32-bit |
+| `double` | Floating point | 64-bit |
 | `bool` | Boolean | 1 byte |
 | `char` | Unicode Character| 1 byte |
 | `str` | String | Variable |

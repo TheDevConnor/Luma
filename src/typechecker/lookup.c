@@ -71,7 +71,21 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     case LITERAL_INT:
       return create_basic_type(arena, "int", expr->line, expr->column);
     case LITERAL_FLOAT:
-      return create_basic_type(arena, "float", expr->line, expr->column);
+      // Check if the literal has a suffix to determine float vs double
+      // You'll need to add suffix information to your literal structure
+      // For now, we can use a heuristic or default behavior:
+
+      // Option 1: Default to double (more precise)
+      return create_basic_type(arena, "double", expr->line, expr->column);
+
+      // Option 2: Check for 'f' suffix (requires lexer changes)
+      // if (expr->expr.literal.has_float_suffix) {
+      //     return create_basic_type(arena, "float", expr->line, expr->column);
+      // } else {
+      //     return create_basic_type(arena, "double", expr->line,
+      //     expr->column);
+      // }
+
     case LITERAL_STRING:
       return create_basic_type(arena, "string", expr->line, expr->column);
     case LITERAL_BOOL:

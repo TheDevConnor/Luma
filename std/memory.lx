@@ -11,18 +11,29 @@ pub const memcpy = fn (dest: *void, src: *void, n: int) *void {
     return dest;
 } 
 
-pub const alligned_alloc = fn (alignment: int, size: int) *void {
+pub const aligned_alloc = fn (alignment: int, size: int) *void {
     if (alignment < sizeof<*void>) {
         alignment = sizeof<*void>;
     }
 
-    let raw: *void = alloc(size + alignment - 1 + sizeof<*void>);
+    // allocate: size + padding + space to store original pointer
+    let raw: *void = alloc(size + alignment - 1 + sizeof<*void>);    
 
+    // compute aligned address using bitwise rounding
     let raw_addr: int = cast<int>(raw) + sizeof<*void>;
     let aligned_addr: int = ((raw_addr + alignment - 1) / alignment) * alignment;
 
+    // store original raw pointer right before aligned block
     let aligned_ptr: **void = cast<**void>(aligned_addr);
     aligned_ptr[-1] = raw;
 
     return cast<*void>(aligned_addr);
+}
+
+pub const aligned_free = fn (ptr: *void) void {
+    // fetch the original pointer that we stored at (aligned - sizeof(void*))
+    let aligned_ptr: **void = cast<**void>(cast<int>(ptr));
+    let raw: *void = aligned_ptr[-1];
+    free(raw);
+    free(ptr);
 }

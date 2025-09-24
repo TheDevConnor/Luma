@@ -23,7 +23,7 @@ AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
     if (!is_numeric_type(left_type)) {
       tc_error_help(
           expr, "Type Error",
-          "Arithmetic operations require numeric operands (int, float)",
+          "Arithmetic operations require numeric operands (int, float, double)",
           "Left operand has non-numeric type '%s'",
           type_to_string(left_type, arena));
       return NULL;
@@ -32,19 +32,26 @@ AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
     if (!is_numeric_type(right_type)) {
       tc_error_help(
           expr, "Type Error",
-          "Arithmetic operations require numeric operands (int, float)",
+          "Arithmetic operations require numeric operands (int, float, double)",
           "Right operand has non-numeric type '%s'",
           type_to_string(right_type, arena));
       return NULL;
     }
 
-    // Return the "wider" type (float > int)
-    if (types_match(left_type, create_basic_type(arena, "float", 0, 0)) ==
-            TYPE_MATCH_EXACT ||
-        types_match(right_type, create_basic_type(arena, "float", 0, 0)) ==
-            TYPE_MATCH_EXACT) {
+    // Enhanced type promotion: double > float > int
+    AstNode *double_type = create_basic_type(arena, "double", 0, 0);
+    AstNode *float_type = create_basic_type(arena, "float", 0, 0);
+
+    if (types_match(left_type, double_type) == TYPE_MATCH_EXACT ||
+        types_match(right_type, double_type) == TYPE_MATCH_EXACT) {
+      return create_basic_type(arena, "double", expr->line, expr->column);
+    }
+
+    if (types_match(left_type, float_type) == TYPE_MATCH_EXACT ||
+        types_match(right_type, float_type) == TYPE_MATCH_EXACT) {
       return create_basic_type(arena, "float", expr->line, expr->column);
     }
+
     return create_basic_type(arena, "int", expr->line, expr->column);
   }
 

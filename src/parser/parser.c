@@ -482,6 +482,7 @@ Type *parse_type(Parser *parser) {
   switch (tok) {
   case TOK_INT:
   case TOK_UINT:
+  case TOK_DOUBLE:
   case TOK_FLOAT:
   case TOK_BOOL:
   case TOK_STRINGT:

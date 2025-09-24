@@ -1,12 +1,20 @@
 @module "main"
 
-@use "math" as math
+@use "memory" as mem
 
 pub const main = fn () int {
-   loop [i: int = 0](i <= 100000000) : (++i) {
-    math::sin((cast<float>(i) * 2 * math::PI) / cast<float>(100));
-   }
+    let p: *void = mem::aligned_alloc(64, 100);
+    defer { mem::aligned_free(p); } 
 
-   return 0;
+    output("Pointer: ", cast<int>(p), "\n");  
+    output("Aligned? ");
+
+    if ((cast<int>(p) / 64) * 64 == cast<int>(p)) {
+        output("yes\n");
+    } else {
+        output("no\n");
+    }
+
+    return 0;
 }
-// time 2.725
+

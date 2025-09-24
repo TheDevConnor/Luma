@@ -34,7 +34,7 @@ void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
 void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
                               const char *var_name) {
   if (!var_name || strcmp(var_name, "unknown") == 0) {
-    printf("Warning: free() called on unknown variable\n");
+    // printf("Warning: free() called on unknown variable\n");
     return;
   }
 
@@ -158,15 +158,15 @@ void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
     // Silence is golden - no issues found
   } else {
     // The detailed errors will be shown when error_report() is called
-    // You could add a summary here if desired
-    printf("\nMemory Analysis Summary:\n");
-    if (leak_count > 0) {
-      printf("- Found %zu potential memory leak(s)\n", leak_count);
-    }
-    if (double_free_count > 0) {
-      printf("- Found %zu double free error(s)\n", double_free_count);
-    }
-    printf("See detailed error report above.\n");
+    // // You could add a summary here if desired
+    // printf("\nMemory Analysis Summary:\n");
+    // if (leak_count > 0) {
+    //   printf("- Found %zu potential memory leak(s)\n", leak_count);
+    // }
+    // if (double_free_count > 0) {
+    //   printf("- Found %zu double free error(s)\n", double_free_count);
+    // }
+    // printf("See detailed error report above.\n");
   }
 }
 
@@ -227,9 +227,10 @@ void static_memory_track_alias(StaticMemoryAnalyzer *analyzer,
   // Transfer primary ownership to new_var
   source_alloc->variable_name = arena_strdup(analyzer->arena, new_var);
 
-  printf("DEBUG: Transferred ownership from '%s' to '%s' (allocation at line "
-         "%zu)\n",
-         source_var, new_var, source_alloc->line);
+  // printf("DEBUG: Transferred ownership from '%s' to '%s' (allocation at line
+  // "
+  //        "%zu)\n",
+  //        source_var, new_var, source_alloc->line);
 }
 
 /**
