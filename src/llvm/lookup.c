@@ -17,7 +17,7 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
   case AST_EXPR_CALL:
     return codegen_expr_call(ctx, node);
   case AST_EXPR_ASSIGNMENT:
-    return codegen_expr_array_assignment(ctx, node);
+    return codegen_expr_assignment(ctx, node);
   case AST_EXPR_GROUPING:
     return codegen_expr(ctx, node->expr.grouping.expr);
   case AST_EXPR_INDEX:

@@ -413,6 +413,84 @@ Token next_token(Lexer *lx) {
                       wh_count); // Make sure this is TOK_NUMBER
   }
 
+  if (c == '\'') {
+    const char *char_start = lx->current; // Start after opening quote
+
+    if (is_at_end(lx)) {
+      // Unclosed character literal
+      report_lexer_error(lx, "LexerError", "unknown_file",
+                         "Unclosed character literal",
+                         get_line_text_from_source(lx->src, lx->line), lx->line,
+                         lx->col - 1, 1);
+      return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+    }
+
+    char ch = peek(lx, 0);
+
+    // Handle escape sequences
+    if (ch == '\\') {
+      advance(lx); // consume backslash
+      if (is_at_end(lx)) {
+        report_lexer_error(lx, "LexerError", "unknown_file",
+                           "Incomplete escape sequence in character literal",
+                           get_line_text_from_source(lx->src, lx->line),
+                           lx->line, lx->col - 2, 2);
+        return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
+      }
+
+      char escaped = peek(lx, 0);
+      // Validate common escape sequences
+      if (escaped != 'n' && escaped != 't' && escaped != 'r' &&
+          escaped != '\\' && escaped != '\'' && escaped != '\"' &&
+          escaped != '0') {
+        static char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg),
+                 "Invalid escape sequence '\\%c' in character literal",
+                 escaped);
+        report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                           get_line_text_from_source(lx->src, lx->line),
+                           lx->line, lx->col - 2, 3);
+        return MAKE_TOKEN(TOK_ERROR, start, lx, 3, wh_count);
+      }
+      advance(lx); // consume escaped character
+    } else if (ch == '\'') {
+      // Empty character literal
+      report_lexer_error(lx, "LexerError", "unknown_file",
+                         "Empty character literal",
+                         get_line_text_from_source(lx->src, lx->line), lx->line,
+                         lx->col - 1, 2);
+      advance(lx); // consume closing quote
+      return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
+    } else if (ch == '\n' || ch == '\r') {
+      // Newline in character literal
+      report_lexer_error(lx, "LexerError", "unknown_file",
+                         "Newline in character literal",
+                         get_line_text_from_source(lx->src, lx->line), lx->line,
+                         lx->col - 1, 1);
+      return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+    } else {
+      // Regular character
+      advance(lx); // consume the character
+    }
+
+    // Check for closing quote
+    if (is_at_end(lx) || peek(lx, 0) != '\'') {
+      report_lexer_error(lx, "LexerError", "unknown_file",
+                         "Unclosed character literal",
+                         get_line_text_from_source(lx->src, lx->line), lx->line,
+                         lx->col - 1, (int)(lx->current - start));
+      return MAKE_TOKEN(TOK_ERROR, start, lx, (int)(lx->current - start),
+                        wh_count);
+    }
+
+    advance(lx); // consume closing quote
+    int total_len = (int)(lx->current - start);
+    int content_len =
+        (int)(lx->current - char_start - 1); // Length of content between quotes
+    return make_token(TOK_CHAR_LITERAL, char_start, lx->line,
+                      lx->col - total_len, content_len, wh_count);
+  }
+
   // Strings
   if (c == '"') {
     while (!is_at_end(lx) && peek(lx, 0) != '"') {

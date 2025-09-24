@@ -82,7 +82,7 @@ pub const calloc = fn (count: int, size: int) *void {
 }
 
 // Reallocate memory (simplified version - allocates new and copies)
-pub const realloc = fn (ptr: *void, old_size: int, new_size: int) *void {
+pub const realloc = fn (ptr: *void, new_size: int) *void {
     if (ptr == cast<*void>(0)) {
         return alloc(new_size);
     }
@@ -93,14 +93,8 @@ pub const realloc = fn (ptr: *void, old_size: int, new_size: int) *void {
     }
     
     let new_ptr: *void = alloc(new_size);
-    if (new_ptr != cast<*void>(0)) {
-        let copy_size: int = old_size;
-        if (new_size < old_size) {
-            copy_size = new_size;
-        }
-        memcpy(new_ptr, ptr, copy_size);
-        free(ptr);
-    }
+    memcpy(new_ptr, ptr, new_size);
+    free(ptr);
     
     return new_ptr;
 }

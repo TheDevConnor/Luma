@@ -265,6 +265,7 @@ Expr *nud(Parser *parser) {
   case TOK_NUMBER:
   case TOK_NUM_FLOAT:
   case TOK_STRING:
+  case TOK_CHAR_LITERAL:
   case TOK_IDENTIFIER:
     return primary(parser);
   case TOK_MINUS:
