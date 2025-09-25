@@ -309,6 +309,7 @@ AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
   }
 
   AstNode *root = parse(&tokens, allocator, config);
+  print_ast(root, "", false, false);
 
   free((void *)source);
   return root;

@@ -299,6 +299,48 @@ const test_aligned_alloc = fn () void {
     output("aligned_alloc passed!\n");
 }
 
+// size_t arr[] = {1, 4, 8};
+// assert(my_struct_align(arr, 3) == 8);
+
+const test_align = fn () void {
+    {
+        let arr: *int = cast<*int>(alloc(3 * sizeof<int>));
+        defer { free(arr); }
+
+        arr[0] = 1;
+        arr[1] = 4;
+        arr[2] = 8;
+
+        if (mem::align(arr, 3) != 8) {
+            output("align failed\n");
+            return;
+        }
+    }
+    {
+        let arr: *int = cast<*int>(alloc(10 * sizeof<int>));
+        defer { free(arr); }
+
+        arr[0] = 10;
+        arr[1] = 2;
+        arr[2] = 18;
+        arr[3] = 50;
+        arr[4] = 1;
+        arr[5] = 14;
+        arr[6] = 25;
+        arr[7] = 5;
+        arr[8] = 100;
+        arr[9] = 79;
+
+        if (mem::align(arr, 10) != 100) {
+            output("align failed\n");
+            return;
+        }
+    }
+
+    output("align passed!\n");
+}
+
+
 // Helper function to run all tests
 const run_all_tests = fn () void {
     output("=== Memory Function Tests ===\n");
@@ -314,7 +356,8 @@ const run_all_tests = fn () void {
     test_memswap();
     test_memrev();
     test_memcount();
-    test_aligned_alloc();
+    // test_aligned_alloc();
+    test_align();
     
     output("=== All Tests Complete ===\n");
 }

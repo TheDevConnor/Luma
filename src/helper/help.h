@@ -48,6 +48,9 @@ typedef struct {
   bool save;
   bool clean;
   bool check_mem;
+  bool format;        // Add format flag
+  bool format_check;  // Add format check flag
+  bool format_in_place; // Add in-place formatting flag
   GrowableArray files; // Change from char** to GrowableArray
   size_t file_count;   // Keep for convenience, or remove and use files.count
 
@@ -70,6 +73,7 @@ bool PathIsDir(const char* p);
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena);
 bool run_build(BuildConfig config, ArenaAllocator *allocator);
+bool run_formatter(BuildConfig config, ArenaAllocator *allocator); // Add formatter function
 
 void print_token(const Token *t);
 

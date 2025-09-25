@@ -17,6 +17,7 @@
     #include <sys/stat.h>
 #endif
 
+#include "../lsp/formatter/formatter.h"
 #include "../c_libs/color/color.h"
 #include "help.h"
 
@@ -139,6 +140,53 @@ int print_license() {
     };
 #endif
 
+bool run_formatter(BuildConfig config, ArenaAllocator *allocator) {
+  if (!config.filepath) {
+    fprintf(stderr, "Error: No source file specified for formatting\n");
+    return false;
+  }
+
+  // Set up formatter config with reasonable defaults
+  FormatterConfig fmt_config = {
+    .indent_size = 2,
+    .use_tabs = false,
+    .max_line_length = 100,
+    .space_around_operator = true,
+    .space_after_comma = true,
+    .compact_blocks = false,
+    .check_only = config.format_check,
+    .write_in_place = config.format_in_place,
+    .output_file = NULL,
+  };
+
+  if (config.format_check) {
+    // Check if file needs formatting
+    bool needs_formatting = check_formatting(config.filepath, fmt_config, allocator);
+    if (needs_formatting) {
+      printf("File needs formatting: %s\n", config.filepath);
+      return false; // Return false to indicate file needs formatting (exit code 1)
+    } else {
+      printf("File is already formatted: %s\n", config.filepath);
+      return true;
+    }
+  }
+
+  // Format the file
+  const char* output_path = config.format_in_place ? config.filepath : NULL;
+  bool success = format_luma_code(config.filepath, output_path, fmt_config, allocator);
+  
+  if (!success) {
+    fprintf(stderr, "Error: Failed to format file: %s\n", config.filepath);
+    return false;
+  }
+
+  if (config.format_in_place) {
+    printf("Formatted file in place: %s\n", config.filepath);
+  }
+
+  return true;
+}
+
 /**
  * @brief Parses command-line arguments and configures the build.
  *
@@ -160,6 +208,10 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
   // set check_mem to true by default
   config->check_mem = true;
   config->filepath = false;
+  config->format = false;
+  config->format_check = false;
+  config->format_in_place = false;
+  
   for (int i = 1; i < argc; i++) {
     if(!PathExist(argv[i]) || argv[i][0] == '-'){
       if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
@@ -179,6 +231,12 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
         config->check_mem = false;
       } else if (strcmp(argv[i], "-debug") == 0) {
             // Placeholder for debug flag
+      } else if (strcmp(argv[i], "fmt") == 0 || strcmp(argv[i], "format") == 0) {
+        config->format = true;
+      } else if (strcmp(argv[i], "-fc") == 0 || strcmp(argv[i], "--format-check") == 0) {
+        config->format_check = true;
+      } else if (strcmp(argv[i], "-fi") == 0 || strcmp(argv[i], "--format-in-place") == 0) {
+        config->format_in_place = true;
       } else if (strcmp(argv[i], "-l") == 0 ||
                 strcmp(argv[i], "-link") == 0) {
             // Collect files until next flag or end of args

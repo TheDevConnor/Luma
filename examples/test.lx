@@ -3,7 +3,8 @@
 @use "math" as math
 
 pub const main = fn () int {
-   let x: double = math::sin(cast<double>(50));
-   output(x, "\n");
-   return 0;
+  let x: double = math::add(1, 10);
+  output(x, "\n");
+  return 0;
 }
+

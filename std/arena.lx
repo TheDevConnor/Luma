@@ -1,7 +1,11 @@
 @module "arena"
 
 @use "math" as math
-@use "arena" as arena
+@use "memory" as mem
+
+const ARENA_MIN_BUFFER_SIZE: int = 64 * 1024; // !64k minimum
+const ARENA_GROWTH_FACTOR: int = 2;
+const ARENA_MAX_BUFFER_SIZE: int = 16 * 1024 * 1024; // !16MB maximum per buffer
 
 const Buffer = struct {
     size: int,
@@ -17,6 +21,9 @@ pub const Allocator = struct {
     total_allocated:  int
 };
 
-// const buffer_create = fn (s: int, alignment: int) *Buffer {
-//     if (alignment == 0) { alignment = 1024; }
-// }
+const buffer_create = fn (s: int, alignment: int) *Buffer {
+    if (alignment == 0) { alignment = 1024; }
+
+    // alignment = math::max_size(alignment, );
+    return cast<*Buffer>(alloc(sizeof<Buffer>));
+}

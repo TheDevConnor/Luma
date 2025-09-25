@@ -250,9 +250,6 @@ LLVMValueRef codegen_expr_member_access(CodeGenContext *ctx, AstNode *node);
 
 LLVMValueRef convert_value_to_type(CodeGenContext *ctx, LLVMValueRef value,
                                    LLVMTypeRef from_type, LLVMTypeRef to_type);
-LLVMValueRef codegen_expr_array_index(CodeGenContext *ctx, AstNode *node);
-LLVMValueRef codegen_expr_array_assignment(CodeGenContext *ctx, AstNode *node);
-LLVMValueRef codegen_expr_array_assignment(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_multidim_array_access(CodeGenContext *ctx,
                                            AstNode *base_expr,
                                            AstNode **indices,

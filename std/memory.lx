@@ -142,6 +142,16 @@ pub const memcount = fn (ptr: *void, value: int, n: int) int {
     return count;
 }
 
+pub const align = fn (member_alignments: *int, count: int) int {
+    let max: int = 1;
+    loop [i: int = 0](i < count) : (++i) {
+        if (max < cast<*int>(member_alignments)[i]) {
+            max = cast<*int>(member_alignments)[i];
+        }
+    }
+    return max;
+}
+
 // Existing aligned allocation functions
 pub const aligned_alloc = fn (alignment: int, size: int) *void {
     if (alignment < sizeof<*void>) {

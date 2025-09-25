@@ -64,7 +64,14 @@ int main(int argc, char *argv[]) {
   }
 
   // Step 6: Run build process
-  bool success = run_build(config, &allocator);
+  bool success;
+
+  if (config.format || config.format_check || config.format_in_place) {
+    success = run_formatter(config, &allocator);
+  } else {
+    // Regular build process
+    success = run_build(config, &allocator);
+  }
 
   // Step 7: Clean up resources
   arena_destroy(&allocator);
