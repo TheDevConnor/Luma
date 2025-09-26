@@ -1,0 +1,18 @@
+<map id="src/lsp/formatter/formatter.h" name="src/lsp/formatter/formatter.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="45,5,251,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,79,72,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="132,33,70,73,67,69,129,28"/>
+<area shape="rect" id="Node000003" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="181,152,323,192"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="166,29,190,50,214,77,232,107,244,138,239,140,227,110,210,80,186,54,162,33"/>
+<area shape="rect" id="Node000007" href="$ast_8h.html" title=" " alt="" coords="97,79,199,104"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="151,31,151,65,145,65,145,31"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="261,240,347,265"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="267,191,291,227,286,230,262,194"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="153,240,236,265"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="240,194,213,230,209,227,236,191"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="55,240,129,265"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="215,194,129,236,127,232,213,190"/>
+<area shape="poly" id="edge9_Node000007_Node000003" title=" " alt="" coords="165,102,218,142,215,146,162,106"/>
+<area shape="poly" id="edge7_Node000007_Node000005" title=" " alt="" coords="152,104,160,143,172,191,186,227,181,229,167,193,154,144,147,105"/>
+<area shape="poly" id="edge8_Node000007_Node000006" title=" " alt="" coords="146,105,103,228,98,226,141,103"/>
+</map>
