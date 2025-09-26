@@ -1,10 +1,18 @@
 @module "main"
 
-@use "math" as math
+// @use "math" as math
 
 pub const main = fn () int {
-  let x: double = math::add(1, 10);
-  output(x, "\n");
+  let x: *int = cast<*int>(alloc(10 * sizeof<int>));
+  defer { free(x); }
+
+  loop [i: int = 0](i < 10) : (++i) {
+    x[i] = i;
+  }
+
+  loop [i: int = 0](i < 10) : (++i) {
+    output(x[i], "\n");
+  }
+
   return 0;
 }
-

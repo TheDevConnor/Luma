@@ -1163,6 +1163,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
             element_type = LLVMInt64TypeInContext(ctx->context); // int
           } else if (strstr(var_name, "float")) {
             element_type = LLVMFloatTypeInContext(ctx->context); // float
+          } else if (strstr(var_name, "double")) {
+            element_type = LLVMDoubleTypeInContext(ctx->context);
           } else {
             // Default for void** -> void*
             element_type =
