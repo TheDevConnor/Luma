@@ -1,7 +1,7 @@
 @module "main"
 
 @use "math" as math
-@use "memory" as mem
+// @use "memory" as mem
 
 let A: double;
 let B: double;
@@ -57,14 +57,21 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) vo
   y = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   z = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
 
+  // Safety check for invalid floating point values
+  if (z <= 0.001) { return; } // Avoid division by very small numbers
+  
   ooz = 1.0 / z;
+  
+  // Check if ooz is reasonable
+  if (ooz > 1000.0 || ooz < -1000.0) { return; }
 
   xp = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
   yp = cast<int>(height / 2 + k1 * ooz * y);
 
-  idx = xp + yp * width;
-  if ((idx >= 0) && (idx < (width * height))) {
-    if (ooz > zBuffer[idx]) {
+  // More strict bounds checking  
+  if (xp >= 0 && xp < width && yp >= 0 && yp < height) {
+    idx = xp + yp * width;
+    if (idx >= 0 && idx < (width * height) && ooz > zBuffer[idx]) {
       zBuffer[idx] = ooz;
       _buffer[idx] = ch;
     }
@@ -72,16 +79,17 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) vo
 }
 
 pub const main = fn () int {
-  zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
-  _buffer = cast<*char>(alloc(160 * 44));
-  defer { free(zBuffer); free(_buffer); }
-
   output("\x1b[2J");
   loop {
-    mem::memset(cast<*void>(_buffer), cast<int>(background_ASCII_code), width * height);
-    mem::memset(cast<*void>(zBuffer), 0, width * height * sizeof<double>);
+    zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
+    _buffer = cast<*char>(alloc(160 * 44));
+    defer { free(zBuffer); free(_buffer); }
 
-    // first cube 
+    loop [i: int = 0](i < width * height) : (++i) {
+      _buffer[i] = background_ASCII_code; 
+      zBuffer[i] = 0.0; 
+    }
+
     cube_width = 20.0;
     horizontal_offset = -2 * cube_width;
 
@@ -111,7 +119,6 @@ pub const main = fn () int {
       }
     }
 
-    // Third cube
     cube_width = 5.0;
     horizontal_offset = 8 * cube_width;
 
@@ -128,7 +135,7 @@ pub const main = fn () int {
 
     output("\x1b[H");
     loop [k: int = 0](k < width * height) : (++k) {
-      if (k % width == 0) { output("\n"); }
+      if (k % width == 0 && k != 0) { output("\r\n"); }
       switch(_buffer[k]) {
         '@' => output("@");
         '$' => output("$");
@@ -140,11 +147,11 @@ pub const main = fn () int {
       }
     }
 
-    A = A + 0.05;
-    B = B + 0.05;
-    C = C + 0.01;
+    A = (A + 0.05) % math::TWO_PI;
+    B = (B + 0.05) % math::TWO_PI;
+    C = (C + 0.01) % math::TWO_PI;
 
-    loop [q: int = 0](q < 80000*2) : (++q) {}
+    // loop [q: int = 0](q < 10000) : (++q) {}
   }
 
   return 0;

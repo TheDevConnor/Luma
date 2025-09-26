@@ -82,45 +82,60 @@ pub const min_size = fn (a: int, b: int) int {
     return b; 
 }
 
-// pub const sin = fn (a: double) double {
-//     a = a % TWO_PI;
-//     if (a < 0) { a = a + TWO_PI; }
-
-//     let quadrant: int = cast<int>(a / HALF_PI);
-//     let t: double = a - quadrant * HALF_PI;
-
-//     let i: int = cast<int>(t *( SIN_TABLE_COUNT / HALF_PI));
-//     if (i >= SIN_TABLE_COUNT) { i = SIN_TABLE_COUNT - 1; }
-//     let frac: double = (t * (SIN_TABLE_COUNT / HALF_PI)) - i;
-
-//     let y: double = SIN_TABLE[i] + frac * (SIN_TABLE[i + 1] - SIN_TABLE[i]);
-
-//     switch(quadrant) {
-//         0 => return y;
-//         1 => return SIN_TABLE[SIN_TABLE_COUNT - i] 
-//                 + frac * (SIN_TABLE[SIN_TABLE_COUNT - (i+1)] - SIN_TABLE[SIN_TABLE_COUNT - i]);
-//         2 => return -y;
-//         3 => return -SIN_TABLE[SIN_TABLE_COUNT - i] 
-//                 - frac * (SIN_TABLE[SIN_TABLE_COUNT - (i+1)] - SIN_TABLE[SIN_TABLE_COUNT - i]);
-//         _ => return 0;
-//     }
-// }
-
 pub const sin = fn (a: double) double {
-    let pi2: double = PI / 2;
-    let x: double = (a + pi2) % (PI * 2) - pi2;
+    // Normalize into [0, TWO_PI)
+    a = a % TWO_PI;
+    if (a < 0.0) {
+        a = a + TWO_PI;
+    }
 
-    let x2: double = x * x;     // x²
-    let x3: double = x * x2;    // x³
-    let x5: double = x3 * x2;   // x⁵
-    let x7: double = x5 * x2;   // x⁷
-    let x9: double = x7 * x2;   // x⁹
-    let x11: double = x9 * x2;  // x¹¹
-    let x13: double = x11 * x2; // x¹³
+    // Quadrant (0–3)
+    let quadrant: int = cast<int>(a / HALF_PI);
 
-    return x - (x3/6.0) + (x5/120.0) - (x7/5040.0)
-             + (x9/362880.0) - (x11/39916800.0) + (x13/6227020800.0);
+    // Local angle in [0, HALF_PI)
+    let t: double = a - quadrant * HALF_PI;
+
+    // Index and fraction
+    let idx_f: double = t * (SIN_TABLE_COUNT / HALF_PI);
+    let i: int = cast<int>(idx_f);
+    if (i >= SIN_TABLE_COUNT - 1) {
+        i = SIN_TABLE_COUNT - 2;
+    }
+    let frac: double = idx_f - i;
+
+    // Mirror index for quadrant 1 and 3
+    if (quadrant == 1 || quadrant == 3) {
+        i = (SIN_TABLE_COUNT - 1) - i;
+    }
+
+    // Interpolate
+    let base: double = SIN_TABLE[i];
+    let next: double = SIN_TABLE[i + 1];
+    let val: double = base + frac * (next - base);
+
+    // Apply sign for quadrant 2 and 3
+    if (quadrant >= 2) {
+        return -val;
+    } else {
+        return val;
+    }
 }
+
+// pub const sin = fn (a: double) double {
+//     let pi2: double = PI / 2;
+//     let x: double = (a + pi2) % (PI * 2) - pi2;
+
+//     let x2: double = x * x;     // x²
+//     let x3: double = x * x2;    // x³
+//     let x5: double = x3 * x2;   // x⁵
+//     let x7: double = x5 * x2;   // x⁷
+//     let x9: double = x7 * x2;   // x⁹
+//     let x11: double = x9 * x2;  // x¹¹
+//     let x13: double = x11 * x2; // x¹³
+
+//     return x - (x3/6.0) + (x5/120.0) - (x7/5040.0)
+//              + (x9/362880.0) - (x11/39916800.0) + (x13/6227020800.0);
+// }
 
 pub const cos = fn (x: double) double {
     return sin(x + HALF_PI);
