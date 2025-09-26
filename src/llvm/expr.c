@@ -549,36 +549,38 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
         LLVM_Symbol *sym = find_symbol(ctx, var_name);
 
         if (sym && !sym->is_function) {
-          // IMPORTANT: For assignments, infer the element type from the VALUE
-          // being assigned rather than trying to guess from variable names
-          element_type = value_type;
-
-          // Special case: if we're assigning an integer and it looks like it
-          // should be 8 bytes, make sure we use the right integer type
-          if (LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
-            unsigned value_bits = LLVMGetIntTypeWidth(value_type);
-            if (value_bits == 64) {
+          // CRITICAL FIX: Use the stored element_type from symbol table
+          if (sym->element_type) {
+            element_type = sym->element_type;
+          } else {
+            // Fallback: try to infer from variable name (temporary workaround)
+            if (strstr(var_name, "int") && !strstr(var_name, "char")) {
               element_type = LLVMInt64TypeInContext(ctx->context);
-            } else if (value_bits == 32) {
-              element_type = LLVMInt32TypeInContext(ctx->context);
-            } else if (value_bits == 8) {
+            } else if (strstr(var_name, "double")) {
+              element_type = LLVMDoubleTypeInContext(ctx->context);
+            } else if (strstr(var_name, "float")) {
+              element_type = LLVMFloatTypeInContext(ctx->context);
+            } else if (strstr(var_name, "char")) {
               element_type = LLVMInt8TypeInContext(ctx->context);
+            } else {
+              // Default to the value type as last resort
+              element_type = value_type;
             }
           }
         }
       }
 
-      // Fallback to value type if we couldn't determine element type
+      // Final fallback if we couldn't determine element type
       if (!element_type) {
         element_type = value_type;
+        fprintf(stderr, "Warning: Could not determine pointer element type, using value type\n");
       }
 
       // CRITICAL FIX: Ensure the value matches the element type exactly
       LLVMValueRef value_final = value;
       if (LLVMGetTypeKind(element_type) != LLVMGetTypeKind(value_type) ||
           (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
-           LLVMGetIntTypeWidth(element_type) !=
-               LLVMGetIntTypeWidth(value_type))) {
+          LLVMGetIntTypeWidth(element_type) != LLVMGetIntTypeWidth(value_type))) {
 
         // Handle integer type conversions
         if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
@@ -587,16 +589,25 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
           unsigned value_bits = LLVMGetIntTypeWidth(value_type);
 
           if (element_bits > value_bits) {
-            value_final = LLVMBuildZExt(ctx->builder, value, element_type,
-                                        "zext_for_store");
+            value_final = LLVMBuildZExt(ctx->builder, value, element_type, "zext_for_store");
           } else if (element_bits < value_bits) {
-            value_final = LLVMBuildTrunc(ctx->builder, value, element_type,
-                                         "trunc_for_store");
+            value_final = LLVMBuildTrunc(ctx->builder, value, element_type, "trunc_for_store");
           }
-        } else {
+        } 
+        // Handle float/int conversions
+        else if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind && 
+                (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind || 
+                  LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind)) {
+          value_final = LLVMBuildFPToSI(ctx->builder, value, element_type, "float_to_int_for_store");
+        }
+        else if ((LLVMGetTypeKind(element_type) == LLVMFloatTypeKind || 
+                  LLVMGetTypeKind(element_type) == LLVMDoubleTypeKind) && 
+                LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
+          value_final = LLVMBuildSIToFP(ctx->builder, value, element_type, "int_to_float_for_store");
+        }
+        else {
           // For other type mismatches, use bitcast as fallback
-          value_final = LLVMBuildBitCast(ctx->builder, value, element_type,
-                                         "cast_for_store");
+          value_final = LLVMBuildBitCast(ctx->builder, value, element_type, "cast_for_store");
         }
       }
 
@@ -813,62 +824,53 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     }
 
   } else if (object_kind == LLVMPointerTypeKind) {
-    // Handle pointer indexing - check if it's a symbol first for better type
-    // info
-    if (node->expr.index.object->type == AST_EXPR_IDENTIFIER) {
-      const char *var_name = node->expr.index.object->expr.identifier.name;
-      LLVM_Symbol *sym = find_symbol(ctx, var_name);
-
-      if (sym && !sym->is_function) {
-        // Check if the symbol type is a pointer to array or just array
-        LLVMTypeRef sym_type = sym->type;
-        LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
-
-        if (sym_kind == LLVMArrayTypeKind) {
-          // This is a direct array stored in the symbol
-          LLVMTypeRef element_type = LLVMGetElementType(sym_type);
-
-          LLVMValueRef indices[2];
-          indices[0] =
-              LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);
-          indices[1] = index;
-
-          LLVMValueRef element_ptr =
-              LLVMBuildGEP2(ctx->builder, sym_type, sym->value, indices, 2,
-                            "array_element_ptr");
-
-          if (LLVMGetTypeKind(element_type) == LLVMArrayTypeKind) {
-            return element_ptr;
-          } else {
-            return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
-                                  "array_element");
-          }
-        }
-      }
-    }
-
-    // General pointer indexing - determine the correct pointee type
+    // Handle pointer indexing - check if it's a symbol first for better type info
     LLVMTypeRef pointee_type = NULL;
-
-    // Check what kind of indexing this is
+    
     if (node->expr.index.object->type == AST_EXPR_IDENTIFIER) {
-      // First-level indexing: variable[index]
       const char *var_name = node->expr.index.object->expr.identifier.name;
       LLVM_Symbol *sym = find_symbol(ctx, var_name);
+
       if (sym && !sym->is_function) {
-        // For pointer-to-pointer types like **double, first index returns
-        // *double
-        if (strstr(var_name, "hp") || strstr(var_name, "double")) {
-          pointee_type =
-              LLVMPointerType(LLVMDoubleTypeInContext(ctx->context), 0);
-        } else if (strstr(var_name, "float")) {
-          pointee_type =
-              LLVMPointerType(LLVMFloatTypeInContext(ctx->context), 0);
-        } else if (strstr(var_name, "int") && !strstr(var_name, "char")) {
-          pointee_type =
-              LLVMPointerType(LLVMInt64TypeInContext(ctx->context), 0);
-        } else if (strstr(var_name, "char") || strstr(var_name, "_buf")) {
-          pointee_type = LLVMInt8TypeInContext(ctx->context);
+        // CRITICAL FIX: Use the stored element_type from symbol table
+        if (sym->element_type) {
+          pointee_type = sym->element_type;
+        } else {
+          // Check if the symbol type is a pointer to array or just array
+          LLVMTypeRef sym_type = sym->type;
+          LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
+
+          if (sym_kind == LLVMArrayTypeKind) {
+            // This is a direct array stored in the symbol
+            LLVMTypeRef element_type = LLVMGetElementType(sym_type);
+
+            LLVMValueRef indices[2];
+            indices[0] =
+                LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);
+            indices[1] = index;
+
+            LLVMValueRef element_ptr =
+                LLVMBuildGEP2(ctx->builder, sym_type, sym->value, indices, 2,
+                              "array_element_ptr");
+
+            if (LLVMGetTypeKind(element_type) == LLVMArrayTypeKind) {
+              return element_ptr;
+            } else {
+              return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
+                                    "array_element");
+            }
+          } else {
+            // Fallback: try to infer from variable name (temporary workaround)
+            if (strstr(var_name, "int") && !strstr(var_name, "char")) {
+              pointee_type = LLVMInt64TypeInContext(ctx->context);
+            } else if (strstr(var_name, "double")) {
+              pointee_type = LLVMDoubleTypeInContext(ctx->context);
+            } else if (strstr(var_name, "float")) {
+              pointee_type = LLVMFloatTypeInContext(ctx->context);
+            } else if (strstr(var_name, "char") || strstr(var_name, "_buf")) {
+              pointee_type = LLVMInt8TypeInContext(ctx->context);
+            }
+          }
         }
       }
     } else if (node->expr.index.object->type == AST_EXPR_INDEX) {
@@ -880,16 +882,29 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
       }
       if (base_node->type == AST_EXPR_IDENTIFIER) {
         const char *base_var_name = base_node->expr.identifier.name;
-        if (strstr(base_var_name, "hp") || strstr(base_var_name, "double")) {
-          pointee_type = LLVMDoubleTypeInContext(ctx->context);
-        } else if (strstr(base_var_name, "float")) {
-          pointee_type = LLVMFloatTypeInContext(ctx->context);
-        } else if (strstr(base_var_name, "int") &&
-                   !strstr(base_var_name, "char")) {
-          pointee_type = LLVMInt64TypeInContext(ctx->context);
-        } else if (strstr(base_var_name, "char") ||
-                   strstr(base_var_name, "_buf")) {
-          pointee_type = LLVMInt8TypeInContext(ctx->context);
+        LLVM_Symbol *base_sym = find_symbol(ctx, base_var_name);
+        if (base_sym && base_sym->element_type) {
+          // For multi-dimensional arrays, the element type after first index
+          // would be a pointer to the inner type
+          if (LLVMGetTypeKind(base_sym->element_type) == LLVMPointerTypeKind) {
+            // This needs more sophisticated handling for multi-dimensional arrays
+            pointee_type = LLVMInt64TypeInContext(ctx->context); // fallback
+          } else {
+            pointee_type = base_sym->element_type;
+          }
+        } else {
+          // Old name-based fallback
+          if (strstr(base_var_name, "double")) {
+            pointee_type = LLVMDoubleTypeInContext(ctx->context);
+          } else if (strstr(base_var_name, "float")) {
+            pointee_type = LLVMFloatTypeInContext(ctx->context);
+          } else if (strstr(base_var_name, "int") &&
+                     !strstr(base_var_name, "char")) {
+            pointee_type = LLVMInt64TypeInContext(ctx->context);
+          } else if (strstr(base_var_name, "char") ||
+                     strstr(base_var_name, "_buf")) {
+            pointee_type = LLVMInt8TypeInContext(ctx->context);
+          }
         }
       }
     } else if (node->expr.index.object->type == AST_EXPR_CAST) {
@@ -903,9 +918,13 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
-    // Final fallback
+    // CRITICAL: Don't fall back to i8! This causes the bug.
+    // If we can't determine the type, it's an error condition.
     if (!pointee_type) {
-      pointee_type = LLVMInt8TypeInContext(ctx->context);
+      fprintf(stderr, "Error: Could not determine pointer element type for indexing '%s'\n",
+              node->expr.index.object->type == AST_EXPR_IDENTIFIER ? 
+              node->expr.index.object->expr.identifier.name : "expression");
+      return NULL;
     }
 
     // Build GEP for pointer arithmetic

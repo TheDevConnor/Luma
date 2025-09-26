@@ -447,6 +447,7 @@ char *process_escape_sequences(const char *input) {
         output[out_idx++] = '\\';
         i++;
         break;
+      
       case '"':
         output[out_idx++] = '"';
         i++;
@@ -454,6 +455,22 @@ char *process_escape_sequences(const char *input) {
       case '0':
         output[out_idx++] = '\0';
         i++;
+        break;
+      case 'x':
+        if (i + 3 < len) {
+          // Parse two hex digits after \x
+          char hex_str[3] = {input[i + 2], input[i + 3], '\0'};
+          char *endptr;
+          long hex_val = strtol(hex_str, &endptr, 16);
+          if (endptr == hex_str + 2) { // Valid hex
+            output[out_idx++] = (char)hex_val;
+            i += 3; // Skip x and two hex digits
+          } else {
+            output[out_idx++] = input[i]; // Invalid hex, keep backslash
+          }
+        } else {
+          output[out_idx++] = input[i]; // Not enough characters
+        }
         break;
       default:
         output[out_idx++] = input[i];

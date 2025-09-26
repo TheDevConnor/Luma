@@ -24,11 +24,11 @@ typedef struct LLVM_Symbol LLVM_Symbol;
 typedef struct CodeGenContext CodeGenContext;
 typedef struct ModuleCompilationUnit ModuleCompilationUnit;
 
-// Symbol table entry for variables and functions
 struct LLVM_Symbol {
   char *name;
   LLVMValueRef value;
-  LLVMTypeRef type;
+  LLVMTypeRef type;           // The type of the symbol itself
+  LLVMTypeRef element_type;   // For pointer types, what it points to
   bool is_function;
   struct LLVM_Symbol *next;
 };
@@ -257,6 +257,19 @@ LLVMValueRef codegen_multidim_array_access(CodeGenContext *ctx,
 void copy_array_elements(CodeGenContext *ctx, LLVMValueRef dest_array,
                          LLVMTypeRef dest_type, LLVMValueRef src_array,
                          LLVMTypeRef src_type);
+
+// Enhanced symbol management with element type support
+void add_symbol_with_element_type(CodeGenContext *ctx, const char *name, 
+                                  LLVMValueRef value, LLVMTypeRef type, 
+                                  LLVMTypeRef element_type, bool is_function);
+
+void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module, 
+                                           const char *name, LLVMValueRef value, 
+                                           LLVMTypeRef type, LLVMTypeRef element_type, 
+                                           bool is_function);
+
+// Helper function to extract element type from AST
+LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node);
 
 LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_identifier(CodeGenContext *ctx, AstNode *node);

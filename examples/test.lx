@@ -3,7 +3,7 @@
 // @use "math" as math
 
 pub const main = fn () int {
-  let x: *int = cast<*int>(alloc(10 * sizeof<int>));
+  let x: *int = cast<*int>(alloc(sizeof<int> * 10));
   defer { free(x); }
 
   loop [i: int = 0](i < 10) : (++i) {

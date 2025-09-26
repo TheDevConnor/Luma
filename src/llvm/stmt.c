@@ -13,19 +13,56 @@ LLVMValueRef codegen_stmt_expression(CodeGenContext *ctx, AstNode *node) {
   return codegen_expr(ctx, node->stmt.expr_stmt.expression);
 }
 
+void add_symbol_with_element_type(CodeGenContext *ctx, const char *name, 
+                                  LLVMValueRef value, LLVMTypeRef type, 
+                                  LLVMTypeRef element_type, bool is_function) {
+  if (ctx->current_module) {
+    add_symbol_to_module_with_element_type(ctx->current_module, name, value, 
+                                          type, element_type, is_function);
+  }
+}
+
+void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module, 
+                                           const char *name, LLVMValueRef value, 
+                                           LLVMTypeRef type, LLVMTypeRef element_type, 
+                                           bool is_function) {
+  LLVM_Symbol *sym = (LLVM_Symbol *)malloc(sizeof(LLVM_Symbol));
+  sym->name = strdup(name);
+  sym->value = value;
+  sym->type = type;
+  sym->element_type = element_type; // Store the element type for pointers
+  sym->is_function = is_function;
+  sym->next = module->symbols;
+  module->symbols = sym;
+}
+
+// Helper function to extract element type from AST type node
+LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node) {
+  if (!type_node) return NULL;
+  
+  if (type_node->type == AST_TYPE_POINTER) {
+    // This is a pointer type, get what it points to
+    return codegen_type(ctx, type_node->type_data.pointer.pointee_type);
+  }
+  
+  return NULL; // Not a pointer type
+}
+
+// Modified variable declaration function
 LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
   LLVMTypeRef var_type = codegen_type(ctx, node->stmt.var_decl.var_type);
   if (!var_type)
     return NULL;
+
+  // Extract element type if this is a pointer
+  LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.var_decl.var_type);
 
   LLVMValueRef var_ref;
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
   if (ctx->current_function == NULL) {
-    var_ref =
-        LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
-
+    var_ref = LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
     if (node->stmt.var_decl.is_public) {
       LLVMSetLinkage(var_ref, LLVMExternalLinkage);
     } else {
@@ -35,60 +72,53 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     var_ref = LLVMBuildAlloca(ctx->builder, var_type, node->stmt.var_decl.name);
   }
 
+  // Handle initializer with type checking
   if (node->stmt.var_decl.initializer) {
     LLVMValueRef init_val = codegen_expr(ctx, node->stmt.var_decl.initializer);
     if (init_val) {
-      // CRITICAL: Handle type conversions between float and double
       LLVMTypeRef init_type = LLVMTypeOf(init_val);
       
       if (var_type != init_type) {
-        // Handle float/double conversions
+        // Handle type conversions
         LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
         LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
         
         if (var_kind == LLVMDoubleTypeKind && init_kind == LLVMFloatTypeKind) {
-          // Convert float to double
           init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type, "float_to_double");
         } else if (var_kind == LLVMFloatTypeKind && init_kind == LLVMDoubleTypeKind) {
-          // Convert double to float
           init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type, "double_to_float");
         } else if (var_kind == LLVMIntegerTypeKind && 
                   (init_kind == LLVMFloatTypeKind || init_kind == LLVMDoubleTypeKind)) {
-          // Convert float/double to integer
           init_val = LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
         } else if ((var_kind == LLVMFloatTypeKind || var_kind == LLVMDoubleTypeKind) && 
                    init_kind == LLVMIntegerTypeKind) {
-          // Convert integer to float/double
           init_val = LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
         }
       }
       
       if (ctx->current_function == NULL) {
-        // For globals, the initializer must be a constant
         if (LLVMIsConstant(init_val)) {
           LLVMSetInitializer(var_ref, init_val);
         } else {
           fprintf(stderr, "Error: Global variable initializer must be constant\n");
-          // Set a default constant initializer
           LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
         }
       } else {
         LLVMBuildStore(ctx->builder, init_val, var_ref);
       }
     } else {
-      // No initializer - set to zero/null
       if (ctx->current_function == NULL) {
         LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
       }
     }
   } else {
-    // No initializer provided
     if (ctx->current_function == NULL) {
       LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
     }
   }
 
-  add_symbol(ctx, node->stmt.var_decl.name, var_ref, var_type, false);
+  // Add symbol with element type information
+  add_symbol_with_element_type(ctx, node->stmt.var_decl.name, var_ref, var_type, element_type, false);
   return var_ref;
 }
 

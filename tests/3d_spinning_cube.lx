@@ -3,27 +3,30 @@
 @use "math" as math
 @use "memory" as mem
 
-let A: double = 0.0;
-let B: double = 0.0;
-let C: double = 0.0;
+let A: double;
+let B: double;
+let C: double;
 
 let zBuffer: *double;
 let _buffer: *char;
 
-// let xp: int;
-// let yp: int;
-// let idx: int;
-// let ooz: double;
+let x: double;
+let y: double;
+let z: double;
 
-// let cube_width: double;
-const width: int = 50;
-const height: int = 50;
+let xp: int;
+let yp: int;
+let idx: int;
+let ooz: double;
 
-// const background_ASCII_code: char = ' ';
+let cube_width: double;
+const width: int = 160;
+const height: int = 44;
+
+const background_ASCII_code: char = ' ';
 const distance_from_cam: int = 100;
 
 const increment_speed: double = 0.6;
-
 let horizontal_offset: double;
 const k1: double = 40.0;
 
@@ -50,28 +53,20 @@ const calculateZ = fn (i: int, j: int, k: int) double {
 }
 
 const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) void {
-  let x: double = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
-  let y: double = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
-  let z: double = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
+  x = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
+  y = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
+  z = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
 
-  let ooz: double = 1.0 / z;
-  // output("x: ", x, " y: ", y," z: ", z, "Cx: ", cX, " Cy: ", cY," Cz: ", cZ, "\n");
+  ooz = 1.0 / z;
 
-  let xp: int = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
-  let yp: int = cast<int>(height / 2 + k1 * ooz * y);
+  xp = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
+  yp = cast<int>(height / 2 + k1 * ooz * y);
 
-  let idx: int = xp + yp * width;
+  idx = xp + yp * width;
   if ((idx >= 0) && (idx < (width * height))) {
-    // output("OOZ: ", ooz, "\n");
     if (ooz > zBuffer[idx]) {
-     // !FIXME: When ever the buffer is not a char the data will not be written
-     // !FIXME: Using the index operator does not work 
-     //  output("BEFORE ZBUFFER: ", zBuffer[idx], "\n");
-     zBuffer[idx] = ooz;
-     //  output("AFTER ZBUFFER: ", zBuffer[idx], "\n");
-     //  output("BEFORE BUFFER: ", _buffer[idx], "\n");
-     _buffer[idx] = ch;
-     //  output("AFTER BUFFER: ", _buffer[idx], "\n");
+      zBuffer[idx] = ooz;
+      _buffer[idx] = ch;
     }
   }
 }
@@ -81,19 +76,17 @@ pub const main = fn () int {
   _buffer = cast<*char>(alloc(160 * 44));
   defer { free(zBuffer); free(_buffer); }
 
-  output("\x1b[2J");       // Clear screen
-  output("\033[H");         // Home cursor
-
-  loop [q: int = 0](q < 1) : (q++) {
-    mem::memset(cast<*void>(_buffer), cast<int>(' '), width * height);
+  output("\x1b[2J");
+  loop {
+    mem::memset(cast<*void>(_buffer), cast<int>(background_ASCII_code), width * height);
     mem::memset(cast<*void>(zBuffer), 0, width * height * sizeof<double>);
 
-    let cube_width: double = 10.0;
-    horizontal_offset = cube_width;
+    // first cube 
+    cube_width = 20.0;
+    horizontal_offset = -2 * cube_width;
 
-    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + 0.6) {
-      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + 0.6) {
-        // output("cubeY: ", cubeY, " cubeX: ", cubeX, "\n");
+    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
+      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
         calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
         calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
         calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
@@ -103,31 +96,55 @@ pub const main = fn () int {
       }
     }
 
-    output("\033[H");        // Home cursor again
-    loop [k: int = 0](k < width * height) : (++k) {
-      if (k % width != 0) {
-        switch(_buffer[k]) {
-          '@' => output("@");
-          '$' => output("$");
-          '~' => output("~");
-          '#' => output("#");
-          ';' => output(";");
-          '+' => output("+");
-          _  => output(" ");
-        }
-      } else {
-        output("\n");
+    // secound cube 
+    cube_width = 10.0;
+    horizontal_offset = 1 * cube_width;
+
+    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
+      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
+        calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
+        calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
+        calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
+        calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
+        calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
+        calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
       }
     }
-    
+
+    // Third cube
+    cube_width = 5.0;
+    horizontal_offset = 8 * cube_width;
+
+    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
+      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
+        calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
+        calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
+        calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
+        calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
+        calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
+        calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
+      }
+    }
+
+    output("\x1b[H");
+    loop [k: int = 0](k < width * height) : (++k) {
+      if (k % width == 0) { output("\n"); }
+      switch(_buffer[k]) {
+        '@' => output("@");
+        '$' => output("$");
+        '~' => output("~");
+        '#' => output("#");
+        ';' => output(";");
+        '+' => output("+");
+         _  => output(" ");
+      }
+    }
+
     A = A + 0.05;
     B = B + 0.05;
     C = C + 0.01;
 
-    // output("\nZBUFFER: ", zBuffer[q], "\n");
-    // output("_BUFFER: ", _buffer[q], "\n");
-
-    loop[i: int = 0](i < 49000000) : (++i) {}
+    loop [q: int = 0](q < 80000*2) : (++q) {}
   }
 
   return 0;
