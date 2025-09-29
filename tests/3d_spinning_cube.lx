@@ -1,7 +1,7 @@
 @module "main"
 
 @use "math" as math
-// @use "memory" as mem
+@use "memory" as mem
 
 let A: double;
 let B: double;
@@ -10,20 +10,10 @@ let C: double;
 let zBuffer: *double;
 let _buffer: *char;
 
-let x: double;
-let y: double;
-let z: double;
-
-let xp: int;
-let yp: int;
-let idx: int;
-let ooz: double;
-
 let cube_width: double;
 const width: int = 160;
 const height: int = 44;
 
-const background_ASCII_code: char = ' ';
 const distance_from_cam: int = 100;
 
 const increment_speed: double = 0.6;
@@ -31,46 +21,58 @@ let horizontal_offset: double;
 const k1: double = 40.0;
 
 const calculateX = fn (i: int, j: int, k: int) double {
-  return (
-    j * math::sin(A) * math::sin(B) * math::cos(C) - k * math::cos(A) * math::sin(B) * math::cos(C) + 
-    j * math::cos(A) * math::sin(C) + k * math::sin(A) * math::sin(C) + i * math::cos(B) * math::cos(C)
-  );
+  let sA: double = math::sin(A);
+  let cA: double = math::cos(A);
+  let sB: double = math::sin(B);
+  let cB: double = math::cos(B);
+  let sC: double = math::sin(C);
+  let cC: double = math::cos(C);
+  
+  return j * sA * sB * cC - k * cA * sB * cC + 
+         j * cA * sC + k * sA * sC + i * cB * cC;
 }
 
 const calculateY = fn (i: int, j: int, k: int) double {
-  return (
-    j * math::cos(A) * math::cos(C) + k * math::sin(A) * math::cos(C) - 
-    j * math::sin(A) * math::sin(B) * math::sin(C) + k * math::cos(A) * math::sin(B) * math::sin(C) - 
-    i * math::cos(B) * math::sin(C)
-  );
+  let sA: double = math::sin(A);
+  let cA: double = math::cos(A);
+  let sB: double = math::sin(B);
+  let cB: double = math::cos(B);
+  let sC: double = math::sin(C);
+  let cC: double = math::cos(C);
+  
+  return j * cA * cC + k * sA * cC - 
+         j * sA * sB * sC + k * cA * sB * sC - 
+         i * cB * sC;
 }
 
 const calculateZ = fn (i: int, j: int, k: int) double {
-  return (
-    k * math::cos(A) * math::cos(B) - 
-    j * math::sin(A) * math::cos(B) + i * math::sin(B)
-  );
+  let sA: double = math::sin(A);
+  let cA: double = math::cos(A);
+  let sB: double = math::sin(B);
+  let cB: double = math::cos(B);
+  
+  return k * cA * cB - j * sA * cB + i * sB;
 }
 
 const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) void {
-  x = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
-  y = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
-  z = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
+  let x: double = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
+  let y: double = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
+  let z: double = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
 
   // Safety check for invalid floating point values
   if (z <= 0.001) { return; } // Avoid division by very small numbers
   
-  ooz = 1.0 / z;
+  let ooz: double = 1.0 / z;
   
   // Check if ooz is reasonable
   if (ooz > 1000.0 || ooz < -1000.0) { return; }
 
-  xp = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
-  yp = cast<int>(height / 2 + k1 * ooz * y);
+  let xp: int = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
+  let yp: int = cast<int>(height / 2 + k1 * ooz * y);
 
   // More strict bounds checking  
   if (xp >= 0 && xp < width && yp >= 0 && yp < height) {
-    idx = xp + yp * width;
+    let idx: int = xp + yp * width;
     if (idx >= 0 && idx < (width * height) && ooz > zBuffer[idx]) {
       zBuffer[idx] = ooz;
       _buffer[idx] = ch;
@@ -78,60 +80,43 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) vo
   }
 }
 
+const print_cube = fn () void {
+ loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
+    loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
+      calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
+      calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
+      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
+      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
+      calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
+      calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
+    }
+  } 
+}
+
 pub const main = fn () int {
+  zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
+  _buffer = cast<*char>(alloc(160 * 44));
+  defer { free(zBuffer); free(_buffer); }
+
   output("\x1b[2J");
   loop {
-    zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
-    _buffer = cast<*char>(alloc(160 * 44));
-    defer { free(zBuffer); free(_buffer); }
-
-    loop [i: int = 0](i < width * height) : (++i) {
-      _buffer[i] = background_ASCII_code; 
-      zBuffer[i] = 0.0; 
-    }
-
+    mem::memset(cast<*void>(_buffer), 32, width * height);
+    mem::memset(cast<*void>(zBuffer),  0, width * height * 8);
+    
+    // first cube
     cube_width = 20.0;
     horizontal_offset = -2 * cube_width;
-
-    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
-      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-        calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
-        calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
-        calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
-        calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
-        calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
-        calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
-      }
-    }
+    print_cube();
 
     // secound cube 
     cube_width = 10.0;
     horizontal_offset = 1 * cube_width;
-
-    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
-      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-        calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
-        calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
-        calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
-        calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
-        calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
-        calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
-      }
-    }
-
+    print_cube();
+  
+    // third cube
     cube_width = 5.0;
     horizontal_offset = 8 * cube_width;
-
-    loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
-      loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-        calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
-        calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
-        calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
-        calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
-        calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
-        calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
-      }
-    }
+    print_cube();
 
     output("\x1b[H");
     loop [k: int = 0](k < width * height) : (++k) {
@@ -150,8 +135,6 @@ pub const main = fn () int {
     A = (A + 0.05) % math::TWO_PI;
     B = (B + 0.05) % math::TWO_PI;
     C = (C + 0.01) % math::TWO_PI;
-
-    // loop [q: int = 0](q < 10000) : (++q) {}
   }
 
   return 0;

@@ -24,9 +24,18 @@ pub const memcmp = fn (a: *void, b: *void, n: int) int {
 
 pub const memset = fn (dest: *void, value: int, n: int) *void {
     let d: *char = cast<*char>(dest);
-    loop [i: int = 0](i < n) : (++i) {
-        d[i] = cast<char>(value);
+    let c:  char = cast<char>(value);
+    let i:   int = 0;
+
+    loop (i + 4 <= n) : (i = i + 4) {
+        d[i] = c;
+        d[i+1] = c;
+        d[i+2] = c;
+        d[i+3] = c;
     }
+
+    loop (i < n) : (++i) { d[i] = c; }
+
     return dest;
 }
 
@@ -65,9 +74,7 @@ pub const memchr = fn (ptr: *void, value: int, n: int) *void {
 }
 
 // Zero out memory (common operation)
-pub const memzero = fn (dest: *void, n: int) *void {
-    return memset(dest, 0, n);
-}
+pub const memzero = fn (dest: *void, n: int) *void { return memset(dest, 0, n); }
 
 // Allocate and zero memory (calloc equivalent)
 pub const calloc = fn (count: int, size: int) *void {
