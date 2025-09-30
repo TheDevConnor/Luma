@@ -99,6 +99,7 @@ pub const main = fn () int {
   defer { free(zBuffer); free(_buffer); }
 
   output("\x1b[2J");
+  output("\x1b[34m"); // set text color to blue
   loop {
     mem::memset(cast<*void>(_buffer), 32, width * height);
     mem::memset(cast<*void>(zBuffer),  0, width * height * 8);
@@ -107,7 +108,7 @@ pub const main = fn () int {
     cube_width = 20.0;
     horizontal_offset = -2 * cube_width;
     print_cube();
-
+    
     // secound cube 
     cube_width = 10.0;
     horizontal_offset = 1 * cube_width;
@@ -120,15 +121,15 @@ pub const main = fn () int {
 
     output("\x1b[H");
     loop [k: int = 0](k < width * height) : (++k) {
-      if (k % width == 0 && k != 0) { output("\r\n"); }
+      if (k % width == 0 && k != 0) { output("\x1b[0m\n"); } // reset color
       switch(_buffer[k]) {
-        '@' => output("@");
-        '$' => output("$");
-        '~' => output("~");
-        '#' => output("#");
-        ';' => output(";");
-        '+' => output("+");
-         _  => output(" ");
+        '@' => output("\x1b[34m@");
+        '$' => output("\x1b[33m$");
+        '~' => output("\x1b[32m~");
+        '#' => output("\x1b[31m#");
+        ';' => output("\x1b[35m;");
+        '+' => output("\x1b[36m+");
+         _  => output("\x1b[30m ");
       }
     }
 

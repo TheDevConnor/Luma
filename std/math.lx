@@ -28,6 +28,11 @@ pub const SIN_TABLE: [double; 129] = [
     1.000000
 ];
 
+pub const rand = fn (seed: *int) int {
+    *seed = (*seed * 1103515245 + 12345) % 2147483648;
+    return *seed;
+}
+
 pub const add = fn (x: int, y: int) int {
     return x + y;
 }
@@ -83,43 +88,44 @@ pub const min_size = fn (a: int, b: int) int {
 }
 
 pub const sin = fn (a: double) double {
-    // Normalize into [0, TWO_PI)
-    a = a % TWO_PI;
-    if (a < 0.0) {
-        a = a + TWO_PI;
-    }
+  // Normalize into [0, TWO_PI)
+  a = a % TWO_PI;
+  if (a < 0.0) {
+      a = a + TWO_PI;
+  }
 
-    // Quadrant (0–3)
-    let quadrant: int = cast<int>(a / HALF_PI);
+  // Quadrant (0–3)
+  let quadrant: int = cast<int>(a / HALF_PI);
 
-    // Local angle in [0, HALF_PI)
-    let t: double = a - quadrant * HALF_PI;
+  // Local angle in [0, HALF_PI)
+  let t: double = a - quadrant * HALF_PI;
 
-    // Index and fraction
-    let idx_f: double = t * (SIN_TABLE_COUNT / HALF_PI);
-    let i: int = cast<int>(idx_f);
-    if (i >= SIN_TABLE_COUNT - 1) {
-        i = SIN_TABLE_COUNT - 2;
-    }
-    let frac: double = idx_f - i;
+  // Index and fraction
+  let idx_f: double = t * (SIN_TABLE_COUNT / HALF_PI);
+  let i: int = cast<int>(idx_f);
+  if (i >= SIN_TABLE_COUNT - 1) {
+      i = SIN_TABLE_COUNT - 2;
+  }
+  let frac: double = idx_f - i;
 
-    // Mirror index for quadrant 1 and 3
-    if (quadrant == 1 || quadrant == 3) {
-        i = (SIN_TABLE_COUNT - 1) - i;
-    }
+  // Mirror index for quadrant 1 and 3
+  if (quadrant == 1 || quadrant == 3) {
+      i = (SIN_TABLE_COUNT - 1) - i;
+  }
 
-    // Interpolate
-    let base: double = SIN_TABLE[i];
-    let next: double = SIN_TABLE[i + 1];
-    let val: double = base + frac * (next - base);
+  // Interpolate
+  let base: double = SIN_TABLE[i];
+  let next: double = SIN_TABLE[i + 1];
+  let val: double = base + frac * (next - base);
 
-    // Apply sign for quadrant 2 and 3
-    if (quadrant >= 2) {
-        return -val;
-    } else {
-        return val;
-    }
+  // Apply sign for quadrant 2 and 3
+  if (quadrant >= 2) {
+      return -val;
+  } else {
+      return val;
+  }
 }
+
 pub const cos = fn (x: double) double { return sin(x + HALF_PI); }
 
 pub const tan = fn (x: double) double { return sin(x)/(cos(x)+0.000000001); }

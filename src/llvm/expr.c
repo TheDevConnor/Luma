@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "llvm.h"
 
 // Add these utility functions to help with consistent range creation and type
@@ -573,14 +575,16 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       // Final fallback if we couldn't determine element type
       if (!element_type) {
         element_type = value_type;
-        fprintf(stderr, "Warning: Could not determine pointer element type, using value type\n");
+        fprintf(stderr, "Warning: Could not determine pointer element type, "
+                        "using value type\n");
       }
 
       // CRITICAL FIX: Ensure the value matches the element type exactly
       LLVMValueRef value_final = value;
       if (LLVMGetTypeKind(element_type) != LLVMGetTypeKind(value_type) ||
           (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
-          LLVMGetIntTypeWidth(element_type) != LLVMGetIntTypeWidth(value_type))) {
+           LLVMGetIntTypeWidth(element_type) !=
+               LLVMGetIntTypeWidth(value_type))) {
 
         // Handle integer type conversions
         if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
@@ -589,25 +593,28 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
           unsigned value_bits = LLVMGetIntTypeWidth(value_type);
 
           if (element_bits > value_bits) {
-            value_final = LLVMBuildZExt(ctx->builder, value, element_type, "zext_for_store");
+            value_final = LLVMBuildZExt(ctx->builder, value, element_type,
+                                        "zext_for_store");
           } else if (element_bits < value_bits) {
-            value_final = LLVMBuildTrunc(ctx->builder, value, element_type, "trunc_for_store");
+            value_final = LLVMBuildTrunc(ctx->builder, value, element_type,
+                                         "trunc_for_store");
           }
-        } 
+        }
         // Handle float/int conversions
-        else if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind && 
-                (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind || 
+        else if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
+                 (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind ||
                   LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind)) {
-          value_final = LLVMBuildFPToSI(ctx->builder, value, element_type, "float_to_int_for_store");
-        }
-        else if ((LLVMGetTypeKind(element_type) == LLVMFloatTypeKind || 
-                  LLVMGetTypeKind(element_type) == LLVMDoubleTypeKind) && 
-                LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
-          value_final = LLVMBuildSIToFP(ctx->builder, value, element_type, "int_to_float_for_store");
-        }
-        else {
+          value_final = LLVMBuildFPToSI(ctx->builder, value, element_type,
+                                        "float_to_int_for_store");
+        } else if ((LLVMGetTypeKind(element_type) == LLVMFloatTypeKind ||
+                    LLVMGetTypeKind(element_type) == LLVMDoubleTypeKind) &&
+                   LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
+          value_final = LLVMBuildSIToFP(ctx->builder, value, element_type,
+                                        "int_to_float_for_store");
+        } else {
           // For other type mismatches, use bitcast as fallback
-          value_final = LLVMBuildBitCast(ctx->builder, value, element_type, "cast_for_store");
+          value_final = LLVMBuildBitCast(ctx->builder, value, element_type,
+                                         "cast_for_store");
         }
       }
 
@@ -824,9 +831,10 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     }
 
   } else if (object_kind == LLVMPointerTypeKind) {
-    // Handle pointer indexing - check if it's a symbol first for better type info
+    // Handle pointer indexing - check if it's a symbol first for better type
+    // info
     LLVMTypeRef pointee_type = NULL;
-    
+
     if (node->expr.index.object->type == AST_EXPR_IDENTIFIER) {
       const char *var_name = node->expr.index.object->expr.identifier.name;
       LLVM_Symbol *sym = find_symbol(ctx, var_name);
@@ -887,7 +895,8 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
           // For multi-dimensional arrays, the element type after first index
           // would be a pointer to the inner type
           if (LLVMGetTypeKind(base_sym->element_type) == LLVMPointerTypeKind) {
-            // This needs more sophisticated handling for multi-dimensional arrays
+            // This needs more sophisticated handling for multi-dimensional
+            // arrays
             pointee_type = LLVMInt64TypeInContext(ctx->context); // fallback
           } else {
             pointee_type = base_sym->element_type;
@@ -921,9 +930,12 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     // CRITICAL: Don't fall back to i8! This causes the bug.
     // If we can't determine the type, it's an error condition.
     if (!pointee_type) {
-      fprintf(stderr, "Error: Could not determine pointer element type for indexing '%s'\n",
-              node->expr.index.object->type == AST_EXPR_IDENTIFIER ? 
-              node->expr.index.object->expr.identifier.name : "expression");
+      fprintf(
+          stderr,
+          "Error: Could not determine pointer element type for indexing '%s'\n",
+          node->expr.index.object->type == AST_EXPR_IDENTIFIER
+              ? node->expr.index.object->expr.identifier.name
+              : "expression");
       return NULL;
     }
 
@@ -1047,13 +1059,6 @@ LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
   if (!type)
     return NULL;
 
-  // Special handling for void type - return pointer size (8 bytes on 64-bit)
-  // This makes sizeof<void> useful for alignment purposes
-  if (LLVMGetTypeKind(type) == LLVMVoidTypeKind) {
-    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
-  }
-
-  // For other types, try to use LLVMSizeOf but with safety checks
   LLVMTypeKind kind = LLVMGetTypeKind(type);
 
   switch (kind) {
@@ -1067,8 +1072,39 @@ LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   case LLVMPointerTypeKind:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
+  case LLVMStructTypeKind: {
+    // Calculate struct size by summing field sizes
+    unsigned field_count = LLVMCountStructElementTypes(type);
+    LLVMTypeRef *field_types = malloc(field_count * sizeof(LLVMTypeRef));
+    LLVMGetStructElementTypes(type, field_types);
+
+    uint64_t total_size = 0;
+    for (unsigned i = 0; i < field_count; i++) {
+      LLVMTypeKind field_kind = LLVMGetTypeKind(field_types[i]);
+      switch (field_kind) {
+      case LLVMIntegerTypeKind:
+        total_size += LLVMGetIntTypeWidth(field_types[i]) / 8;
+        break;
+      case LLVMFloatTypeKind:
+        total_size += 4;
+        break;
+      case LLVMDoubleTypeKind:
+        total_size += 8;
+        break;
+      case LLVMPointerTypeKind:
+        total_size += 8;
+        break;
+      default:
+        total_size += 8; // fallback
+        break;
+      }
+    }
+
+    free(field_types);
+    return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), total_size,
+                        false);
+  }
   default:
-    // For complex types, return 8 as a safe default
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   }
 }
