@@ -2,16 +2,19 @@
 
 @use "math" as math
 @use "memory" as mem
+@use "string" as string
+@use "termfx" as fx
 
 let A: double;
 let B: double;
 let C: double;
 
 let zBuffer: *double;
+let _colorBuffer: **char;
 let _buffer: *char;
 
 let cube_width: double;
-const width: int = 160;
+const width: int = 161;
 const height: int = 44;
 
 const distance_from_cam: int = 100;
@@ -19,6 +22,9 @@ const distance_from_cam: int = 100;
 const increment_speed: double = 0.6;
 let horizontal_offset: double;
 const k1: double = 40.0;
+
+let cube_gradient_size: int = 12;
+let cube_gradient: [[*char; 12]; 6];
 
 const calculateX = fn (i: int, j: int, k: int) double {
   let sA: double = math::sin(A);
@@ -54,89 +60,128 @@ const calculateZ = fn (i: int, j: int, k: int) double {
   return k * cA * cB - j * sA * cB + i * sB;
 }
 
-const calculateForSurface = fn (cX: double, cY: double, cZ: double, ch: char) void {
+const calculateForSurface = fn (cX: double, cY: double, cZ: double, 
+                                ch: char, faceOffset: int, frame: int) void {
   let x: double = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   let y: double = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   let z: double = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
 
-  // Safety check for invalid floating point values
-  if (z <= 0.001) { return; } // Avoid division by very small numbers
+  if (z <= 0.001) { return; }
   
   let ooz: double = 1.0 / z;
   
-  // Check if ooz is reasonable
   if (ooz > 1000.0 || ooz < -1000.0) { return; }
 
   let xp: int = cast<int>(width / 2 + horizontal_offset + k1 * ooz * x * 2);
   let yp: int = cast<int>(height / 2 + k1 * ooz * y);
 
-  // More strict bounds checking  
   if (xp >= 0 && xp < width && yp >= 0 && yp < height) {
     let idx: int = xp + yp * width;
-    if (idx >= 0 && idx < (width * height) && ooz > zBuffer[idx]) {
+    if (ooz > zBuffer[idx]) {
       zBuffer[idx] = ooz;
       _buffer[idx] = ch;
+
+      let color: *char = cube_gradient[faceOffset][(frame / 10) % cube_gradient_size];
+      _colorBuffer[idx] = color;
     }
   }
 }
 
-const print_cube = fn () void {
- loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
+const print_cube = fn (frame: int) void {
+  loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
     loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-      calculateForSurface(cubeX,       cubeY,       -cube_width, '@');
-      calculateForSurface(cube_width,  cubeY,       cubeX,       '$');
-      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~');
-      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#');
-      calculateForSurface(cubeX,       -cube_width, -cubeY,      ';');
-      calculateForSurface(cubeX,       cube_width,  cubeY,       '+');
+      calculateForSurface(cubeX,       cubeY,       -cube_width, '@', 0, frame);
+      calculateForSurface(cube_width,  cubeY,       cubeX,       '$', 1, frame);
+      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~', 2, frame);
+      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#', 3, frame);
+      calculateForSurface(cubeX,       -cube_width, -cubeY,      ';', 4, frame);
+      calculateForSurface(cubeX,       cube_width,  cubeY,       '+', 5, frame);
     }
   } 
 }
 
 pub const main = fn () int {
   zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
+  _colorBuffer = cast<**char>(alloc(160 * 44 * 8));
   _buffer = cast<*char>(alloc(160 * 44));
-  defer { free(zBuffer); free(_buffer); }
+  
+  defer { free(zBuffer); free(_colorBuffer); free(_buffer); }
 
-  output("\x1b[2J");
-  output("\x1b[34m"); // set text color to blue
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME, fx::BRIGHT_MAGENTA, fx::BLINK, "3D", fx::RESET, 
+         fx::BRIGHT_CYAN, " Spinning Cubes in Luma\n", fx::RESET, fx::CURSOR_HIDE);
+
+  let frame_count: int = 0;
+
+  cube_gradient = [
+     // Face 0 (Red -> Orange -> Yellow)
+     [fx::BRIGHT_RED,    fx::BRIGHT_YELLOW, fx::YELLOW,        fx::BRIGHT_YELLOW,
+      fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_RED,    fx::RED,
+      fx::BRIGHT_RED,    fx::YELLOW,        fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW],
+     // Face 1 (Green -> Cyan)
+     [fx::BRIGHT_GREEN, fx::BRIGHT_CYAN, fx::CYAN,         fx::BRIGHT_CYAN,
+      fx::BRIGHT_CYAN,  fx::BRIGHT_CYAN, fx::BRIGHT_GREEN, fx::GREEN,
+      fx::BRIGHT_GREEN, fx::CYAN,        fx::BRIGHT_CYAN,  fx::BRIGHT_CYAN],
+     // Face 2 (Blue shades)
+     [fx::BRIGHT_BLUE, fx::BLUE,        fx::BRIGHT_BLUE, fx::BRIGHT_BLUE,
+      fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BLUE,
+      fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE],
+     // Face 3 (Magenta shades)
+     [fx::BRIGHT_MAGENTA, fx::MAGENTA,        fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA,
+      fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::MAGENTA,
+      fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA],
+     // Face 4 (Bright Pink to White)
+     [fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA,
+      fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,
+      fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE],
+     // Face 5 (Orange to Green gradient)
+     [fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW,
+      fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,
+      fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN]
+  ];
+
   loop {
     mem::memset(cast<*void>(_buffer), 32, width * height);
-    mem::memset(cast<*void>(zBuffer),  0, width * height * 8);
+    mem::memset(cast<*void>(_colorBuffer), 0, width * height * 8);
+    mem::memset(cast<*void>(zBuffer), 0, width * height * sizeof<double>);
     
-    // first cube
     cube_width = 20.0;
     horizontal_offset = -2 * cube_width;
-    print_cube();
+    print_cube(frame_count);
     
-    // secound cube 
     cube_width = 10.0;
     horizontal_offset = 1 * cube_width;
-    print_cube();
+    print_cube(frame_count);
   
-    // third cube
     cube_width = 5.0;
     horizontal_offset = 8 * cube_width;
-    print_cube();
+    print_cube(frame_count);
 
-    output("\x1b[H");
+    output(fx::CURSOR_HOME);
     loop [k: int = 0](k < width * height) : (++k) {
-      if (k % width == 0 && k != 0) { output("\x1b[0m\n"); } // reset color
-      switch(_buffer[k]) {
-        '@' => output("\x1b[34m@");
-        '$' => output("\x1b[33m$");
-        '~' => output("\x1b[32m~");
-        '#' => output("\x1b[31m#");
-        ';' => output("\x1b[35m;");
-        '+' => output("\x1b[36m+");
-         _  => output("\x1b[30m ");
-      }
-    }
+      if (k % width == 0) { output("\n"); }
 
+      if (_colorBuffer[k] != cast<*char>(0)) {
+        output(_colorBuffer[k]);
+      }
+      output(string::from_char(_buffer[k]), fx::RESET);
+    }
+    
+    output( 
+      fx::move_cursor(1, 29),
+      fx::BOLD, fx::WHITE, " Frame: ",
+      fx::BRIGHT_GREEN, frame_count, " ",
+      fx::RESET
+    );
+
+    // Rotate cube
     A = (A + 0.05) % math::TWO_PI;
     B = (B + 0.05) % math::TWO_PI;
     C = (C + 0.01) % math::TWO_PI;
+
+    // Increment frame count
+    ++frame_count;
   }
 
   return 0;
 }
+

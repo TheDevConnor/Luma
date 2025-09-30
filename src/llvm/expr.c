@@ -73,22 +73,8 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context),
                         node->expr.literal.value.int_val, false);
   case LITERAL_FLOAT:
-    // IMPORTANT: Check if this literal should be float or double
-    // This needs to match what your type checker decided in lookup.c
-
-    // Option 1: Always create double (matches type checker default to double)
     return LLVMConstReal(LLVMDoubleTypeInContext(ctx->context),
                          node->expr.literal.value.float_val);
-
-    // Option 2: Use context to determine type (more sophisticated)
-    // You would need to add type annotation to the literal node
-    // if (node->expr.literal.target_type == FLOAT_TYPE) {
-    //     return LLVMConstReal(LLVMFloatTypeInContext(ctx->context),
-    //                          node->expr.literal.value.float_val);
-    // } else {
-    //     return LLVMConstReal(LLVMDoubleTypeInContext(ctx->context),
-    //                          node->expr.literal.value.float_val);
-    // }
 
   case LITERAL_BOOL:
     return LLVMConstInt(LLVMInt1TypeInContext(ctx->context),
@@ -97,9 +83,46 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
     return LLVMConstInt(LLVMInt8TypeInContext(ctx->context),
                         (unsigned char)node->expr.literal.value.char_val,
                         false);
-  case LITERAL_STRING:
-    return LLVMBuildGlobalStringPtr(ctx->builder,
-                                    node->expr.literal.value.string_val, "str");
+  case LITERAL_STRING: {
+    char *processed_str =
+        process_escape_sequences(node->expr.literal.value.string_val);
+
+    // String literals must be created in the current module
+    LLVMModuleRef current_llvm_module =
+        ctx->current_module ? ctx->current_module->module : ctx->module;
+
+    // Create the global string in the current module
+    LLVMValueRef global_str =
+        LLVMAddGlobal(current_llvm_module,
+                      LLVMArrayType(LLVMInt8TypeInContext(ctx->context),
+                                    strlen(processed_str) + 1),
+                      "str");
+
+    // Set the initializer with processed string
+    LLVMSetInitializer(global_str,
+                       LLVMConstStringInContext(ctx->context, processed_str,
+                                                strlen(processed_str), 0));
+
+    // Set linkage and other properties
+    LLVMSetLinkage(global_str, LLVMPrivateLinkage);
+    LLVMSetGlobalConstant(global_str, 1);
+    LLVMSetUnnamedAddr(global_str, 1);
+
+    // Return a pointer to the first element
+    LLVMValueRef indices[2] = {
+        LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, 0),
+        LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, 0)};
+
+    LLVMValueRef result =
+        LLVMConstGEP2(LLVMArrayType(LLVMInt8TypeInContext(ctx->context),
+                                    strlen(processed_str) + 1),
+                      global_str, indices, 2);
+
+    // Free the processed string
+    free(processed_str);
+
+    return result;
+  }
   case LITERAL_NULL:
     return LLVMConstNull(
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0));
@@ -496,7 +519,6 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
 
     if (object_kind == LLVMArrayTypeKind) {
       // Array assignment: arr[i] = value
-      // We need the array to be stored somewhere to get its address
       LLVMValueRef array_ptr;
 
       if (target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
@@ -504,7 +526,7 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
         const char *var_name = target->expr.index.object->expr.identifier.name;
         LLVM_Symbol *sym = find_symbol(ctx, var_name);
         if (sym && !sym->is_function) {
-          array_ptr = sym->value; // This should be the alloca/global
+          array_ptr = sym->value;
         } else {
           fprintf(stderr, "Error: Array variable %s not found for assignment\n",
                   var_name);
@@ -545,48 +567,55 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       LLVMTypeRef element_type = NULL;
       LLVMTypeRef value_type = LLVMTypeOf(value);
 
-      // Try to get element type from symbol information first
+      // Strategy 1: Try to get element type from symbol table
       if (target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
         const char *var_name = target->expr.index.object->expr.identifier.name;
         LLVM_Symbol *sym = find_symbol(ctx, var_name);
 
-        if (sym && !sym->is_function) {
-          // CRITICAL FIX: Use the stored element_type from symbol table
-          if (sym->element_type) {
-            element_type = sym->element_type;
-          } else {
-            // Fallback: try to infer from variable name (temporary workaround)
-            if (strstr(var_name, "int") && !strstr(var_name, "char")) {
-              element_type = LLVMInt64TypeInContext(ctx->context);
-            } else if (strstr(var_name, "double")) {
-              element_type = LLVMDoubleTypeInContext(ctx->context);
-            } else if (strstr(var_name, "float")) {
-              element_type = LLVMFloatTypeInContext(ctx->context);
-            } else if (strstr(var_name, "char")) {
-              element_type = LLVMInt8TypeInContext(ctx->context);
-            } else {
-              // Default to the value type as last resort
-              element_type = value_type;
-            }
-          }
+        if (sym && !sym->is_function && sym->element_type) {
+          element_type = sym->element_type;
         }
       }
 
-      // Final fallback if we couldn't determine element type
+      // Strategy 2: Extract from cast expression
+      else if (target->expr.index.object->type == AST_EXPR_CAST) {
+        AstNode *cast_node = target->expr.index.object;
+        if (cast_node->expr.cast.type->type == AST_TYPE_POINTER) {
+          element_type = codegen_type(
+              ctx, cast_node->expr.cast.type->type_data.pointer.pointee_type);
+        }
+      }
+
+      // Strategy 3: Infer from variable name (fallback for legacy code)
+      if (!element_type &&
+          target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
+        const char *var_name = target->expr.index.object->expr.identifier.name;
+
+        if (strstr(var_name, "int") && !strstr(var_name, "char")) {
+          element_type = LLVMInt64TypeInContext(ctx->context);
+        } else if (strstr(var_name, "double")) {
+          element_type = LLVMDoubleTypeInContext(ctx->context);
+        } else if (strstr(var_name, "float")) {
+          element_type = LLVMFloatTypeInContext(ctx->context);
+        } else if (strstr(var_name, "char")) {
+          element_type = LLVMInt8TypeInContext(ctx->context);
+        }
+      }
+
+      // Final fallback: use value type
       if (!element_type) {
         element_type = value_type;
         fprintf(stderr, "Warning: Could not determine pointer element type, "
                         "using value type\n");
       }
 
-      // CRITICAL FIX: Ensure the value matches the element type exactly
+      // Convert value to match element type if needed
       LLVMValueRef value_final = value;
       if (LLVMGetTypeKind(element_type) != LLVMGetTypeKind(value_type) ||
           (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
            LLVMGetIntTypeWidth(element_type) !=
                LLVMGetIntTypeWidth(value_type))) {
 
-        // Handle integer type conversions
         if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
             LLVMGetTypeKind(value_type) == LLVMIntegerTypeKind) {
           unsigned element_bits = LLVMGetIntTypeWidth(element_type);
@@ -599,11 +628,9 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
             value_final = LLVMBuildTrunc(ctx->builder, value, element_type,
                                          "trunc_for_store");
           }
-        }
-        // Handle float/int conversions
-        else if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
-                 (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind ||
-                  LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind)) {
+        } else if (LLVMGetTypeKind(element_type) == LLVMIntegerTypeKind &&
+                   (LLVMGetTypeKind(value_type) == LLVMFloatTypeKind ||
+                    LLVMGetTypeKind(value_type) == LLVMDoubleTypeKind)) {
           value_final = LLVMBuildFPToSI(ctx->builder, value, element_type,
                                         "float_to_int_for_store");
         } else if ((LLVMGetTypeKind(element_type) == LLVMFloatTypeKind ||
@@ -612,7 +639,6 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
           value_final = LLVMBuildSIToFP(ctx->builder, value, element_type,
                                         "int_to_float_for_store");
         } else {
-          // For other type mismatches, use bitcast as fallback
           value_final = LLVMBuildBitCast(ctx->builder, value, element_type,
                                          "cast_for_store");
         }
@@ -758,6 +784,23 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
     }
   }
 
+  // *** ADD THE NEW CODE HERE ***
+  // Check if any element references a global from another module
+  for (size_t i = 0; i < element_count && all_constants; i++) {
+    if (LLVMIsConstant(element_values[i]) &&
+        LLVMIsAGlobalVariable(element_values[i])) {
+      // Check if it's from a different module
+      LLVMModuleRef elem_module = LLVMGetGlobalParent(element_values[i]);
+      LLVMModuleRef current_module =
+          ctx->current_module ? ctx->current_module->module : ctx->module;
+      if (elem_module != current_module) {
+        all_constants = false; // Force runtime initialization
+        break;
+      }
+    }
+  }
+  // *** END NEW CODE ***
+
   if (all_constants) {
     // Create constant array
     return LLVMConstArray(element_type, element_values, element_count);
@@ -777,7 +820,7 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
       LLVMBuildStore(ctx->builder, element_values[i], element_ptr);
     }
 
-    return array_alloca; // Return pointer to array
+    return LLVMBuildLoad2(ctx->builder, array_type, array_alloca, "array_val");
   }
 }
 
@@ -822,13 +865,11 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
         LLVMBuildGEP2(ctx->builder, object_type, array_alloca, indices, 2,
                       "array_element_ptr");
 
-    // If the element is also an array, return the pointer to it (for chaining)
-    if (LLVMGetTypeKind(element_type) == LLVMArrayTypeKind) {
-      return element_ptr;
-    } else {
-      return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
-                            "array_element");
-    }
+    // CRITICAL FIX: Always load the element value
+    // If it's an inner array, load it so the next indexing operation
+    // receives an array value (not a pointer)
+    return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
+                          "array_element");
 
   } else if (object_kind == LLVMPointerTypeKind) {
     // Handle pointer indexing - check if it's a symbol first for better type
@@ -861,12 +902,9 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
                 LLVMBuildGEP2(ctx->builder, sym_type, sym->value, indices, 2,
                               "array_element_ptr");
 
-            if (LLVMGetTypeKind(element_type) == LLVMArrayTypeKind) {
-              return element_ptr;
-            } else {
-              return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
-                                    "array_element");
-            }
+            // Always load the element
+            return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
+                                  "array_element");
           } else {
             // Fallback: try to infer from variable name (temporary workaround)
             if (strstr(var_name, "int") && !strstr(var_name, "char")) {
@@ -946,13 +984,6 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     // Load the actual value
     LLVMValueRef result = LLVMBuildLoad2(ctx->builder, pointee_type,
                                          element_ptr, "ptr_element_val");
-
-#ifdef DEBUG_TYPES
-    fprintf(stderr, "Debug: object_type kind = %d, pointee_type kind = %d\n",
-            LLVMGetTypeKind(object_type), LLVMGetTypeKind(pointee_type));
-    fprintf(stderr, "Debug: result type kind = %d\n",
-            LLVMGetTypeKind(LLVMTypeOf(result)));
-#endif
 
     return result;
 

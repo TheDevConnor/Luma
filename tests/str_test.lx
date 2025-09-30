@@ -1,9 +1,9 @@
 @module "main"
 
 // Compile this with the following command
-// ./luma tests/str_test.lx -name `string_test -l std/string.lx std/memory.lx -no-sanitize && ./string_test
+// ./luma tests/str_test.lx -name string_test -l std/string.lx std/memory.lx -no-sanitize && ./string_test
 
-@use "stdstr" as string
+@use "string" as string
 @use "memory" as mem
 
 const test_strlen = fn () void {
@@ -90,16 +90,16 @@ const test_s_char = fn () void {
     defer { free(test_str); }
     
     test_str[0] = 'H';  // 'H'
-    test_str[1] = 'e'; // 'e'
-    test_str[2] = 'l'; // 'l'
-    test_str[3] = 'l'; // 'l'
-    test_str[4] = 'o'; // 'o'
+    test_str[1] = 'e';  // 'e'
+    test_str[2] = 'l';  // 'l'
+    test_str[3] = 'l';  // 'l'
+    test_str[4] = 'o';  // 'o'
     test_str[5] = ' ';  // ' '
     test_str[6] = 'W';  // 'W'
-    test_str[7] = 'o'; // 'o'
-    test_str[8] = 'r'; // 'r'
-    test_str[9] = 'l'; // 'l'
-    test_str[10]= 'd'; // 'd'
+    test_str[7] = 'o';  // 'o'
+    test_str[8] = 'r';  // 'r'
+    test_str[9] = 'l';  // 'l'
+    test_str[10]= 'd';  // 'd'
     test_str[11] = cast<char>(0);   // null terminator
 
     // Test finding existing character

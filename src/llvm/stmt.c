@@ -36,13 +36,16 @@ void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module,
   module->symbols = sym;
 }
 
-// Helper function to extract element type from AST type node
 LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node) {
   if (!type_node) return NULL;
   
   if (type_node->type == AST_TYPE_POINTER) {
     // This is a pointer type, get what it points to
-    return codegen_type(ctx, type_node->type_data.pointer.pointee_type);
+    AstNode *pointee = type_node->type_data.pointer.pointee_type;
+    
+    // Generate the full type for what this pointer points to
+    // This correctly handles **char -> *char, ***int -> **int, etc.
+    return codegen_type(ctx, pointee);
   }
   
   return NULL; // Not a pointer type
@@ -176,8 +179,10 @@ LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
     LLVMValueRef alloca = LLVMBuildAlloca(ctx->builder, param_types[i],
                                           node->stmt.func_decl.param_names[i]);
     LLVMBuildStore(ctx->builder, param, alloca);
-    add_symbol(ctx, node->stmt.func_decl.param_names[i], alloca, param_types[i],
-               false);
+
+    // Extract element type for the pointer 
+    LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
+    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i], alloca, param_types[i], element_type, false);
   }
 
   // Create blocks for normal return and cleanup

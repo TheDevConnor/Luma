@@ -1,0 +1,103 @@
+@module "termfx"
+
+@use "string" as string
+
+pub const RESET: *char   = "\x1b[0m";
+pub const BLACK: *char   = "\x1b[30m";
+pub const RED: *char     = "\x1b[31m";
+pub const GREEN: *char   = "\x1b[32m";
+pub const YELLOW: *char  = "\x1b[33m";
+pub const BLUE: *char    = "\x1b[34m";
+pub const MAGENTA: *char = "\x1b[35m";
+pub const CYAN: *char    = "\x1b[36m";
+pub const WHITE: *char   = "\x1b[37m";
+
+pub const BRIGHT_BLACK: *char   = "\x1b[90m";
+pub const BRIGHT_RED: *char     = "\x1b[91m";
+pub const BRIGHT_GREEN: *char   = "\x1b[92m";
+pub const BRIGHT_YELLOW: *char  = "\x1b[93m";
+pub const BRIGHT_BLUE: *char    = "\x1b[94m";
+pub const BRIGHT_MAGENTA: *char = "\x1b[95m";
+pub const BRIGHT_CYAN: *char    = "\x1b[96m";
+pub const BRIGHT_WHITE: *char   = "\x1b[97m";
+
+pub const BG_BLACK: *char   = "\x1b[40m";
+pub const BG_RED: *char     = "\x1b[41m";
+pub const BG_GREEN: *char   = "\x1b[42m";
+pub const BG_YELLOW: *char  = "\x1b[43m";
+pub const BG_BLUE: *char    = "\x1b[44m";
+pub const BG_MAGENTA: *char = "\x1b[45m";
+pub const BG_CYAN: *char    = "\x1b[46m";
+pub const BG_WHITE: *char   = "\x1b[47m";
+
+pub const BG_BRIGHT_BLACK: *char   = "\x1b[100m";
+pub const BG_BRIGHT_RED: *char     = "\x1b[101m";
+pub const BG_BRIGHT_GREEN: *char   = "\x1b[102m";
+pub const BG_BRIGHT_YELLOW: *char  = "\x1b[103m";
+pub const BG_BRIGHT_BLUE: *char    = "\x1b[104m";
+pub const BG_BRIGHT_MAGENTA: *char = "\x1b[105m";
+pub const BG_BRIGHT_CYAN: *char    = "\x1b[106m";
+pub const BG_BRIGHT_WHITE: *char   = "\x1b[107m";
+
+pub const BOLD: *char          = "\x1b[1m";
+pub const DIM: *char           = "\x1b[2m";
+pub const ITALIC: *char        = "\x1b[3m";  // not always supported
+pub const UNDERLINE: *char     = "\x1b[4m";
+pub const BLINK: *char         = "\x1b[5m";  // rarely supported
+pub const INVERT: *char        = "\x1b[7m";  // swap fg/bg
+pub const HIDDEN: *char        = "\x1b[8m";  // invisible text
+pub const STRIKETHROUGH: *char = "\x1b[9m";
+
+pub const CLEAR_SCREEN: *char     = "\x1b[2J";
+pub const CLEAR_LINE: *char       = "\x1b[2K";
+pub const CURSOR_HOME: *char      = "\x1b[H";
+pub const CURSOR_HIDE: *char      = "\x1b[?25l";
+pub const CURSOR_SHOW: *char      = "\x1b[?25h";
+
+pub const SAVE_CURSOR: *char    = "\x1b[s";
+pub const RESTORE_CURSOR: *char = "\x1b[u";
+
+pub const CLEAR_TO_EOL: *char = "\x1b[K";
+pub const CLEAR_TO_EOS: *char = "\x1b[J";
+
+pub const fg_rgb = fn (r: int, g: int, b: int) *char {
+    let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
+    
+    string::cat(msg, msg, "\x1b[38;2;");
+    string::cat(msg, msg, string::from_int(r));
+    string::cat(msg, msg, ";");
+    string::cat(msg, msg, string::from_int(g));
+    string::cat(msg, msg, ";");
+    string::cat(msg, msg, string::from_int(b));
+    string::cat(msg, msg, "m");
+
+    return msg; 
+}
+
+pub const bg_rgb = fn (r: int, g: int, b: int) *char {
+    let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
+
+    string::cat(msg, msg, "\x1b[48;2;");
+    string::cat(msg, msg, string::from_int(r));
+    string::cat(msg, msg, ";");
+    string::cat(msg, msg, string::from_int(g));
+    string::cat(msg, msg, ";");
+    string::cat(msg, msg, string::from_int(b));
+    string::cat(msg, msg, "m");
+
+    output(msg);
+
+    return msg;
+}
+
+pub const move_cursor = fn (row: int, col: int) *char {
+    let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
+
+    string::cat(msg, msg, "\x1b[");
+    string::cat(msg, msg, string::from_int(row));
+    string::cat(msg, msg, ";");
+    string::cat(msg, msg, string::from_int(col));
+    string::cat(msg, msg, "H");
+
+    return msg;
+}

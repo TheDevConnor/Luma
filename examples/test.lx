@@ -1,0 +1,7 @@
+@module "main"
+
+pub const main = fn () int {
+  let test_str: *char = "Hello";
+  output ("Length of 'Hello' is: ", strlen(test_str), "\n");
+  return 0;
+}

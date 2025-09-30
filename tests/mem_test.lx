@@ -21,324 +21,320 @@ const test_memset = fn () void {
     output("memset passed!\n");
 }
 
-// const test_memcmp = fn () void {
-//     let a: *void = alloc(5);
-//     let b: *void = alloc(5);
-//     defer { free(a); free(b); }
-// 
-//     // Test equal buffers
-//     mem::memset(a, 88, 5);
-//     mem::memset(b, 88, 5);
-// 
-//     if (mem::memcmp(a, b, 5) != 0) {
-//         output("memcmp failed: equal buffers not detected\n");
-//         return;
-//     }
-// 
-//     // Test inequality
-//     cast<*char>(b)[2] = cast<char>(89);
-// 
-//     if (mem::memcmp(a, b, 5) >= 0) {
-//         output("memcmp failed: inequality not detected\n");
-//         return;
-//     }
-// 
-//     output("memcmp passed!\n");
-// }
-// 
-// const test_memcpy = fn () void {
-//     let src: *void = alloc(10);
-//     let dest: *void = alloc(10);
-//     defer { free(src); free(dest); }
-// 
-//     // Fill source with pattern
-//     loop [i: int = 0](i < 10) : (++i) {
-//         cast<*char>(src)[i] = cast<char>(i + 48); // ASCII '0' to '9'
-//     }
-// 
-//     // Copy to destination
-//     mem::memcpy(dest, src, 10);
-// 
-//     // Verify copy
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (cast<char>(dest[i]) != cast<char>(i + 48)) {
-//             output("memcpy failed at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("memcpy passed!\n");
-// }
-// 
-// const test_memmove = fn () void {
-//     let buf: *void = alloc(20);
-//     defer { free(buf); }
-// 
-//     // Initialize buffer with pattern
-//     loop [i: int = 0](i < 20) : (++i) {
-//         cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, ...
-//     }
-// 
-//     // Test overlapping move (forward)
-//     mem::memmove(cast<*void>(cast<int>(buf) + 5), buf, 10);
-// 
-//     // Verify first 10 chars are now at positions 5-14
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (cast<char>(buf[i + 5]) != cast<char>(65 + i)) {
-//             output("memmove (forward) failed at index ", i + 5, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("memmove passed!\n");
-// }
-// 
-// const test_memchr = fn () void {
-//     let buf: *void = alloc(10);
-//     defer { free(buf); }
-//   
-//     // Fill with pattern where 'X' is at  position 5
-//     loop [i: int = 0](i < 10) : (++i) {
-//       if (i == 5) {
-//         cast<*char>(buf)[i] = cast<char>(88); // 'X'
-//       } else {
-//         cast<*char>(buf)[i] = cast<char>(65); // 'A'
-//       }
-//     }
-// 
-//     let found: *void = mem::memchr(buf, 88, 10);
-// 
-//     if (found == cast<*void>(0)) {
-//       output("memchr failed: X not found\n");
-//       return;
-//     }
-// 
-//     // Check if found at correct position
-//     let offset: int = cast<int>(found) - cast<int>(buf);
-//     if (offset != 5) {
-//       output("memchr failed: X found at wrong position ", offset, "\n");
-//       return;
-//     }
-// 
-//     // Test not found
-//     let not_found: *void = mem::memchr(buf, 90, 10); // 'Z'
-//     if (not_found != cast<*void>(0)) {
-//       output("memchr failed: Z should not be found\n");
-//       return;
-//     }
-// 
-//     output("memchr passed!\n");
-// }
-// 
-// const test_memzero = fn () void {
-//     let buf: *void = alloc(10);
-//     defer { free(buf); }
-// 
-//     // Fill with non-zero values
-//     mem::memset(buf, 255, 10);
-// 
-//     // Zero it out
-//     mem::memzero(buf, 10);
-// 
-//     // Verify all zeros
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (cast<char>(buf[i]) != cast<char>(0)) {
-//             output("memzero failed at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("memzero passed!\n");
-// }
-// 
-// const test_calloc = fn () void {
-//     let buf: *void = mem::calloc(10, sizeof<char>);
-//     defer { free(buf); }
-// 
-//     if (buf == cast<*void>(0)) {
-//         output("calloc failed: returned null\n");
-//         return;
-//     }
-// 
-//     // Verify all zeros
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (cast<char>(buf[i]) != cast<char>(0)) {
-//             output("calloc failed: not zeroed at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("calloc passed!\n");
-// }
-// 
-// // TODO: Fix the failed case on realloc
-// const test_realloc = fn () void {
-//     let buf: *void = alloc(5);
-//     
-//     // Fill original buffer
-//     loop [i: int = 0](i < 5) : (++i) {
-//         cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, D, E
-//     }
-// 
-//     // Expand buffer
-//     buf = mem::realloc(buf, 10);
-//     defer { free(buf); }
-// 
-//     if (buf == cast<*void>(0)) {
-//         output("realloc failed: returned null\n");
-//         return;
-//     }
-// 
-//     // Verify original data preserved
-//     loop [i: int = 0](i < 5) : (++i) {
-//         if (cast<*char>(buf)[i] != cast<char>(65 + i)) {
-//             output("realloc failed: data not preserved at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("realloc passed!\n");
-// }
-// 
-// const test_memswap = fn () void {
-//     let a: *void = alloc(5);
-//     let b: *void = alloc(5);
-//     defer { free(a); free(b); }
-// 
-//     // Fill buffers with different patterns
-//     mem::memset(a, 65, 5); // All 'A'
-//     mem::memset(b, 66, 5); // All 'B'
-// 
-//     // Swap them
-//     mem::memswap(a, b, 5);
-// 
-//     // Verify swap
-//     loop [i: int = 0](i < 5) : (++i) {
-//         if (cast<char>(a[i]) != cast<char>(66)) {
-//             output("memswap failed: buffer a not swapped at index ", i, "\n");
-//             return;
-//         }
-//         if (cast<char>(b[i]) != cast<char>(65)) {
-//             output("memswap failed: buffer b not swapped at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("memswap passed!\n");
-// }
-// 
-// const test_memrev = fn () void {
-//     let buf: *void = alloc(5);
-//     defer { free(buf); }
-// 
-//     // Fill with pattern: A, B, C, D, E
-//     loop [i: int = 0](i < 5) : (++i) {
-//         cast<*char>(buf)[i] = cast<char>(65 + i);
-//     }
-// 
-//     // Reverse it
-//     mem::memrev(buf, 5);
-// 
-//     // Verify reversal: should be E, D, C, B, A
-//     loop [i: int = 0](i < 5) : (++i) {
-//         let expected: char = cast<char>(69 - i); // E=69, D=68, etc.
-//         if (cast<char>(buf[i]) != expected) {
-//             output("memrev failed at index ", i, "\n");
-//             return;
-//         }
-//     }
-// 
-//     output("memrev passed!\n");
-// }
-// 
-// const test_memcount = fn () void {
-//     let buf: *void = alloc(10);
-//     defer { free(buf); }
-// 
-//     // Fill with pattern where 'A' appears 3 times
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (i == 2 || i == 5 || i == 8) {
-//             cast<*char>(buf)[i] = cast<char>(65); // 'A'
-//         } else {
-//             cast<*char>(buf)[i] = cast<char>(66); // 'B'
-//         }
-//     }
-// 
-//     let count: int = mem::memcount(buf, 65, 10);
-//     if (count != 3) {
-//         output("memcount failed: expected 3, got ", count, "\n");
-//         return;
-//     }
-// 
-//     output("memcount passed!\n");
-// }
-// 
-// const test_aligned_alloc = fn () void {
-//     let p: *void = mem::aligned_alloc(64, 100);
-//     defer { mem::aligned_free(p); }
-// 
-//     if (p == cast<*void>(0)) {
-//         output("aligned_alloc failed: returned null\n");
-//         return;
-//     }
-// 
-//     // Check alignment
-//     let addr: int = cast<int>(p);
-//     if ((addr % 64) != 0) {
-//         output("aligned_alloc failed: not aligned to 64 bytes\n");
-//         return;
-//     }
-// 
-//     // Test we can write to the memory
-//     mem::memset(p, 42, 100);
-//     if (cast<char>(p[0]) != cast<char>(42)) {
-//         output("aligned_alloc failed: memory not writable\n");
-//         return;
-//     }
-// 
-//     output("aligned_alloc passed!\n");
-// }
-// 
-// // size_t arr[] = {1, 4, 8};
-// // assert(my_struct_align(arr, 3) == 8);
-// 
-// const test_align = fn () void {
-//     {
-//         let arr: *int = cast<*int>(alloc(3 * sizeof<int>));
-//         defer { free(arr); }
-// 
-//         arr[0] = 1;
-//         arr[1] = 4;
-//         arr[2] = 8;
-// 
-//         if (mem::align(arr, 3) != 8) {
-//             output("align failed\n");
-//             return;
-//         }
-//     }
-//     {
-//         let arr: *int = cast<*int>(alloc(10 * sizeof<int>));
-//         defer { free(arr); }
-// 
-//         arr[0] = 10;
-//         arr[1] = 2;
-//         arr[2] = 18;
-//         arr[3] = 50;
-//         arr[4] = 1;
-//         arr[5] = 14;
-//         arr[6] = 25;
-//         arr[7] = 5;
-//         arr[8] = 100;
-//         arr[9] = 79;
-// 
-//         if (mem::align(arr, 10) != 100) {
-//             output("align failed\n");
-//             return;
-//         }
-//     }
-// 
-//     output("align passed!\n");
-// }
+const test_memcmp = fn () void {
+    let a: *void = alloc(5 * sizeof<char>);
+    let b: *void = alloc(5 * sizeof<char>);
+    defer { free(a); free(b); }
+
+    // Test equal buffers
+    mem::memset(a, 88, 5);
+    mem::memset(b, 88, 5);
+
+    if (mem::memcmp(a, b, 5) != 0) {
+        output("memcmp failed: equal buffers not detected\n");
+        return;
+    }
+
+    // Test inequality
+    cast<*char>(b)[2] = cast<char>(89);
+
+    if (mem::memcmp(a, b, 5) >= 0) {
+        output("memcmp failed: inequality not detected\n");
+        return;
+    }
+
+    output("memcmp passed!\n");
+}
+ 
+const test_memcpy = fn () void {
+    let src: *void = alloc(10 * sizeof<char>);
+    let dest: *void = alloc(10 * sizeof<char>);
+    defer { free(src); free(dest); }
+
+    // Fill source with pattern
+    loop [i: int = 0](i < 10) : (++i) {
+        cast<*char>(src)[i] = cast<char>(i + 48); // ASCII '0' to '9'
+    }
+
+    // Copy to destination
+    mem::memcpy(dest, src, 10);
+
+    // Verify copy
+    loop [i: int = 0](i < 10) : (++i) {
+        if (cast<*char>(dest)[i] != cast<char>(i + 48)) {
+            output("memcpy failed at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("memcpy passed!\n");
+}
+
+const test_memmove = fn () void {
+    let buf: *void = alloc(20 * sizeof<char>);
+    defer { free(buf); }
+
+    // Initialize buffer with pattern
+    loop [i: int = 0](i < 20) : (++i) {
+        cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, ...
+    }
+
+    // Test overlapping move (forward)
+    mem::memmove(cast<*void>(cast<int>(buf) + 5), buf, 10);
+
+    // Verify first 10 chars are now at positions 5-14
+    loop [i: int = 0](i < 10) : (++i) {
+        if (cast<*char>(buf)[i+5] != cast<char>(65 + i)) {
+            output("memmove (forward) failed at index ", i + 5, "\n");
+            return;
+        }
+    }
+
+    output("memmove passed!\n");
+}
+
+const test_memchr = fn () void {
+    let buf: *void = alloc(10 * sizeof<char>);
+    defer { free(buf); }
+  
+    // Fill with pattern where 'X' is at  position 5
+    loop [i: int = 0](i < 10) : (++i) {
+      if (i == 5) {
+        cast<*char>(buf)[i] = cast<char>(88); // 'X'
+      } else {
+        cast<*char>(buf)[i] = cast<char>(65); // 'A'
+      }
+    }
+
+    let found: *void = mem::memchr(buf, 88, 10);
+
+    if (found == cast<*void>(0)) {
+      output("memchr failed: X not found\n");
+      return;
+    }
+
+    // Check if found at correct position
+    let offset: int = cast<int>(found) - cast<int>(buf);
+    if (offset != 5) {
+      output("memchr failed: X found at wrong position ", offset, "\n");
+      return;
+    }
+
+    // Test not found
+    let not_found: *void = mem::memchr(buf, 90, 10); // 'Z'
+    if (not_found != cast<*void>(0)) {
+      output("memchr failed: Z should not be found\n");
+      return;
+    }
+
+    output("memchr passed!\n");
+}
+ 
+const test_memzero = fn () void {
+    let buf: *void = alloc(10 * sizeof<char>);
+    defer { free(buf); }
+
+    // Fill with non-zero values
+    mem::memset(buf, 255, 10);
+
+    // Zero it out
+    mem::memzero(buf, 10);
+
+    // Verify all zeros
+    loop [i: int = 0](i < 10) : (++i) {
+        if (cast<*char>(buf)[i] != cast<char>(0)) {
+            output("memzero failed at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("memzero passed!\n");
+}
+
+const test_calloc = fn () void {
+    let buf: *void = mem::calloc(10, sizeof<char>);
+    defer { free(buf); }
+
+    if (buf == cast<*void>(0)) {
+        output("calloc failed: returned null\n");
+        return;
+    }
+
+    // Verify all zeros
+    loop [i: int = 0](i < 10) : (++i) {
+        if (cast<*char>(buf)[i] != cast<char>(0)) {
+            output("calloc failed: not zeroed at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("calloc passed!\n");
+}
+
+const test_realloc = fn () void {
+    let buf: *void = alloc(5 * sizeof<char>);
+    
+    // Fill original buffer
+    loop [i: int = 0](i < 5) : (++i) {
+        cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, D, E
+    }
+
+    // Expand buffer
+    buf = mem::realloc(buf, 10);
+    defer { free(buf); }
+
+    if (buf == cast<*void>(0)) {
+        output("realloc failed: returned null\n");
+        return;
+    }
+
+    // Verify original data preserved
+    loop [i: int = 0](i < 5) : (++i) {
+        if (cast<*char>(buf)[i] != cast<char>(65 + i)) {
+            output("realloc failed: data not preserved at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("realloc passed!\n");
+}
+
+const test_memswap = fn () void {
+    let a: *void = alloc(5 * sizeof<char>);
+    let b: *void = alloc(5 * sizeof<char>);
+    defer { free(a); free(b); }
+
+    // Fill buffers with different patterns
+    mem::memset(a, 65, 5); // All 'A'
+    mem::memset(b, 66, 5); // All 'B'
+
+    // Swap them
+    mem::memswap(a, b, 5);
+
+    // Verify swap
+    loop [i: int = 0](i < 5) : (++i) {
+        if (cast<*char>(a)[i] != cast<char>(66)) {
+            output("memswap failed: buffer a not swapped at index ", i, "\n");
+            return;
+        }
+        if (cast<*char>(b)[i] != cast<char>(65)) {
+            output("memswap failed: buffer b not swapped at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("memswap passed!\n");
+}
+
+const test_memrev = fn () void {
+    let buf: *void = alloc(5 * sizeof<char>);
+    defer { free(buf); }
+
+    // Fill with pattern: A, B, C, D, E
+    loop [i: int = 0](i < 5) : (++i) {
+        cast<*char>(buf)[i] = cast<char>(65 + i);
+    }
+
+    // Reverse it
+    mem::memrev(buf, 5);
+
+    // Verify reversal: should be E, D, C, B, A
+    loop [i: int = 0](i < 5) : (++i) {
+        let expected: char = cast<char>(69 - i); // E=69, D=68, etc.
+        if (cast<*char>(buf)[i] != expected) {
+            output("memrev failed at index ", i, "\n");
+            return;
+        }
+    }
+
+    output("memrev passed!\n");
+}
+
+const test_memcount = fn () void {
+    let buf: *void = alloc(10 * sizeof<char>);
+    defer { free(buf); }
+
+    // Fill with pattern where 'A' appears 3 times
+    loop [i: int = 0](i < 10) : (++i) {
+        if (i == 2 || i == 5 || i == 8) {
+            cast<*char>(buf)[i] = cast<char>(65); // 'A'
+        } else {
+            cast<*char>(buf)[i] = cast<char>(66); // 'B'
+        }
+    }
+
+    let count: int = mem::memcount(buf, 65, 10);
+    if (count != 3) {
+        output("memcount failed: expected 3, got ", count, "\n");
+        return;
+    }
+
+    output("memcount passed!\n");
+}
+
+const test_aligned_alloc = fn () void {
+    let p: *void = mem::aligned_alloc(64, 100);
+    defer { mem::aligned_free(p); }
+
+    if (p == cast<*void>(0)) {
+        output("aligned_alloc failed: returned null\n");
+        return;
+    }
+
+    // Check alignment
+    let addr: int = cast<int>(p);
+    if ((addr % 64) != 0) {
+        output("aligned_alloc failed: not aligned to 64 bytes\n");
+        return;
+    }
+
+    // Test we can write to the memory
+    mem::memset(p, 42, 100);
+    if (cast<*char>(p)[0] != cast<char>(42)) {
+        output("aligned_alloc failed: memory not writable\n");
+        return;
+    }
+
+    output("aligned_alloc passed!\n");
+}
+
+const test_align = fn () void {
+    {
+        let arr: *int = cast<*int>(alloc(3 * sizeof<int>));
+        defer { free(arr); }
+
+        arr[0] = 1;
+        arr[1] = 4;
+        arr[2] = 8;
+
+        if (mem::align(arr, 3) != 8) {
+            output("align failed\n");
+            return;
+        }
+    }
+    {
+        let arr: *int = cast<*int>(alloc(10 * sizeof<int>));
+        defer { free(arr); }
+
+        arr[0] = 10;
+        arr[1] = 2;
+        arr[2] = 18;
+        arr[3] = 50;
+        arr[4] = 1;
+        arr[5] = 14;
+        arr[6] = 25;
+        arr[7] = 5;
+        arr[8] = 100;
+        arr[9] = 79;
+
+        if (mem::align(arr, 10) != 100) {
+            output("align failed\n");
+            return;
+        }
+    }
+
+    output("align passed!\n");
+}
 
 
 // Helper function to run all tests
@@ -346,18 +342,18 @@ const run_all_tests = fn () void {
     output("=== Memory Function Tests ===\n");
     
     test_memset();
-    // test_memcmp();
-    // test_memcpy();
-    // test_memmove();
-    // test_memchr();
-    // test_memzero();
-    // test_calloc();
-    // test_realloc();
-    // test_memswap();
-    // test_memrev();
-    // test_memcount();
+    test_memcmp();
+    test_memcpy();
+    test_memmove();
+    test_memchr();
+    test_memzero();
+    test_calloc();
+    test_realloc();
+    test_memswap();
+    test_memrev();
+    test_memcount();
     // test_aligned_alloc();
-    // test_align();
+    test_align();
     
     output("=== All Tests Complete ===\n");
 }

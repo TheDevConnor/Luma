@@ -1,4 +1,47 @@
-@module "stdstr"
+@module "string"
+
+pub const from_char = fn (c: char) *char {
+  let s: *char = cast<*char>(alloc(2 * sizeof<char>));
+  s[0] = c;
+  s[1] = cast<char>(0);
+  return s;
+}
+
+pub const from_int = fn (n: int) *char {
+  if (n == 0) {
+    return from_char(cast<char>('0'));
+  }
+
+  let negative: int = 0;
+  if (n < 0) {
+    negative = 1;
+    n = -n;
+  }
+
+  let buffer: [char; 20]; // enough for 64-bit int
+  let i: int = 0;
+
+  loop (n != 0) {
+    let digit: int = n % 10;
+    buffer[i] = cast<char>(digit + cast<int>('0'));
+    n = n / 10;
+    i = i + 1;
+  }
+
+  if (negative == 1) {
+    buffer[i] = '-';
+    i = i + 1;
+  }
+
+  // Reverse the string
+  let s: *char = cast<*char>(alloc((i + 1) * sizeof<char>));
+  loop [j: int = 0](j < i) : (j = j + 1) {
+    s[j] = buffer[i - j - 1];
+  }
+  s[i] = cast<char>(0); // null terminator
+
+  return s;
+}
 
 pub const strlen = fn (s: *char) int {
   let length: int = 0;
