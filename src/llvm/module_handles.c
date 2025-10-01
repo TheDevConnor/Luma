@@ -2,6 +2,114 @@
 
 #include <stdlib.h>
 
+ModuleDependencyInfo *build_codegen_dependency_info(AstNode **modules,
+                                                    size_t module_count,
+                                                    ArenaAllocator *arena) {
+
+  ModuleDependencyInfo *dep_info = (ModuleDependencyInfo *)arena_alloc(
+      arena, sizeof(ModuleDependencyInfo) * module_count,
+      alignof(ModuleDependencyInfo));
+
+  for (size_t i = 0; i < module_count; i++) {
+    AstNode *module = modules[i];
+    if (!module || module->type != AST_PREPROCESSOR_MODULE)
+      continue;
+
+    dep_info[i].module_name = module->preprocessor.module.name;
+    dep_info[i].processed = false;
+    dep_info[i].dep_count = 0;
+
+    // Count dependencies
+    AstNode **body = module->preprocessor.module.body;
+    int body_count = module->preprocessor.module.body_count;
+
+    size_t use_count = 0;
+    for (int j = 0; j < body_count; j++) {
+      if (body[j] && body[j]->type == AST_PREPROCESSOR_USE) {
+        use_count++;
+      }
+    }
+
+    dep_info[i].dependencies = (char **)arena_alloc(
+        arena, sizeof(char *) * use_count, alignof(char *));
+
+    // Collect dependency names
+    size_t dep_idx = 0;
+    for (int j = 0; j < body_count; j++) {
+      if (body[j] && body[j]->type == AST_PREPROCESSOR_USE) {
+        dep_info[i].dependencies[dep_idx++] =
+            (char *)body[j]->preprocessor.use.module_name;
+      }
+    }
+    dep_info[i].dep_count = use_count;
+  }
+
+  return dep_info;
+}
+
+// Process a single module and its dependencies recursively
+static bool process_module_codegen_recursive(CodeGenContext *ctx,
+                                             const char *module_name,
+                                             AstNode **modules,
+                                             size_t module_count,
+                                             ModuleDependencyInfo *dep_info) {
+
+  // Find dependency info for this module
+  ModuleDependencyInfo *current_dep = NULL;
+  size_t current_idx = 0;
+  for (size_t i = 0; i < module_count; i++) {
+    if (strcmp(dep_info[i].module_name, module_name) == 0) {
+      current_dep = &dep_info[i];
+      current_idx = i;
+      break;
+    }
+  }
+
+  if (!current_dep) {
+    fprintf(stderr, "Error: Module '%s' not found in dependency info\n",
+            module_name);
+    return false;
+  }
+
+  if (current_dep->processed) {
+    return true; // Already processed
+  }
+
+  // First, recursively process all dependencies
+  for (size_t i = 0; i < current_dep->dep_count; i++) {
+    if (!process_module_codegen_recursive(ctx, current_dep->dependencies[i],
+                                          modules, module_count, dep_info)) {
+      return false;
+    }
+  }
+
+  // Now process this module's body
+  AstNode *module = modules[current_idx];
+  ModuleCompilationUnit *unit = find_module(ctx, module_name);
+  if (!unit) {
+    fprintf(stderr, "Error: Module unit not found for '%s'\n", module_name);
+    return false;
+  }
+
+  set_current_module(ctx, unit);
+  ctx->module = unit->module;
+
+  // Process all non-@use statements
+  AstNode **body = module->preprocessor.module.body;
+  int body_count = module->preprocessor.module.body_count;
+
+  for (int j = 0; j < body_count; j++) {
+    if (!body[j])
+      continue;
+    if (body[j]->type != AST_PREPROCESSOR_USE) {
+      codegen_stmt(ctx, body[j]);
+    }
+  }
+
+  current_dep->processed = true;
+  return true;
+}
+
 // =============================================================================
 // MULTI-MODULE PROGRAM HANDLER
 // =============================================================================
@@ -12,25 +120,27 @@ LLVMValueRef codegen_stmt_program_multi_module(CodeGenContext *ctx,
     return NULL;
   }
 
-  // First pass: Create all module units and process module declarations
+  // PASS 1: Create all module units (unchanged)
   for (size_t i = 0; i < node->stmt.program.module_count; i++) {
     AstNode *module_node = node->stmt.program.modules[i];
 
     if (module_node->type == AST_PREPROCESSOR_MODULE) {
       const char *module_name = module_node->preprocessor.module.name;
 
-      // Create module compilation unit
+      ModuleCompilationUnit *existing = find_module(ctx, module_name);
+      if (existing) {
+        fprintf(stderr, "Error: Duplicate module definition: %s\n",
+                module_name);
+        return NULL;
+      }
+
       ModuleCompilationUnit *unit = create_module_unit(ctx, module_name);
-
-      // Set as current module for processing
       set_current_module(ctx, unit);
-      ctx->module = unit->module; // Update legacy field
-
-      // printf("Created module: %s\n", module_name);
+      ctx->module = unit->module;
     }
   }
 
-  // Second pass: Process module contents and handle @use directives
+  // PASS 2: Process all @use directives (unchanged)
   for (size_t i = 0; i < node->stmt.program.module_count; i++) {
     AstNode *module_node = node->stmt.program.modules[i];
 
@@ -38,12 +148,38 @@ LLVMValueRef codegen_stmt_program_multi_module(CodeGenContext *ctx,
       const char *module_name = module_node->preprocessor.module.name;
       ModuleCompilationUnit *unit = find_module(ctx, module_name);
 
-      if (unit) {
-        set_current_module(ctx, unit);
-        ctx->module = unit->module; // Update legacy field
+      if (!unit) {
+        fprintf(stderr, "Error: Module unit not found: %s\n", module_name);
+        return NULL;
+      }
 
-        // Process module body
-        codegen_stmt_module(ctx, module_node);
+      set_current_module(ctx, unit);
+      ctx->module = unit->module;
+
+      AstNode **body = module_node->preprocessor.module.body;
+      int body_count = module_node->preprocessor.module.body_count;
+
+      for (int j = 0; j < body_count; j++) {
+        if (body[j] && body[j]->type == AST_PREPROCESSOR_USE) {
+          codegen_stmt_use(ctx, body[j]);
+        }
+      }
+    }
+  }
+
+  // PASS 3: Generate code in DEPENDENCY ORDER
+  ModuleDependencyInfo *dep_info = build_codegen_dependency_info(
+      node->stmt.program.modules, node->stmt.program.module_count, ctx->arena);
+
+  for (size_t i = 0; i < node->stmt.program.module_count; i++) {
+    AstNode *module_node = node->stmt.program.modules[i];
+    if (module_node->type == AST_PREPROCESSOR_MODULE) {
+      const char *module_name = module_node->preprocessor.module.name;
+
+      if (!process_module_codegen_recursive(
+              ctx, module_name, node->stmt.program.modules,
+              node->stmt.program.module_count, dep_info)) {
+        return NULL;
       }
     }
   }
@@ -90,13 +226,21 @@ LLVMValueRef codegen_stmt_use(CodeGenContext *ctx, AstNode *node) {
   const char *module_name = node->preprocessor.use.module_name;
   const char *alias = node->preprocessor.use.alias;
 
-  // printf("Processing @use directive: module '%s' as '%s'\n", module_name,
-  //        alias ? alias : module_name);
-
   // Find the referenced module
   ModuleCompilationUnit *referenced_module = find_module(ctx, module_name);
   if (!referenced_module) {
-    fprintf(stderr, "Error: Module '%s' not found\n", module_name);
+    fprintf(stderr, "Error: Cannot import module '%s' - module not found\n",
+            module_name);
+    fprintf(stderr,
+            "Note: Make sure the module is defined before it's imported\n");
+    return NULL;
+  }
+
+  // Ensure we're not trying to import ourselves
+  if (ctx->current_module &&
+      strcmp(ctx->current_module->module_name, module_name) == 0) {
+    fprintf(stderr, "Warning: Module '%s' trying to import itself - skipping\n",
+            module_name);
     return NULL;
   }
 
@@ -246,6 +390,40 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
         // Regular variable - load its value
         return LLVMBuildLoad2(ctx->builder, qualified_sym->type,
                               qualified_sym->value, "load");
+      }
+    }
+
+    // 1.5 Search all modules to find where this symbol exists
+    // (handles both direct module names and aliases)
+    for (ModuleCompilationUnit *search_module = ctx->modules; search_module;
+         search_module = search_module->next) {
+      if (search_module == ctx->current_module)
+        continue;
+
+      LLVM_Symbol *source_sym = find_symbol_in_module(search_module, member);
+      if (source_sym) {
+        // Found the symbol - import it now with the alias prefix
+        if (source_sym->is_function) {
+          import_function_symbol(ctx, source_sym, search_module, object_name);
+        } else if (is_enum_constant(source_sym)) {
+          // For enum constants, return directly from source
+          return LLVMGetInitializer(source_sym->value);
+        } else {
+          import_variable_symbol(ctx, source_sym, search_module, object_name);
+        }
+
+        // Now try to find the imported symbol again
+        qualified_sym =
+            find_symbol_in_module(ctx->current_module, qualified_name);
+        if (qualified_sym) {
+          if (qualified_sym->is_function) {
+            return qualified_sym->value;
+          } else {
+            return LLVMBuildLoad2(ctx->builder, qualified_sym->type,
+                                  qualified_sym->value, "load");
+          }
+        }
+        break; // Found and imported, stop searching
       }
     }
 

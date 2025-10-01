@@ -60,7 +60,6 @@ bool add_module_import(Scope *importing_scope, const char *module_name,
  */
 Symbol *lookup_qualified_symbol(Scope *scope, const char *module_alias,
                                 const char *symbol_name) {
-  // Search up the scope chain for imports
   Scope *current = scope;
   while (current) {
     for (size_t i = 0; i < current->imported_modules.count; i++) {
@@ -69,13 +68,17 @@ Symbol *lookup_qualified_symbol(Scope *scope, const char *module_alias,
                            i * sizeof(ModuleImport));
 
       if (strcmp(import->alias, module_alias) == 0) {
-        // Get the requesting module scope for visibility check
-        Scope *requesting_module = find_containing_module(scope);
+        // Check what symbols exist in the module
+        for (size_t j = 0; j < import->module_scope->symbols.count; j++) {
+          Symbol *s = (Symbol *)((char *)import->module_scope->symbols.data +
+                                 j * sizeof(Symbol));
+        }
 
-        // Use visibility-aware lookup - only public symbols can be accessed
-        // from other modules
-        return scope_lookup_current_only_with_visibility(
+        Scope *requesting_module = find_containing_module(scope);
+        Symbol *result = scope_lookup_current_only_with_visibility(
             import->module_scope, symbol_name, requesting_module);
+
+        return result;
       }
     }
     current = current->parent;
@@ -97,4 +100,108 @@ Scope *create_module_scope(Scope *global_scope, const char *module_name,
                       sizeof(ModuleImport));
 
   return module_scope;
+}
+
+void build_dependency_graph(AstNode **modules, size_t module_count,
+                            GrowableArray *dep_graph, ArenaAllocator *arena) {
+  for (size_t i = 0; i < module_count; i++) {
+    AstNode *module = modules[i];
+    if (!module || module->type != AST_PREPROCESSOR_MODULE)
+      continue;
+
+    const char *module_name = module->preprocessor.module.name;
+
+    ModuleDependency *dep = (ModuleDependency *)growable_array_push(dep_graph);
+    dep->module_name = module_name;
+    dep->processed = false;
+    growable_array_init(&dep->dependencies, arena, 4, sizeof(const char *));
+
+    // Scan for @use statements to find dependencies
+    AstNode **body = module->preprocessor.module.body;
+    int body_count = module->preprocessor.module.body_count;
+
+    for (int j = 0; j < body_count; j++) {
+      if (body[j] && body[j]->type == AST_PREPROCESSOR_USE) {
+        const char *imported_module = body[j]->preprocessor.use.module_name;
+        const char **dep_slot =
+            (const char **)growable_array_push(&dep->dependencies);
+        *dep_slot = imported_module;
+      }
+    }
+  }
+}
+
+/**
+ * @brief Process modules in dependency order (topological sort)
+ */
+bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
+                             AstNode **modules, size_t module_count,
+                             Scope *global_scope, ArenaAllocator *arena) {
+  // Find this module's dependency info
+  ModuleDependency *current_dep = NULL;
+  for (size_t i = 0; i < dep_graph->count; i++) {
+    ModuleDependency *dep = (ModuleDependency *)((char *)dep_graph->data +
+                                                 i * sizeof(ModuleDependency));
+    if (strcmp(dep->module_name, module_name) == 0) {
+      current_dep = dep;
+      break;
+    }
+  }
+
+  if (!current_dep)
+    return true; // Module not found, skip
+  if (current_dep->processed)
+    return true; // Already processed
+
+  // First, process all dependencies recursively
+  for (size_t i = 0; i < current_dep->dependencies.count; i++) {
+    const char **dep_name =
+        (const char **)((char *)current_dep->dependencies.data +
+                        i * sizeof(const char *));
+    if (!process_module_in_order(*dep_name, dep_graph, modules, module_count,
+                                 global_scope, arena)) {
+      return false;
+    }
+  }
+
+  // Now process this module's body
+  AstNode *module = NULL;
+  for (size_t i = 0; i < module_count; i++) {
+    if (modules[i] && modules[i]->type == AST_PREPROCESSOR_MODULE &&
+        strcmp(modules[i]->preprocessor.module.name, module_name) == 0) {
+      module = modules[i];
+      break;
+    }
+  }
+
+  if (!module) {
+    fprintf(stderr, "Error: Module '%s' not found\n", module_name);
+    return false;
+  }
+
+  Scope *module_scope = find_module_scope(global_scope, module_name);
+  if (!module_scope) {
+    fprintf(stderr, "Error: Module scope not found for '%s'\n", module_name);
+    return false;
+  }
+
+  AstNode **body = module->preprocessor.module.body;
+  int body_count = module->preprocessor.module.body_count;
+
+  // Process all non-@use statements
+  for (int j = 0; j < body_count; j++) {
+    if (!body[j])
+      continue;
+    if (body[j]->type == AST_PREPROCESSOR_USE)
+      continue;
+
+    if (!typecheck(body[j], module_scope, arena)) {
+      tc_error(body[j], "Module Error",
+               "Failed to typecheck statement in module '%s'", module_name);
+      return false;
+    }
+  }
+
+  current_dep->processed = true;
+  return true;
 }

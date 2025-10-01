@@ -14,7 +14,7 @@ let _colorBuffer: **char;
 let _buffer: *char;
 
 let cube_width: double;
-const width: int = 161;
+const width: int = 160;
 const height: int = 44;
 
 const distance_from_cam: int = 100;
@@ -24,7 +24,6 @@ let horizontal_offset: double;
 const k1: double = 40.0;
 
 let cube_gradient_size: int = 12;
-let cube_gradient: [[*char; 12]; 6];
 
 const calculateX = fn (i: int, j: int, k: int) double {
   let sA: double = math::sin(A);
@@ -61,7 +60,7 @@ const calculateZ = fn (i: int, j: int, k: int) double {
 }
 
 const calculateForSurface = fn (cX: double, cY: double, cZ: double, 
-                                ch: char, faceOffset: int, frame: int) void {
+                                ch: char, color: *char) void {
   let x: double = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   let y: double = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   let z: double = calculateZ(cast<int>(cX), cast<int>(cY), cast<int>(cZ)) + distance_from_cam;
@@ -80,22 +79,20 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double,
     if (ooz > zBuffer[idx]) {
       zBuffer[idx] = ooz;
       _buffer[idx] = ch;
-
-      let color: *char = cube_gradient[faceOffset][(frame / 10) % cube_gradient_size];
       _colorBuffer[idx] = color;
     }
   }
 }
 
-const print_cube = fn (frame: int) void {
+const print_cube = fn () void {
   loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
     loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-      calculateForSurface(cubeX,       cubeY,       -cube_width, '@', 0, frame);
-      calculateForSurface(cube_width,  cubeY,       cubeX,       '$', 1, frame);
-      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~', 2, frame);
-      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#', 3, frame);
-      calculateForSurface(cubeX,       -cube_width, -cubeY,      ';', 4, frame);
-      calculateForSurface(cubeX,       cube_width,  cubeY,       '+', 5, frame);
+      calculateForSurface(cubeX,       cubeY,       -cube_width, ' ', fx::BG_RED);
+      calculateForSurface(cube_width,  cubeY,       cubeX,       ' ', fx::BG_MAGENTA);
+      calculateForSurface(-cube_width, cubeY,       -cubeX,      ' ', fx::BG_CYAN);
+      calculateForSurface(-cubeX,      cubeY,       cube_width,  ' ', fx::BG_WHITE);
+      calculateForSurface(cubeX,       -cube_width, -cubeY,      ' ', fx::BG_GREEN);
+      calculateForSurface(cubeX,       cube_width,  cubeY,       ' ', fx::BG_YELLOW);
     }
   } 
 }
@@ -107,37 +104,10 @@ pub const main = fn () int {
   
   defer { free(zBuffer); free(_colorBuffer); free(_buffer); }
 
-  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME, fx::BRIGHT_MAGENTA, fx::BLINK, "3D", fx::RESET, 
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME, fx::BRIGHT_MAGENTA, "3D", fx::RESET, 
          fx::BRIGHT_CYAN, " Spinning Cubes in Luma\n", fx::RESET, fx::CURSOR_HIDE);
 
   let frame_count: int = 0;
-
-  cube_gradient = [
-     // Face 0 (Red -> Orange -> Yellow)
-     [fx::BRIGHT_RED,    fx::BRIGHT_YELLOW, fx::YELLOW,        fx::BRIGHT_YELLOW,
-      fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_RED,    fx::RED,
-      fx::BRIGHT_RED,    fx::YELLOW,        fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW],
-     // Face 1 (Green -> Cyan)
-     [fx::BRIGHT_GREEN, fx::BRIGHT_CYAN, fx::CYAN,         fx::BRIGHT_CYAN,
-      fx::BRIGHT_CYAN,  fx::BRIGHT_CYAN, fx::BRIGHT_GREEN, fx::GREEN,
-      fx::BRIGHT_GREEN, fx::CYAN,        fx::BRIGHT_CYAN,  fx::BRIGHT_CYAN],
-     // Face 2 (Blue shades)
-     [fx::BRIGHT_BLUE, fx::BLUE,        fx::BRIGHT_BLUE, fx::BRIGHT_BLUE,
-      fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BLUE,
-      fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE, fx::BRIGHT_BLUE],
-     // Face 3 (Magenta shades)
-     [fx::BRIGHT_MAGENTA, fx::MAGENTA,        fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA,
-      fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::MAGENTA,
-      fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA],
-     // Face 4 (Bright Pink to White)
-     [fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA, fx::BRIGHT_MAGENTA,
-      fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,
-      fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE,   fx::BRIGHT_WHITE],
-     // Face 5 (Orange to Green gradient)
-     [fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW, fx::BRIGHT_YELLOW,
-      fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,
-      fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN,  fx::BRIGHT_GREEN]
-  ];
 
   loop {
     mem::memset(cast<*void>(_buffer), 32, width * height);
@@ -146,15 +116,15 @@ pub const main = fn () int {
     
     cube_width = 20.0;
     horizontal_offset = -2 * cube_width;
-    print_cube(frame_count);
+    print_cube();
     
     cube_width = 10.0;
     horizontal_offset = 1 * cube_width;
-    print_cube(frame_count);
+    print_cube();
   
     cube_width = 5.0;
     horizontal_offset = 8 * cube_width;
-    print_cube(frame_count);
+    print_cube();
 
     output(fx::CURSOR_HOME);
     loop [k: int = 0](k < width * height) : (++k) {

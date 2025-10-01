@@ -84,6 +84,12 @@ typedef struct {
   Scope *module_scope;
 } ModuleImport;
 
+typedef struct {
+  const char *module_name;
+  GrowableArray dependencies; // Array of const char* (module names)
+  bool processed;
+} ModuleDependency;
+
 /**
  * @brief Result of type compatibility checking.
  */
@@ -148,6 +154,13 @@ Scope *create_child_scope(Scope *parent, const char *name,
                           ArenaAllocator *arena);
 void debug_print_scope(Scope *scope, int indent_level);
 void debug_print_struct_type(AstNode *struct_type, int indent);
+void build_dependency_graph(AstNode **modules, size_t module_count,
+                            GrowableArray *dep_graph, ArenaAllocator *arena);
+bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
+                             AstNode **modules, size_t module_count,
+                             Scope *global_scope, ArenaAllocator *arena);
+bool typecheck_program_multipass(AstNode *program, Scope *global_scope,
+                                 ArenaAllocator *arena);
 
 // ============================================================================
 // Module Management

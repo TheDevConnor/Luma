@@ -27,8 +27,8 @@ typedef struct ModuleCompilationUnit ModuleCompilationUnit;
 struct LLVM_Symbol {
   char *name;
   LLVMValueRef value;
-  LLVMTypeRef type;           // The type of the symbol itself
-  LLVMTypeRef element_type;   // For pointer types, what it points to
+  LLVMTypeRef type;         // The type of the symbol itself
+  LLVMTypeRef element_type; // For pointer types, what it points to
   bool is_function;
   struct LLVM_Symbol *next;
 };
@@ -41,6 +41,13 @@ struct ModuleCompilationUnit {
   bool is_main_module;
   struct ModuleCompilationUnit *next;
 };
+
+typedef struct ModuleDependencyInfo {
+  const char *module_name;
+  char **dependencies; // Array of module names this depends on
+  size_t dep_count;
+  bool processed;
+} ModuleDependencyInfo;
 
 typedef struct DeferredStatement {
   AstNode *statement;
@@ -259,17 +266,17 @@ void copy_array_elements(CodeGenContext *ctx, LLVMValueRef dest_array,
                          LLVMTypeRef src_type);
 
 // Enhanced symbol management with element type support
-void add_symbol_with_element_type(CodeGenContext *ctx, const char *name, 
-                                  LLVMValueRef value, LLVMTypeRef type, 
+void add_symbol_with_element_type(CodeGenContext *ctx, const char *name,
+                                  LLVMValueRef value, LLVMTypeRef type,
                                   LLVMTypeRef element_type, bool is_function);
 
-void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module, 
-                                           const char *name, LLVMValueRef value, 
-                                           LLVMTypeRef type, LLVMTypeRef element_type, 
-                                           bool is_function);
+void add_symbol_to_module_with_element_type(
+    ModuleCompilationUnit *module, const char *name, LLVMValueRef value,
+    LLVMTypeRef type, LLVMTypeRef element_type, bool is_function);
 
 // Helper function to extract element type from AST
-LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node);
+LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx,
+                                          AstNode *type_node);
 
 LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_identifier(CodeGenContext *ctx, AstNode *node);

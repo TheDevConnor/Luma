@@ -5,13 +5,7 @@
 bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
   switch (stmt->type) {
   case AST_PROGRAM:
-    // Simple single-pass approach: just process each module
-    for (size_t i = 0; i < stmt->stmt.program.module_count; i++) {
-      if (!typecheck(stmt->stmt.program.modules[i], scope, arena)) {
-        return false;
-      }
-    }
-    return true;
+    return typecheck_program_multipass(stmt, scope, arena);
   case AST_STMT_VAR_DECL:
     return typecheck_var_decl(stmt, scope, arena);
   case AST_STMT_FUNCTION:
@@ -143,4 +137,119 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
              expr->type);
     return create_basic_type(arena, "unknown", expr->line, expr->column);
   }
+}
+
+/**
+ * @brief Three-pass typechecking for modules to handle forward references
+ *
+ * This allows modules to be declared and used in any order by:
+ * - Pass 1: Registering all module scopes (creates namespaces)
+ * - Pass 2: Processing all @use statements (resolves imports)
+ * - Pass 3: Typechecking module bodies (validates code)
+ *
+ * @param program AST_PROGRAM node containing all modules
+ * @param global_scope Global scope to register modules in
+ * @param arena Arena allocator for memory management
+ * @return true if all passes succeed, false on any error
+ */
+bool typecheck_program_multipass(AstNode *program, Scope *global_scope,
+                                 ArenaAllocator *arena) {
+  if (program->type != AST_PROGRAM) {
+    tc_error(program, "Internal Error", "Expected program node");
+    return false;
+  }
+
+  AstNode **modules = program->stmt.program.modules;
+  size_t module_count = program->stmt.program.module_count;
+
+  // -------------------------------------------------------------------------
+  // PASS 1: Register all module scopes
+  // -------------------------------------------------------------------------
+  // This creates empty module scopes so they can be found by @use statements
+  // in any module, regardless of declaration order.
+  for (size_t i = 0; i < module_count; i++) {
+    AstNode *module = modules[i];
+    if (!module || module->type != AST_PREPROCESSOR_MODULE) {
+      continue;
+    }
+
+    const char *module_name = module->preprocessor.module.name;
+
+    // Check if module already exists (duplicate module definition)
+    Scope *existing = find_module_scope(global_scope, module_name);
+    if (existing) {
+      tc_error(module, "Duplicate Module", "Module '%s' is already defined",
+               module_name);
+      return false;
+    }
+
+    // Create and register the module scope
+    Scope *module_scope = create_module_scope(global_scope, module_name, arena);
+    if (!register_module(global_scope, module_name, module_scope, arena)) {
+      tc_error(module, "Module Error", "Failed to register module '%s'",
+               module_name);
+      return false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // PASS 2: Process all @use statements
+  // -------------------------------------------------------------------------
+  // Now that all modules exist, we can resolve imports. This must happen
+  // before typechecking bodies because code may reference imported symbols.
+  for (size_t i = 0; i < module_count; i++) {
+    AstNode *module = modules[i];
+    if (!module || module->type != AST_PREPROCESSOR_MODULE) {
+      continue;
+    }
+
+    const char *module_name = module->preprocessor.module.name;
+    Scope *module_scope = find_module_scope(global_scope, module_name);
+    if (!module_scope) {
+      tc_error(module, "Internal Error",
+               "Module scope not found for '%s' after registration",
+               module_name);
+      return false;
+    }
+
+    AstNode **body = module->preprocessor.module.body;
+    int body_count = module->preprocessor.module.body_count;
+
+    // Process only @use statements in this pass
+    // In lookup.c - typecheck_program_multipass, Pass 2
+    for (int j = 0; j < body_count; j++) {
+      if (!body[j])
+        continue;
+
+      if (body[j]->type == AST_PREPROCESSOR_USE) {
+        if (!typecheck_use_stmt(body[j], module_scope, global_scope, arena)) {
+          // error
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // PASS 3: Typecheck all module bodies (in dependency order)
+  // -------------------------------------------------------------------------
+  GrowableArray dep_graph;
+  growable_array_init(&dep_graph, arena, module_count,
+                      sizeof(ModuleDependency));
+  build_dependency_graph(modules, module_count, &dep_graph, arena);
+
+  // Process each module in dependency order
+  for (size_t i = 0; i < module_count; i++) {
+    AstNode *module = modules[i];
+    if (!module || module->type != AST_PREPROCESSOR_MODULE)
+      continue;
+
+    const char *module_name = module->preprocessor.module.name;
+
+    if (!process_module_in_order(module_name, &dep_graph, modules, module_count,
+                                 global_scope, arena)) {
+      return false;
+    }
+  }
+
+  return true;
 }
