@@ -85,8 +85,6 @@ pub const bg_rgb = fn (r: int, g: int, b: int) *char {
     string::cat(msg, msg, string::from_int(b));
     string::cat(msg, msg, "m");
 
-    output(msg);
-
     return msg;
 }
 

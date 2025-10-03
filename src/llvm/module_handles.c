@@ -368,6 +368,37 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
 
   const char *object_name = object->expr.identifier.name;
 
+  // NEW: First check if this is actually a local variable/parameter with struct type
+  // This prevents false positives when parameter names match module names
+  LLVM_Symbol *local_sym = find_symbol(ctx, object_name);
+  if (local_sym && !local_sym->is_function) {
+    // Check if this local variable has a struct type
+    LLVMTypeRef sym_type = local_sym->type;
+    LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
+    
+    // If it's a struct or pointer to struct, this is struct field access
+    bool is_struct_access = false;
+    
+    if (sym_kind == LLVMStructTypeKind) {
+      is_struct_access = true;
+    } else if (sym_kind == LLVMPointerTypeKind && local_sym->element_type) {
+      if (LLVMGetTypeKind(local_sym->element_type) == LLVMStructTypeKind) {
+        is_struct_access = true;
+      }
+    }
+    
+    if (is_struct_access) {
+      // This is definitely struct field access, not module access
+      if (is_compiletime) {
+        fprintf(stderr, "Error: Cannot use compile-time access '::' for struct field.\n"
+                       "  Variable '%s' is a struct, use runtime access '.' instead: %s.%s\n",
+                object_name, object_name, member);
+        return NULL;
+      }
+      return codegen_expr_struct_access(ctx, node);
+    }
+  }
+
   // Check if this is compile-time access (::)
   if (is_compiletime) {
     // This is compile-time access - handle module functions and enum members
@@ -429,11 +460,6 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
 
     // 2. Check if this is an imported module function
     // Look for module import with this alias
-    // Scope *current =
-    //     NULL; // We don't have scope context here, but we can check imports
-
-    // Check if object_name is a known module alias by looking for imported
-    // symbols
     for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
       if (unit == ctx->current_module)
         continue;
@@ -482,7 +508,7 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
 
   // This is runtime access (.) - handle struct field access
 
-  // 1. First, check if base_name is a known module (give helpful error)
+  // 1. Check if base_name is a known module (give helpful error)
   bool is_module_access = false;
   for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
     if (strcmp(unit->module_name, object_name) == 0) {
@@ -504,8 +530,8 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
 
   if (is_module_access) {
     fprintf(stderr,
-            "Error: Cannot use runtime access '.' for module function - did "
-            "you mean '%s::%s'?\n",
+            "Error: Cannot use runtime access '.' for module function.\n"
+            "  Did you mean '%s::%s'?\n",
             object_name, member);
     return NULL;
   }

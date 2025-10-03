@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 // Custom random number generator using LCG algorithm
@@ -11,16 +10,10 @@ unsigned int custom_rand(unsigned int *seed) {
   return *seed;
 }
 
-#ifdef _WIN32
-#include <windows.h>
-#define CLEAR "cls"
-#else
-#include <sys/ioctl.h>
-#define CLEAR "clear"
-#endif
-
 #define MIN_SPEED 1
 #define MAX_SPEED 3
+#define FIXED_ROWS 30
+#define FIXED_COLS 100
 
 typedef struct {
   int y;
@@ -30,18 +23,10 @@ typedef struct {
 } Drop;
 
 void get_terminal_size(int *rows, int *cols) {
-#ifdef _WIN32
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-  *cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-  *rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-#else
-  struct winsize w;
-  ioctl(0, TIOCGWINSZ, &w);
-  *rows = w.ws_row;
-  *cols = w.ws_col;
-#endif
+    *rows = FIXED_ROWS;
+    *cols = FIXED_COLS;
 }
+
 
 char random_char(unsigned int *seed) {
   const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0"
@@ -105,7 +90,7 @@ void render(Drop *drops, int num_drops, int rows, int cols) {
 }
 
 int main() {
-  unsigned int seed = time(NULL);
+  unsigned int seed = 123456789;
 
   int rows, cols;
   get_terminal_size(&rows, &cols);

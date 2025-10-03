@@ -7,6 +7,7 @@ Luma is a statically typed, compiled programming language designed for systems p
 - [Language Philosophy](#language-philosophy)
 - [Quick Start](#quick-start)
 - [Type System](#type-system)
+- [Generics](#generics)
 - [Top-Level Bindings with `const`](#top-level-bindings-with-const)
 - [Name Resolution](#name-resolution)
 - [Control Flow](#control-flow)
@@ -142,6 +143,183 @@ const player: Player = Player {
 };
 ```
 
+## Generics
+
+Luma supports generic programming through templates, enabling you to write code that works with multiple types while maintaining type safety and zero-cost abstractions.
+
+### Generic Functions
+
+Generic functions are declared with type parameters in angle brackets `<>` after the `fn` keyword:
+
+```luma
+const add = fn<T>(a: T, b: T) T { 
+    return a + b; 
+}
+
+const swap = fn<T>(a: *T, b: *T) void {
+    let temp: T = *a;
+    *a = *b;
+    *b = temp;
+}
+
+const max = fn<T>(a: T, b: T) T {
+    if a > b {
+        return a;
+    }
+    return b;
+}
+```
+
+### Using Generic Functions
+
+Generic functions require **explicit type arguments** at the call site:
+
+```luma
+const main = fn() int {
+    // Integer arithmetic
+    outputln("add(1, 2) = ", add<int>(1, 2));
+    
+    // Floating-point arithmetic
+    outputln("add(1.5, 2.5) = ", add<float>(1.5, 2.5));
+
+    // Swapping integers
+    let x: int = 5; 
+    let y: int = 10;
+    swap<int>(&x, &y);
+    outputln("After swap: x = ", x, ", y = ", y);
+    
+    // Finding maximum
+    let largest: int = max<int>(42, 17);
+    outputln("Max: ", largest);
+    
+    return 0;
+}
+```
+
+### Generic Structs
+
+Structs can also be generic, allowing you to create container types and data structures that work with any type:
+
+```luma
+const Box = struct<T> {
+    value: T,
+    
+    get = fn() T {
+        return value;
+    },
+    
+    set = fn(new_value: T) void {
+        value = new_value;
+    }
+};
+
+const Pair = struct<T, U> {
+    first: T,
+    second: U
+};
+
+// Usage
+const main = fn() int {
+    // Box holding an integer
+    let int_box: Box<int> = Box<int> { value: 42 };
+    outputln("Box contains: ", int_box.get());
+    
+    // Box holding a float
+    let float_box: Box<float> = Box<float> { value: 3.14 };
+    
+    // Pair with different types
+    let pair: Pair<int, str> = Pair<int, str> { 
+        first: 1, 
+        second: "hello" 
+    };
+    outputln("Pair: (", pair.first, ", ", pair.second, ")");
+    
+    return 0;
+}
+```
+
+### Multiple Type Parameters
+
+Generic functions and structs can have multiple type parameters:
+
+```luma
+const convert = fn<From, To>(value: From) To {
+    return cast<To>(value);
+}
+
+const Tuple = struct<T, U, V> {
+    first: T,
+    second: U,
+    third: V
+};
+```
+
+### Generic Arrays and Collections
+
+Generics are particularly useful for building collection types:
+
+```luma
+const DynamicArray = struct<T> {
+    data: *T,
+    size: uint,
+    capacity: uint,
+    
+    push = fn(item: T) void {
+        // Implementation for adding items
+    },
+    
+    get = fn(index: uint) T {
+        return data[index];
+    }
+};
+
+const main = fn() int {
+    let numbers: DynamicArray<int> = DynamicArray<int> {
+        data: null,
+        size: 0,
+        capacity: 0
+    };
+    
+    numbers.push(10);
+    numbers.push(20);
+    numbers.push(30);
+    
+    return 0;
+}
+```
+
+### Monomorphization
+
+Luma uses **monomorphization** for generic code generation. This means:
+
+- The compiler generates **separate machine code** for each concrete type used
+- Generic code has **zero runtime overhead** compared to hand-written type-specific code
+- Each instantiation (e.g., `add<int>`, `add<float>`) produces its own optimized assembly
+- Similar to C++ templates and Rust generics, not Java's type erasure
+
+**Example:**
+
+```luma
+const identity = fn<T>(x: T) T {
+    return x;
+}
+
+// These calls generate separate functions in the compiled binary:
+let a: int = identity<int>(42);        // Generates identity_int
+let b: float = identity<float>(3.14);  // Generates identity_float
+let c: str = identity<str>("hello");   // Generates identity_str
+```
+
+### Design Considerations
+
+**Explicit type arguments**: Luma requires explicit type arguments at call sites (`add<int>(1, 2)`) rather than type inference. This makes code more readable and predictable, avoiding "magic" type deduction.
+
+**Angle bracket syntax**: Type parameters use `<>` brackets, consistent with type casting syntax (`cast<T>`) and familiar from other systems languages.
+
+**No partial specialization**: Currently, Luma generics do not support partial specialization or constraints (traits/concepts). This keeps the system simple while still covering most use cases.
+
+**Compile-time only**: All generic instantiations happen at compile time. There is no runtime polymorphism or dynamic dispatch with generics.
+
 ## Top-Level Bindings with `const`
 
 Luma uses the `const` keyword as a **unified declaration mechanism** for all top-level bindings. Whether you're declaring variables, functions, types, or enums, `const` provides a consistent syntax that enforces immutability at the binding level.
@@ -152,8 +330,13 @@ Luma uses the `const` keyword as a **unified declaration mechanism** for all top
 const NUM: int = 42;                                  // Immutable variable
 const Direction = enum { North, South, East, West };  // Enum definition
 const Point = struct { x: int, y: int };              // Struct definition
+const Box = struct<T> { value: T };                   // Generic struct
 const add = fn (a: int, b: int) int {                 // Function definition
     return a + b; 
+};
+const max = fn<T>(a: T, b: T) T {                     // Generic function
+    if (a > b) { return a; }
+    return b;
 };
 ```
 
@@ -207,6 +390,10 @@ outputln(point.x);  // Access field at runtime
 
 // Method calls on instances
 let distance: float = origin.distance_to(destination);
+
+// Generic struct field access
+let box: Box<int> = Box<int> { value: 42 };
+outputln(box.value);
 ```
 
 ### Benefits of This Distinction
@@ -489,6 +676,7 @@ const check_sizes = fn () {
     outputln("int size: ", sizeof(int));        // 8 bytes
     outputln("Point size: ", sizeof(Point));    // 16 bytes
     outputln("Direction size: ", sizeof(Direction)); // 4 bytes
+    outputln("Box<int> size: ", sizeof(Box<int>));   // Size of int
 }
 ```
 

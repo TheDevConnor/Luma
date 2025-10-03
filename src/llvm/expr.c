@@ -578,11 +578,26 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       }
 
       // Strategy 2: Extract from cast expression
-      else if (target->expr.index.object->type == AST_EXPR_CAST) {
+      if (!element_type && target->expr.index.object->type == AST_EXPR_CAST) {
         AstNode *cast_node = target->expr.index.object;
         if (cast_node->expr.cast.type->type == AST_TYPE_POINTER) {
           element_type = codegen_type(
               ctx, cast_node->expr.cast.type->type_data.pointer.pointee_type);
+        }
+      }
+
+      // NEW: Check if element_type is a struct - this is likely an error
+      if (element_type && LLVMGetTypeKind(element_type) == LLVMStructTypeKind) {
+        if (LLVMGetTypeKind(value_type) != LLVMStructTypeKind) {
+          const char *var_name = target->expr.index.object->type == AST_EXPR_IDENTIFIER
+              ? target->expr.index.object->expr.identifier.name
+              : "pointer";
+          fprintf(stderr, 
+                  "Error: Cannot assign scalar value to struct pointer element.\n"
+                  "  Variable '%s' is a pointer to struct, not an array of values.\n"
+                  "  Did you mean to use a different pointer variable?\n",
+                  var_name);
+          return NULL;
         }
       }
 
@@ -639,8 +654,11 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
           value_final = LLVMBuildSIToFP(ctx->builder, value, element_type,
                                         "int_to_float_for_store");
         } else {
-          value_final = LLVMBuildBitCast(ctx->builder, value, element_type,
-                                         "cast_for_store");
+          // NEW: Better error for incompatible types
+          fprintf(stderr, 
+                  "Error: Cannot convert value type (kind %d) to pointer element type (kind %d)\n",
+                  LLVMGetTypeKind(value_type), LLVMGetTypeKind(element_type));
+          return NULL;
         }
       }
 
