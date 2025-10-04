@@ -1,0 +1,27 @@
+@module "main"
+
+const WeekDay = enum {
+    Sunday,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+};
+
+const classify_day = fn (day: WeekDay) void {
+    switch (day) {
+        WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
+        WeekDay::Thursday, WeekDay::Friday =>
+            outputln("Weekday => ", day, "\n");
+        WeekDay::Saturday, WeekDay::Sunday =>
+            outputln("Weekend => ", day, "\n");
+    }
+}
+
+pub const main = fn () int {
+    classify_day(WeekDay::Monday);   // Output: Weekday => 1
+    classify_day(WeekDay::Saturday); // Output: Weekend => 6
+    return 0;
+}

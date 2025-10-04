@@ -87,12 +87,12 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double,
 const print_cube = fn () void {
   loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
     loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
-      calculateForSurface(cubeX,       cubeY,       -cube_width, '@', fx::RESET);
-      calculateForSurface(cube_width,  cubeY,       cubeX,       '+', fx::RESET);
-      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~', fx::RESET);
-      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#', fx::RESET);
-      calculateForSurface(cubeX,       -cube_width, -cubeY,      '*', fx::RESET);
-      calculateForSurface(cubeX,       cube_width,  cubeY,       '-', fx::RESET);
+      calculateForSurface(cubeX,       cubeY,       -cube_width, '@', fx::BRIGHT_RED);
+      calculateForSurface(cube_width,  cubeY,       cubeX,       '+', fx::BRIGHT_GREEN);
+      calculateForSurface(-cube_width, cubeY,       -cubeX,      '~', fx::BRIGHT_YELLOW);
+      calculateForSurface(-cubeX,      cubeY,       cube_width,  '#', fx::BRIGHT_BLUE);
+      calculateForSurface(cubeX,       -cube_width, -cubeY,      '*', fx::BRIGHT_CYAN);
+      calculateForSurface(cubeX,       cube_width,  cubeY,       '-', fx::BRIGHT_MAGENTA);
     }
   } 
 }

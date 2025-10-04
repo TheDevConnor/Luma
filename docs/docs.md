@@ -484,6 +484,8 @@ Luma provides powerful pattern matching through `switch` statements that work wi
 ### Basic Switch Syntax
 
 ```luma
+@module "main"
+
 const WeekDay = enum {
     Sunday,
     Monday,
@@ -494,15 +496,21 @@ const WeekDay = enum {
     Saturday,
 };
 
-const classify_day = fn (day: WeekDay) {
+const classify_day = fn (day: WeekDay) void {
     switch (day) {
         WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
-        WeekDay::Thursday, WeekDay::Friday: 
-            outputln("Weekday");
-        WeekDay::Saturday, WeekDay::Sunday: 
-            outputln("Weekend");
+        WeekDay::Thursday, WeekDay::Friday =>
+            outputln("Weekday => ", day, "\n");
+        WeekDay::Saturday, WeekDay::Sunday =>
+            outputln("Weekend => ", day, "\n");
     }
-};
+}
+
+pub const main = fn () int {
+    classify_day(WeekDay::Monday);   // Output: Weekday => 1
+    classify_day(WeekDay::Saturday); // Output: Weekend => 6
+    return 0;
+}
 ```
 
 ### Switch with Default Case
@@ -512,10 +520,10 @@ When you need to handle unexpected values or want a catch-all case, use the defa
 ```luma
 const handle_status_code = fn (code: int) {
     switch (code) {
-        200: outputln("OK");
-        404: outputln("Not Found");
-        500: outputln("Internal Server Error");
-        _: outputln("Unknown status code");
+        200 => outputln("OK");
+        404 => outputln("Not Found");
+        500 => outputln("Internal Server Error");
+        _   => outputln("Unknown status code");
     }
 };
 ```
@@ -610,8 +618,7 @@ Luma provides explicit memory management with safety-oriented features. While ma
 alloc(size: uint) -> *void    // Allocate memory
 free(ptr: *void)              // Deallocate memory
 cast<T>(ptr: *void) -> *T     // Type casting
-sizeof(type) -> uint          // Size of type in bytes
-memcpy(dest: *void, src: *void, size: uint)  // Memory copy
+sizeof<type> -> uint          // Size of type in bytes
 ```
 
 ### Example Usage
@@ -673,10 +680,10 @@ defer {
 
 ```luma
 const check_sizes = fn () {
-    outputln("int size: ", sizeof(int));        // 8 bytes
-    outputln("Point size: ", sizeof(Point));    // 16 bytes
-    outputln("Direction size: ", sizeof(Direction)); // 4 bytes
-    outputln("Box<int> size: ", sizeof(Box<int>));   // Size of int
+    outputln("int size: ", sizeof<int>);            // 8 bytes
+    outputln("Point size: ", sizeof<Point>);        // 16 bytes
+    outputln("Direction size: ", sizeof<Directio>); // 4 bytes
+    outputln("Box<int> size: ", sizeof<Box<int>>);  // Size of int
 }
 ```
 
