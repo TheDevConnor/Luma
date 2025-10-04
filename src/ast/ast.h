@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "../c_libs/memory/memory.h"
+#include "../lexer/lexer.h"
 
 // Forward declaration
 typedef struct AstNode AstNode;
@@ -138,6 +139,9 @@ struct AstNode {
           int potions;
           AstNode **body;
           size_t body_count;
+          const char *file_path;
+          Token *tokens;
+          size_t token_count;
         } module;
 
         // @use "module_name" as module;
@@ -224,7 +228,7 @@ struct AstNode {
           AstNode **elements; // Changed from Expr** to AstNode**
           size_t element_count;
         } array;
-        
+
         // Deref expression
         struct {
           AstNode *object;

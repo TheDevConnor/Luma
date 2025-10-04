@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../ast/ast_utils.h"
+// #include "../ast/ast_utils.h"
 #include "type.h"
 
 AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,

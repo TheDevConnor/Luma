@@ -257,6 +257,10 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
     printf(BOLD_CYAN("Module Name: "));
     if (node->preprocessor.module.name) {
       printf(YELLOW("%s"), node->preprocessor.module.name);
+      printf(BOLD_CYAN(" (File: %s)\n"),
+             node->preprocessor.module.file_path
+                 ? node->preprocessor.module.file_path
+                 : "<unknown>");
     } else {
       printf(YELLOW("<unnamed>\n"));
     }

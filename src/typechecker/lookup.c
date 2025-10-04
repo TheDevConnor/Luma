@@ -176,6 +176,15 @@ bool typecheck_program_multipass(AstNode *program, Scope *global_scope,
     }
 
     const char *module_name = module->preprocessor.module.name;
+    const char *file_path = module->preprocessor.module.file_path;
+
+    if (!module_name) {
+      tc_error(module, "Unnamed Module", "Module at index %zu has no name", i);
+      return false;
+    }
+
+    Token *tokens = module->preprocessor.module.tokens;
+    size_t token_count = module->preprocessor.module.token_count;
 
     // Check if module already exists (duplicate module definition)
     Scope *existing = find_module_scope(global_scope, module_name);

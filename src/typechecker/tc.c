@@ -4,11 +4,6 @@
 
 // Updated typecheck function in tc.c
 bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena) {
-  if (!node) {
-    fprintf(stderr, "Error: Null AST node\n");
-    return false;
-  }
-
   switch (node->category) {
   case Node_Category_STMT:
     return typecheck_statement(node, scope, arena);
@@ -33,8 +28,10 @@ bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       return false;
     }
 
-  default:
-    fprintf(stderr, "Error: Unknown node category %d\n", node->category);
+  default: {
+    tc_error(node, "Unsupported Node", "Unsupported node category %d",
+             node->category);
     return false;
+  }
   }
 }

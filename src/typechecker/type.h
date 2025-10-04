@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "../helper/help.h"
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
 #include "../lexer/lexer.h"
@@ -38,6 +39,9 @@ typedef struct {
   GrowableArray aliases;
   bool reported;
   const char *function_name;
+  const char *file_path;
+  Token *tokens;
+  size_t token_count;
 } StaticAllocation;
 
 typedef struct {
@@ -121,7 +125,9 @@ void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
                                  ArenaAllocator *arena);
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                size_t column, const char *var_name,
-                               const char *function_name);
+                               const char *function_name,
+                               Token *tokens, size_t token_count,
+                               const char *file_path);
 void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
                               const char *var_name,
                               const char *function_name);

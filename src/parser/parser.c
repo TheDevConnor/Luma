@@ -20,6 +20,7 @@
 
 #include <stdalign.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../ast/ast.h"
 #include "../c_libs/error/error.h"
@@ -138,7 +139,7 @@ Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config) {
     }
     *slot = stmt;
   }
-
+  
   // Update module with parsed statements
   *module_slot =
       create_module_node(parser.arena, module_name, 0, (Stmt **)stmts.data,

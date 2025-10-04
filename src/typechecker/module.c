@@ -164,7 +164,6 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     }
   }
 
-  // Now process this module's body
   AstNode *module = NULL;
   for (size_t i = 0; i < module_count; i++) {
     if (modules[i] && modules[i]->type == AST_PREPROCESSOR_MODULE &&
@@ -178,6 +177,13 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     fprintf(stderr, "Error: Module '%s' not found\n", module_name);
     return false;
   }
+
+  // UPDATE ERROR CONTEXT FOR THIS MODULE - ADD THIS BLOCK
+  g_tokens = module->preprocessor.module.tokens;
+  g_token_count = module->preprocessor.module.token_count;
+  g_file_path = module->preprocessor.module.file_path;
+
+  tc_error_init(g_tokens, g_token_count, g_file_path, arena);
 
   Scope *module_scope = find_module_scope(global_scope, module_name);
   if (!module_scope) {
@@ -200,6 +206,12 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
                "Failed to typecheck statement in module '%s'", module_name);
       return false;
     }
+  }
+
+  StaticMemoryAnalyzer *analyzer = get_static_analyzer(module_scope);
+  if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
+    static_memory_check_and_report(analyzer, arena, g_tokens,
+                                  g_token_count, g_file_path);
   }
 
   current_dep->processed = true;

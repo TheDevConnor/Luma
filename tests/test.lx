@@ -1,11 +1,13 @@
 @module "main"
 
+@use "math" as math
+
 pub const main = fn () int {
     let x: *int = cast<*int>(alloc(4 * sizeof<int>));
-    free(x);
+    defer { free(x); }
 
     *x = 10;
-    output("Value of x: ", *x, "\n");
+    output("Value of x: ", math::rand(x), "\n");
 
     return 0;
 }

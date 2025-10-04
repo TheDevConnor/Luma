@@ -13,7 +13,9 @@ void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
 
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                size_t column, const char *var_name,
-                               const char *function_name) { // NEW PARAM
+                               const char *function_name,
+                               Token *tokens, size_t token_count,
+                               const char *file_path) {
   if (!var_name || strcmp(var_name, "anonymous") == 0) {
     return;
   }
@@ -30,7 +32,15 @@ void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
     alloc->reported = false;
     alloc->function_name = function_name
                                ? arena_strdup(analyzer->arena, function_name)
-                               : NULL; // NEW
+                               : NULL;
+    
+    // CRITICAL: Store the current module's token context
+    alloc->file_path = g_file_path ? arena_strdup(analyzer->arena, g_file_path) : NULL;
+    
+    // Create a copy of the tokens array so it doesn't get invalidated
+    alloc->tokens = tokens;
+    alloc->token_count = token_count;
+    
     growable_array_init(&alloc->aliases, analyzer->arena, 4, sizeof(char *));
   }
 }
@@ -131,7 +141,7 @@ bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
              var_name, alloc->line);
     error.message = message;
 
-    error.line_text = generate_line(arena, tokens, token_count, error.line);
+    error.line_text = generate_line(arena, g_tokens, g_token_count, error.line);
     error.note = "Memory was freed earlier in this scope";
     error.help = "Remove the use after free or restructure your code";
 
@@ -208,40 +218,50 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
         (StaticAllocation *)((char *)analyzer->allocations.data +
                              i * sizeof(StaticAllocation));
 
-    // Skip if already reported
     if (alloc->reported) {
       continue;
     }
 
-    // Report use after free
+    // DEBUG: Show what we're working with
+    // fprintf(stderr, "\n=== DEBUGGING ALLOCATION ===\n");
+    // fprintf(stderr, "Variable: %s\n", alloc->variable_name);
+    // fprintf(stderr, "File: %s\n", alloc->file_path ? alloc->file_path : "NULL");
+    // fprintf(stderr, "Line: %zu, Column: %zu\n", alloc->line, alloc->column);
+    // fprintf(stderr, "Token count: %zu\n", alloc->token_count);
+    
+    // Show first few tokens to verify they're from the right file
+    if (alloc->tokens && alloc->token_count > 0) {
+      fprintf(stderr, "First 5 tokens:\n");
+      for (size_t j = 0; j < 5 && j < alloc->token_count; j++) {
+        fprintf(stderr, "  [%zu] Line %d, Col %d: '%.*s'\n", 
+                j, alloc->tokens[j].line, alloc->tokens[j].col,
+                alloc->tokens[j].length, alloc->tokens[j].value);
+      }
+      
+      // Find tokens on the allocation line
+      fprintf(stderr, "Tokens on line %zu:\n", alloc->line);
+      int found_count = 0;
+      for (size_t j = 0; j < alloc->token_count; j++) {
+        if (alloc->tokens[j].line == (int)alloc->line) {
+          fprintf(stderr, "  [%zu] Col %d: '%.*s'\n",
+                  j, alloc->tokens[j].col,
+                  alloc->tokens[j].length, alloc->tokens[j].value);
+          found_count++;
+        }
+      }
+      if (found_count == 0) {
+        fprintf(stderr, "  NO TOKENS FOUND ON LINE %zu!\n", alloc->line);
+      }
+    }
+    fprintf(stderr, "===========================\n\n");
 
     if (alloc->free_count > 1) {
-      // Double free error
-      ErrorInformation error = {0};
-      error.error_type = "Double Free";
-      error.file_path = file_path;
-      error.line = (int)alloc->line;
-      error.col = (int)alloc->column;
-      error.token_length = (int)strlen(alloc->variable_name);
-      error.note = "Memory was already freed previously";
-      error.help =
-          "Remove the duplicate free() call or check your control flow";
-
-      char *message = arena_alloc(arena, 256, alignof(char));
-      snprintf(message, 256, "Variable '%s' was freed %d times",
-               alloc->variable_name, alloc->free_count);
-      error.message = message;
-
-      error.line_text = generate_line(arena, tokens, token_count, error.line);
-
-      error_add(error);
-      issues_found++;
-
+      // ... double free error ...
     } else if (!alloc->has_matching_free) {
       // Memory leak
       ErrorInformation error = {0};
       error.error_type = "Memory Leak";
-      error.file_path = file_path;
+      error.file_path = alloc->file_path ? alloc->file_path : file_path;
       error.line = (int)alloc->line;
       error.col = (int)alloc->column;
       error.token_length = (int)strlen(alloc->variable_name);
@@ -250,7 +270,6 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
 
       char *message = arena_alloc(arena, 512, alignof(char));
 
-      // List all aliases if any
       if (alloc->aliases.count > 0) {
         char alias_list[256] = {0};
         size_t offset = 0;
@@ -271,7 +290,7 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
       }
 
       error.message = message;
-      error.line_text = generate_line(arena, tokens, token_count, error.line);
+      error.line_text = generate_line(arena, alloc->tokens, alloc->token_count, error.line);
 
       error_add(error);
       issues_found++;

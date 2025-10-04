@@ -88,7 +88,7 @@ pub const memzero = fn (dest: *void, n: int) *void { return memset(dest, 0, n); 
 //     return ptr;
 // }
 
-// // Reallocate memory (simplified version - allocates new and copies)
+// Reallocate memory (simplified version - allocates new and copies)
 // pub const realloc = fn (ptr: *void, new_size: int) *void {
 //     if (ptr == cast<*void>(0)) {
 //         return alloc(new_size);

@@ -208,8 +208,6 @@ bool link_object_files_enhanced(const char *output_dir,
   return false;
 }
 
-// Helper function to parse a single file and extract its module
-// Helper function to parse a single file and extract its module
 Stmt *parse_file_to_module(const char *path, size_t position,
                            ArenaAllocator *allocator, BuildConfig *config) {
   const char *source = read_file(path);
@@ -244,10 +242,13 @@ Stmt *parse_file_to_module(const char *path, size_t position,
     return NULL;
   }
 
+  // Temporarily update config for parsing
+  GrowableArray old_tokens = config->tokens;
+  size_t old_count = config->token_count;
+
   config->tokens = tokens;
   config->token_count = tokens.count;
 
-  // Parse and extract the module from the program
   AstNode *program_root = parse(&tokens, allocator, config);
   free((void *)source);
 
@@ -255,22 +256,28 @@ Stmt *parse_file_to_module(const char *path, size_t position,
     return NULL;
   }
 
-  // Extract the first (and should be only) module from the program
+  // Extract the module
   if (program_root->type == AST_PROGRAM &&
       program_root->stmt.program.module_count > 0) {
     Stmt *module = (Stmt *)program_root->stmt.program.modules[0];
 
-    // Update the module's position if it's actually a module
     if (module && module->type == AST_PREPROCESSOR_MODULE) {
-      // Assuming your module structure has a position field - adjust based on
-      // your actual AST structure This might be module->data.module.position =
-      // position; depending on your struct layout
       module->preprocessor.module.potions = position;
+      module->preprocessor.module.file_path = path;
+      // CRITICAL: Store THIS file's tokens in the module
+      module->preprocessor.module.tokens = (Token *)tokens.data;
+      module->preprocessor.module.token_count = tokens.count;
     }
+
+    // Restore config
+    config->tokens = old_tokens;
+    config->token_count = old_count;
 
     return module;
   }
 
+  config->tokens = old_tokens;
+  config->token_count = old_count;
   return NULL;
 }
 
@@ -328,9 +335,9 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // Stage 1: Lexing
   print_progress(++step, total_stages, "Lexing");
 
-  // Parse additional files
   for (size_t i = 0; i < config.file_count; i++) {
     char **files_array = (char **)config.files.data;
+
     Stmt *module = parse_file_to_module(files_array[i], i, allocator, &config);
     if (!module || error_report())
       goto cleanup;
@@ -339,6 +346,7 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
     if (!slot)
       goto cleanup;
     *slot = (AstNode *)module;
+    // Tokens are already set in parse_file_to_module!
   }
 
   // Stage 2: Parsing
@@ -364,9 +372,6 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
 
   // print_ast(combined_program, "", false, false);
 
-  tc_error_init((Token *)config.tokens.data, config.token_count,
-                config.filepath, allocator);
-
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");
 
@@ -376,23 +381,11 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   // Don't report yet - wait until after memory analysis
 
   if (tc) {
-    if (config.check_mem) {
-      // Stage 5: Memory Analysis
-      print_progress(++step, total_stages, "Memory Analysis");
-
-      StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
-      if (analyzer && analyzer->allocations.count > 0) {
-        static_memory_check_and_report(analyzer, allocator, config.tokens.data,
-                                       config.token_count, config.filepath);
-      }
-    } else {
-      ++step;
-    }
-
     // Report ALL errors once (both typecheck and memory analysis)
     if (error_report()) {
-      // If there were errors, don't continue to LLVM generation
       goto cleanup;
+    } else {
+      ++step;
     }
 
     // Stage 6: LLVM IR (UPDATED - now uses module system)

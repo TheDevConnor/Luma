@@ -107,8 +107,9 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       if (func_scope && func_scope->associated_node) {
         func_name = func_scope->associated_node->stmt.func_decl.name;
       }
-      
-      static_memory_track_alloc(analyzer, node->line, node->column, name, func_name);
+
+      static_memory_track_alloc(analyzer, node->line, node->column, name,
+                                func_name, g_tokens, g_token_count, g_file_path);
     }
   }
   // NEW: Track pointer aliasing in variable initialization
