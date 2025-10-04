@@ -364,42 +364,35 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
 
   // print_ast(combined_program, "", false, false);
 
+  tc_error_init((Token *)config.tokens.data, config.token_count,
+                config.filepath, allocator);
+
   // Stage 4: Typechecking
   print_progress(++step, total_stages, "Typechecking");
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
-  tc_error_init(config.tokens.data, config.token_count, config.filepath,
-                allocator);
   bool tc = typecheck(combined_program, &root_scope, allocator);
-  error_report();
-  // debug_print_scope(&root_scope, 0);
+  // Don't report yet - wait until after memory analysis
 
   if (tc) {
     if (config.check_mem) {
-      // Stage 5: Memory Analysis - ensure clean line before output
+      // Stage 5: Memory Analysis
       print_progress(++step, total_stages, "Memory Analysis");
 
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(&root_scope);
       if (analyzer && analyzer->allocations.count > 0) {
-        // Use the error system instead of direct printing
-        int memory_issues = static_memory_check_and_report(
-            analyzer,
-            allocator,          // Your arena allocator
-            config.tokens.data, // Your token array
-            config.token_count, // Number of tokens
-            config.filepath);   // Source file path
-
-        // Optional: Print a brief summary after progress bar
-        if (memory_issues > 0) {
-          ensure_clean_line(); // Clean up progress bar
-          error_report();
-        } else {
-          error_report();
-        }
+        static_memory_check_and_report(analyzer, allocator, config.tokens.data,
+                                       config.token_count, config.filepath);
       }
     } else {
       ++step;
+    }
+
+    // Report ALL errors once (both typecheck and memory analysis)
+    if (error_report()) {
+      // If there were errors, don't continue to LLVM generation
+      goto cleanup;
     }
 
     // Stage 6: LLVM IR (UPDATED - now uses module system)

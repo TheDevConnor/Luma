@@ -15,7 +15,38 @@ bool contains_alloc_expression(AstNode *expr) {
   case AST_EXPR_BINARY:
     return contains_alloc_expression(expr->expr.binary.left) ||
            contains_alloc_expression(expr->expr.binary.right);
-  // Add other expression types as needed
+  case AST_EXPR_INDEX:
+    return contains_alloc_expression(expr->expr.index.object) ||
+           contains_alloc_expression(expr->expr.index.index);
+  case AST_EXPR_MEMBER:
+    return contains_alloc_expression(expr->expr.member.object);
+  case AST_EXPR_DEREF:
+    return contains_alloc_expression(expr->expr.deref.object);
+  case AST_EXPR_ADDR:
+    return contains_alloc_expression(expr->expr.addr.object);
+  case AST_EXPR_UNARY:
+    return contains_alloc_expression(expr->expr.unary.operand);
+  case AST_EXPR_CALL: {
+    for (size_t i = 0; i < expr->expr.call.arg_count; i++) {
+      if (contains_alloc_expression(expr->expr.call.args[i])) {
+        return true;
+      }
+    }
+    return contains_alloc_expression(expr->expr.call.callee);
+  }
+  case AST_EXPR_GROUPING:
+    return contains_alloc_expression(expr->expr.grouping.expr);
+  case AST_EXPR_ASSIGNMENT:
+    return contains_alloc_expression(expr->expr.assignment.target) ||
+           contains_alloc_expression(expr->expr.assignment.value);
+  case AST_EXPR_ARRAY: {
+    for (size_t i = 0; i < expr->expr.array.element_count; i++) {
+      if (contains_alloc_expression(expr->expr.array.elements[i])) {
+        return true;
+      }
+    }
+    return false;
+  }
   default:
     return false;
   }
@@ -30,7 +61,14 @@ const char *extract_variable_name(AstNode *expr) {
     return expr->expr.identifier.name;
   case AST_EXPR_DEREF:
     return extract_variable_name(expr->expr.deref.object);
-  // Add other cases as needed
+  case AST_EXPR_ADDR:
+    return extract_variable_name(expr->expr.addr.object);
+  case AST_EXPR_MEMBER:
+    return extract_variable_name(expr->expr.member.object);
+  case AST_EXPR_INDEX:
+    return extract_variable_name(expr->expr.index.object);
+  case AST_EXPR_CAST:
+    return extract_variable_name(expr->expr.cast.castee);
   default:
     return NULL;
   }
@@ -60,7 +98,17 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   if (initializer && contains_alloc_expression(initializer)) {
     StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
     if (analyzer) {
-      static_memory_track_alloc(analyzer, node->line, node->column, name);
+      // Get the containing function name
+      const char *func_name = NULL;
+      Scope *func_scope = scope;
+      while (func_scope && !func_scope->is_function_scope) {
+        func_scope = func_scope->parent;
+      }
+      if (func_scope && func_scope->associated_node) {
+        func_name = func_scope->associated_node->stmt.func_decl.name;
+      }
+      
+      static_memory_track_alloc(analyzer, node->line, node->column, name, func_name);
     }
   }
   // NEW: Track pointer aliasing in variable initialization
@@ -208,6 +256,25 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       tc_error(node, "Function Body Error",
                "Function '%s' body failed typechecking", name);
       return false;
+    }
+
+    // Process all deferred frees at function exit
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
+    if (analyzer && func_scope->deferred_frees.count > 0) {
+      bool old_skip = analyzer->skip_memory_tracking;
+      analyzer->skip_memory_tracking = false;
+
+      for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
+        const char **var =
+            (const char **)((char *)func_scope->deferred_frees.data +
+                            i * sizeof(const char *));
+        static_memory_track_free(analyzer, *var, name);
+      }
+
+      // CRITICAL: Clear the deferred frees after processing
+      func_scope->deferred_frees.count = 0;
+
+      analyzer->skip_memory_tracking = old_skip;
     }
   }
 

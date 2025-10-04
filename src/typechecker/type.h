@@ -22,25 +22,28 @@
 // Data Structures
 // ============================================================================
 
-static Token *g_tokens = NULL;
-static int g_token_count = 0;
-static const char *g_file_path = NULL;
-static ArenaAllocator *g_arena = NULL;
+extern Token *g_tokens;
+extern int g_token_count;
+extern const char *g_file_path;
+extern ArenaAllocator *g_arena;
 
 typedef struct {
   size_t line;
   size_t column;
-  const char *variable_name;     // Current owner of the allocated pointer
-  const char *original_variable; // Original allocator (for tracking)
+  const char *variable_name;
+  const char *original_variable;
   bool has_matching_free;
   int free_count;
-  GrowableArray
-      aliases; // Array of const char* - variables that alias this allocation
+  int use_after_free_count;
+  GrowableArray aliases;
+  bool reported;
+  const char *function_name;
 } StaticAllocation;
 
 typedef struct {
-  GrowableArray allocations; // Array of StaticAllocation
+  GrowableArray allocations;
   ArenaAllocator *arena;
+  bool skip_memory_tracking;
 } StaticMemoryAnalyzer;
 
 /**
@@ -58,13 +61,13 @@ typedef struct {
  * @brief Represents a lexical scope with hierarchical relationships.
  */
 typedef struct Scope {
-  struct Scope *parent;   /**< Parent scope */
-  GrowableArray symbols;  /**< Array of Symbol entries */
-  GrowableArray children; /**< Array of child scopes */
-  const char *scope_name; /**< Debugging name (function, block, etc.) */
-  size_t depth;           /**< Nesting depth from global scope */
+  struct Scope *parent;
+  GrowableArray symbols;
+  GrowableArray children;
+  const char *scope_name;
+  size_t depth;
   bool is_function_scope;
-  AstNode *associated_node; /**< AST node that created this scope */
+  AstNode *associated_node;
 
   // Module-related metadata
   bool is_module_scope;
@@ -73,6 +76,7 @@ typedef struct Scope {
 
   // Memory tracking
   StaticMemoryAnalyzer *memory_analyzer;
+  GrowableArray deferred_frees;
 } Scope;
 
 /**
@@ -116,17 +120,27 @@ typedef struct {
 void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
                                  ArenaAllocator *arena);
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
-                               size_t column, const char *var_name);
+                               size_t column, const char *var_name,
+                               const char *function_name);
 void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
-                              const char *var_name);
+                              const char *var_name,
+                              const char *function_name);
 void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
                                 ArenaAllocator *arena, Token *tokens,
                                 int token_count, const char *file_path);
 int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
                                    ArenaAllocator *arena, Token *tokens,
                                    int token_count, const char *file_path);
+bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
+                                        const char *var_name, size_t line,
+                                        size_t column, ArenaAllocator *arena,
+                                        Token *tokens, int token_count,
+                                        const char *file_path,
+                                        const char *function_name); 
+
 StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
 const char *extract_variable_name_from_free(AstNode *free_expr);
+
 void static_memory_track_alias(StaticMemoryAnalyzer *analyzer,
                                const char *new_var, const char *source_var);
 void static_memory_invalidate_alias(StaticMemoryAnalyzer *analyzer,

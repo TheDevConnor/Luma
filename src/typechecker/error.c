@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
+Token *g_tokens = NULL;
+int g_token_count = 0;
+const char *g_file_path = NULL;
+ArenaAllocator *g_arena = NULL;
+
 /**
  * @brief Set global context for error reporting
  * Call this once at the start of typechecking

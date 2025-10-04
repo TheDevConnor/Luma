@@ -156,14 +156,22 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
 
   // Check for pointer assignment that might transfer ownership
   if (is_pointer_type(target_type) && is_pointer_type(value_type)) {
+    // fprintf(stderr, "DEBUG: Detected pointer assignment\n");
+
     // Extract variable names from both sides
     const char *target_var =
         extract_variable_name(expr->expr.assignment.target);
     const char *source_var = extract_variable_name(expr->expr.assignment.value);
 
+    // fprintf(stderr, "DEBUG: target_var='%s', source_var='%s'\n",
+    //         target_var ? target_var : "NULL", source_var ? source_var : "NULL");
+
     if (target_var && source_var) {
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+      // fprintf(stderr, "DEBUG: Got analyzer: %p\n", (void *)analyzer);
       if (analyzer) {
+        // fprintf(stderr, "DEBUG: Calling track_alias('%s', '%s')\n", target_var,
+        //         source_var);
         static_memory_track_alias(analyzer, target_var, source_var);
       }
     }
@@ -376,7 +384,29 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // Typecheck the object being indexed
+  if (expr->expr.index.object->type == AST_EXPR_IDENTIFIER) {
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+    if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
+      const char *var_name = expr->expr.index.object->expr.identifier.name;
+      
+      // NEW: Get current function name
+      const char *func_name = NULL;
+      Scope *func_scope = scope;
+      while (func_scope && !func_scope->is_function_scope) {
+        func_scope = func_scope->parent;
+      }
+      if (func_scope && func_scope->associated_node) {
+        func_name = func_scope->associated_node->stmt.func_decl.name;
+      }
+      
+      static_memory_check_use_after_free(analyzer, var_name,
+                                         expr->expr.index.object->line,
+                                         expr->expr.index.object->column, arena,
+                                         g_tokens, g_token_count, g_file_path,
+                                         func_name);  // PASS FUNC NAME
+    }
+  }
+
   AstNode *object_type =
       typecheck_expression(expr->expr.index.object, scope, arena);
   if (!object_type) {
@@ -385,7 +415,6 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // Typecheck the index expression
   AstNode *index_type =
       typecheck_expression(expr->expr.index.index, scope, arena);
   if (!index_type) {
@@ -394,7 +423,6 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // Verify index is numeric (typically int)
   if (!is_numeric_type(index_type)) {
     tc_error_help(
         expr, "Index Type Error",
@@ -404,46 +432,15 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // Handle different indexable types
   if (object_type->type == AST_TYPE_ARRAY) {
-    // Array indexing: arr[i] returns element type
     AstNode *element_type = object_type->type_data.array.element_type;
     if (!element_type) {
       tc_error(expr, "Array Index Error", "Array has invalid element type");
       return NULL;
     }
-
-    // Optional: Check bounds for constant indices and array sizes
-    if (index_type->type == AST_EXPR_LITERAL &&
-        index_type->expr.literal.lit_type == LITERAL_INT &&
-        object_type->type_data.array.size &&
-        object_type->type_data.array.size->type == AST_EXPR_LITERAL &&
-        object_type->type_data.array.size->expr.literal.lit_type ==
-            LITERAL_INT) {
-
-      long long index_val = index_type->expr.literal.value.int_val;
-      long long array_size =
-          object_type->type_data.array.size->expr.literal.value.int_val;
-
-      if (index_val < 0) {
-        tc_error_help(expr, "Array Bounds Error",
-                      "Array indices must be non-negative",
-                      "Index value %lld is negative", index_val);
-        return NULL;
-      }
-
-      if (index_val >= array_size) {
-        tc_error_help(expr, "Array Bounds Error", "Array index out of bounds",
-                      "Index %lld is out of bounds for array of size %lld",
-                      index_val, array_size);
-        return NULL;
-      }
-    }
-
     return element_type;
 
   } else if (object_type->type == AST_TYPE_POINTER) {
-    // Pointer indexing: ptr[i] returns pointee type
     AstNode *pointee_type = object_type->type_data.pointer.pointee_type;
     if (!pointee_type) {
       tc_error(expr, "Pointer Index Error", "Pointer has invalid pointee type");
@@ -453,11 +450,9 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
 
   } else if (object_type->type == AST_TYPE_BASIC &&
              strcmp(object_type->type_data.basic.name, "string") == 0) {
-    // String indexing: str[i] returns char
     return create_basic_type(arena, "char", expr->line, expr->column);
 
   } else {
-    // Not an indexable type
     tc_error_help(expr, "Index Error",
                   "Only arrays, pointers, and strings can be indexed",
                   "Cannot index expression of type '%s'",
@@ -632,6 +627,29 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
 AstNode *typecheck_deref_expr(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena) {
+  if (expr->expr.deref.object->type == AST_EXPR_IDENTIFIER) {
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+    if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
+      const char *var_name = expr->expr.deref.object->expr.identifier.name;
+      
+      // Get current function name
+      const char *func_name = NULL;
+      Scope *func_scope = scope;
+      while (func_scope && !func_scope->is_function_scope) {
+        func_scope = func_scope->parent;
+      }
+      if (func_scope && func_scope->associated_node) {
+        func_name = func_scope->associated_node->stmt.func_decl.name;
+      }
+      
+      static_memory_check_use_after_free(analyzer, var_name,
+                                         expr->expr.deref.object->line,
+                                         expr->expr.deref.object->column, arena,
+                                         g_tokens, g_token_count, g_file_path,
+                                         func_name);  // ADD THIS PARAMETER
+    }
+  }
+
   AstNode *pointer_type =
       typecheck_expression(expr->expr.deref.object, scope, arena);
   if (!pointer_type) {
@@ -693,12 +711,33 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // Track memory deallocation if tracker is available
   StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
-  if (analyzer) {
-    // Try to get the variable name from the free expression
-    const char *var_name = extract_variable_name_from_free(expr);
-    static_memory_track_free(analyzer, var_name);
+  if (analyzer->skip_memory_tracking) {
+    // We're in a defer - add to the FUNCTION scope's deferred list
+    Scope *func_scope = scope;
+    while (func_scope && !func_scope->is_function_scope) {
+      func_scope = func_scope->parent;
+    }
+
+    if (func_scope) {
+      const char **slot =
+          (const char **)growable_array_push(&func_scope->deferred_frees);
+      if (slot) {
+        if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
+          const char *var_name = expr->expr.free.ptr->expr.identifier.name;
+          *slot = var_name;
+        } else {
+          *slot = NULL; // Non-identifier, cannot track
+        }
+      }
+    }
+  } else {
+    // Normal free - track in static analyzer
+    if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
+      const char *var_name = expr->expr.free.ptr->expr.identifier.name;
+      static_memory_track_free(analyzer, var_name, NULL);
+      // Error already reported if use-after-free detected, continue typechecking
+    }
   }
 
   return create_basic_type(arena, "void", expr->line, expr->column);

@@ -21,13 +21,14 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
   case AST_STMT_IF:
     return typecheck_if_decl(stmt, scope, arena);
   case AST_STMT_BLOCK: {
-    // Create new scope for block
     Scope *block_scope = create_child_scope(scope, "block", arena);
+
     for (size_t i = 0; i < stmt->stmt.block.stmt_count; i++) {
       if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena)) {
         return false;
       }
     }
+
     return true;
   }
   case AST_STMT_PRINT: {
@@ -40,8 +41,24 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     }
     return true;
   }
-  case AST_STMT_DEFER:
-    return typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
+  case AST_STMT_DEFER: {
+    StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+    bool old_skip_state = false;
+
+    if (analyzer) {
+      old_skip_state = analyzer->skip_memory_tracking;
+      analyzer->skip_memory_tracking = true;
+    }
+
+    bool result =
+        typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
+
+    if (analyzer) {
+      analyzer->skip_memory_tracking = old_skip_state;
+    }
+
+    return result;
+  }
   case AST_STMT_LOOP:
     return typecheck_loop_decl(stmt, scope, arena);
   case AST_STMT_BREAK_CONTINUE:
@@ -60,26 +77,11 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena) {
   switch (expr->type) {
   case AST_EXPR_LITERAL: {
-    // Return appropriate type based on literal type
     switch (expr->expr.literal.lit_type) {
     case LITERAL_INT:
       return create_basic_type(arena, "int", expr->line, expr->column);
     case LITERAL_FLOAT:
-      // Check if the literal has a suffix to determine float vs double
-      // You'll need to add suffix information to your literal structure
-      // For now, we can use a heuristic or default behavior:
-
-      // Option 1: Default to double (more precise)
       return create_basic_type(arena, "double", expr->line, expr->column);
-
-      // Option 2: Check for 'f' suffix (requires lexer changes)
-      // if (expr->expr.literal.has_float_suffix) {
-      //     return create_basic_type(arena, "float", expr->line, expr->column);
-      // } else {
-      //     return create_basic_type(arena, "double", expr->line,
-      //     expr->column);
-      // }
-
     case LITERAL_STRING:
       return create_basic_type(arena, "string", expr->line, expr->column);
     case LITERAL_BOOL:

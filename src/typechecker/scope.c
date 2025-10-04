@@ -53,18 +53,15 @@
 // Updated init_scope function in scope.c
 void init_scope(Scope *scope, Scope *parent, const char *name,
                 ArenaAllocator *arena) {
-  // Set up parent-child relationship
   scope->parent = parent;
   scope->scope_name = name ? arena_strdup(arena, name) : "unnamed";
   scope->depth = parent ? parent->depth + 1 : 0;
 
-  // Initialize scope type flags
   scope->is_function_scope = false;
   scope->is_module_scope = false;
   scope->associated_node = NULL;
   scope->module_name = NULL;
 
-  // Initialize memory tracker (only for global scope)
   if (!parent) {
     scope->memory_analyzer = arena_alloc(arena, sizeof(StaticMemoryAnalyzer),
                                          alignof(StaticMemoryAnalyzer));
@@ -73,10 +70,10 @@ void init_scope(Scope *scope, Scope *parent, const char *name,
     scope->memory_analyzer = parent->memory_analyzer;
   }
 
-  // Initialize growable arrays
   growable_array_init(&scope->symbols, arena, 16, sizeof(Symbol));
   growable_array_init(&scope->children, arena, 8, sizeof(Scope *));
   growable_array_init(&scope->imported_modules, arena, 4, sizeof(ModuleImport));
+  growable_array_init(&scope->deferred_frees, arena, 4, sizeof(const char*)); // NEW
 }
 /**
  * @brief Add a symbol to the specified scope with duplicate checking

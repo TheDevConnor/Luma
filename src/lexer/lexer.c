@@ -87,6 +87,8 @@ static const KeywordEntry preprocessor_directives[] = {
     {"@use", TOK_USE},
 };
 
+static const KeywordEntry builtin_macros[] = {};
+
 /**
  * @brief Adds a lexer error to the global error list.
  *
