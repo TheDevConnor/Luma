@@ -8,9 +8,9 @@
 <p align="center">
   <a href="#why">Why?</a> •
   <a href="#language-goals">Goals</a> •
+  <a href="#static-analysis-and-ownership">Static Analysis & Ownership</a> •
   <a href="#project-status">Status</a> •
   <a href="#getting-started">Getting Started</a> •
-  <a href="#usage">Usage</a> •
   <a href="#join-us">Join Us</a>
 </p>
 
@@ -18,24 +18,72 @@
 
 ## Introduction
 
-Luma is a modern systems programming language designed to provide the performance and control of low-level languages while maintaining developer productivity and code clarity. Built from the ground up to address common pain points in systems programming.
+Luma is a modern systems programming language designed to provide the performance and control of low-level languages while maintaining developer productivity and code clarity.  
+It’s built from the ground up to address common pain points in systems programming — offering explicit memory control, compile-time verification, and minimal abstraction overhead.
+
+Luma uses **manual memory management with static analysis**, giving developers full control over when and how memory is allocated or freed, while the type checker verifies correctness before code generation.
+
+---
 
 ## Why?
 
-Modern systems programming often involves a trade-off between performance, safety, and developer experience. Luma aims to bridge this gap by providing:
+Modern systems programming often involves a trade-off between performance, safety, and developer experience.  
+Luma aims to bridge that gap by providing:
 
-- **Direct hardware access** without sacrificing code readability
-- **Predictable performance** characteristics for systems-critical applications  
-- **Developer-friendly tooling** that doesn't compromise on compile speed
-- **Memory safety options** that can be opted into when needed
+- **Manual memory control** with **compile-time static analysis**  
+  — The type checker validates use-after-free, double-free, and unfreed allocations before codegen.
+- **Direct hardware access** and predictable performance  
+- **Readable, minimal syntax** that doesn’t hide control flow or introduce lifetimes
+- **Zero runtime overhead** — all verification is done statically
+- **Fast, transparent tooling** that stays close to the metal
+
+Unlike Rust, Luma doesn’t use lifetimes or a borrow checker. Instead, developers can annotate functions with lightweight ownership hints like `#returns_ownership` and `#takes_ownership` so the analyzer can reason about ownership transfers — for example, when returning an allocated pointer.
+
+The result: **C-level control with static guarantees**, and no runtime or hidden semantics.
+
+---
 
 ## Language Goals
 
-- **🎯 Minimal & Explicit Syntax** – Avoid hidden control flow or magic
-- **⚡ Fast Compilation** – Prioritize developer feedback cycles
-- **🚀 Zero-Cost Abstractions** – Avoid performance penalties for convenience
-- **🔧 Manual Memory Control** – Support fine-grained memory management
-- **🛠️ Toolchain Simplicity** – No complex build systems required
+- **🎯 Minimal & Explicit Syntax** – No hidden control flow or implicit behavior  
+- **⚡ Fast Compilation** – Prioritize fast feedback and simple builds  
+- **🚀 Zero-Cost Abstractions** – No runtime overhead for safety or ergonomics  
+- **🔧 Manual Memory Control** – You decide when to `alloc()` and `free()`  
+- **🧠 Static Verification** – The type checker validates memory safety (use-after-free, double-free, leaks) before codegen  
+- **🔍 Optional Ownership Annotations** – Use `#returns_ownership` and `#takes_ownership` to make ownership transfer explicit  
+
+---
+
+## Static Analysis and Ownership
+
+Luma performs **end-of-type-check static analysis** to ensure memory safety without runtime overhead.
+
+The analyzer checks for:
+- Memory allocated but never freed  
+- Double frees  
+- Use-after-free errors  
+
+It doesn’t use lifetimes or a borrow checker — instead, it relies on **explicit ownership annotations** to clarify intent.
+
+### Example
+
+```luma
+#returns_ownership fn create_buffer(size: int) *byte {
+    return alloc(size);
+}
+
+#takes_ownership fn destroy_buffer(buf: *byte) void {
+    free(buf);
+}
+
+pub const main = fn() int {
+    let buf = create_buffer(128);
+    defer destroy_buffer(buf);
+
+    // safe, verified at the type check stage
+    return 0;
+}
+```
 
 ## Project Status
 

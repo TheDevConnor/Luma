@@ -1,5 +1,6 @@
 @module "string"
 
+#returns_ownership 
 pub const from_char = fn (c: char) *char {
   let s: *char = cast<*char>(alloc(2 * sizeof<char>));
   s[0] = c;
@@ -7,6 +8,7 @@ pub const from_char = fn (c: char) *char {
   return s;
 }
 
+#returns_ownership
 pub const from_int = fn (n: int) *char {
   if (n == 0) {
     return from_char(cast<char>('0'));
