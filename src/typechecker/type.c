@@ -71,19 +71,7 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     if (!type2_is_builtin && strcmp(name1, "int") == 0) {
       return TYPE_MATCH_COMPATIBLE; // int -> enum
     }
-
-    // int <-> float
-    if ((strcmp(name1, "int") == 0 && strcmp(name2, "float") == 0) ||
-        (strcmp(name1, "float") == 0 && strcmp(name2, "int") == 0)) {
-      return TYPE_MATCH_COMPATIBLE;
-    }
-
-    // int <-> double
-    if ((strcmp(name1, "int") == 0 && strcmp(name2, "double") == 0) ||
-        (strcmp(name1, "double") == 0 && strcmp(name2, "int") == 0)) {
-      return TYPE_MATCH_COMPATIBLE;
-    }
-
+    
     // float <-> double
     if ((strcmp(name1, "float") == 0 && strcmp(name2, "double") == 0) ||
         (strcmp(name1, "double") == 0 && strcmp(name2, "float") == 0)) {

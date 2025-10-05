@@ -263,11 +263,25 @@ Stmt *parse_file_to_module(const char *path, size_t position,
 
     if (module && module->type == AST_PREPROCESSOR_MODULE) {
       module->preprocessor.module.potions = position;
-      module->preprocessor.module.file_path = path;
-      // CRITICAL: Store THIS file's tokens in the module
       module->preprocessor.module.tokens = (Token *)tokens.data;
       module->preprocessor.module.token_count = tokens.count;
     }
+
+    char abs_path[4096];
+    const char *file_path_to_store = path;
+
+#ifndef _WIN32
+    if (realpath(path, abs_path)) {
+      file_path_to_store = arena_strdup(allocator, abs_path);
+    }
+#else
+    if (_fullpath(abs_path, path, sizeof(abs_path))) {
+      file_path_to_store = arena_strdup(allocator, abs_path);
+    }
+#endif
+
+    // ... rest of the function, using file_path_to_store instead of path
+    module->preprocessor.module.file_path = file_path_to_store;
 
     // Restore config
     config->tokens = old_tokens;
@@ -377,17 +391,14 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
-  bool tc = typecheck(combined_program, &root_scope, allocator);
-  // Don't report yet - wait until after memory analysis
+  bool tc = typecheck(combined_program, &root_scope, allocator, &config);
+  if (error_report()) {
+    goto cleanup;
+  } else {
+    ++step;
+  }
 
   if (tc) {
-    // Report ALL errors once (both typecheck and memory analysis)
-    if (error_report()) {
-      goto cleanup;
-    } else {
-      ++step;
-    }
-
     // Stage 6: LLVM IR (UPDATED - now uses module system)
     print_progress(++step, total_stages, "LLVM IR");
 

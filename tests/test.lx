@@ -4,7 +4,7 @@
 
 pub const main = fn () int {
     let x: *int = cast<*int>(alloc(4 * sizeof<int>));
-    defer { free(x); }
+    // free(x);
 
     *x = 10;
     output("Value of x: ", math::rand(x), "\n");

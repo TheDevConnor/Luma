@@ -24,7 +24,7 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     Scope *block_scope = create_child_scope(scope, "block", arena);
 
     for (size_t i = 0; i < stmt->stmt.block.stmt_count; i++) {
-      if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena)) {
+      if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena, scope->config)) {
         return false;
       }
     }

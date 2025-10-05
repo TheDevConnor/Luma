@@ -201,7 +201,7 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     if (body[j]->type == AST_PREPROCESSOR_USE)
       continue;
 
-    if (!typecheck(body[j], module_scope, arena)) {
+    if (!typecheck(body[j], module_scope, arena, global_scope->config)) {
       tc_error(body[j], "Module Error",
                "Failed to typecheck statement in module '%s'", module_name);
       return false;
@@ -209,9 +209,8 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
   }
 
   StaticMemoryAnalyzer *analyzer = get_static_analyzer(module_scope);
-  if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
-    static_memory_check_and_report(analyzer, arena, g_tokens,
-                                  g_token_count, g_file_path);
+  if (analyzer && g_tokens && g_token_count > 0 && g_file_path && global_scope->config->check_mem) {
+    static_memory_check_and_report(analyzer, arena);
   }
 
   current_dep->processed = true;

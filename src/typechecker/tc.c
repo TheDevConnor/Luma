@@ -1,9 +1,11 @@
 #include <stdio.h>
 
+#include "../helper/help.h"
 #include "type.h"
 
 // Updated typecheck function in tc.c
-bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena) {
+bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena, BuildConfig *config) {
+  scope->config = config;
   switch (node->category) {
   case Node_Category_STMT:
     return typecheck_statement(node, scope, arena);

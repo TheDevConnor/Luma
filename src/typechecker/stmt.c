@@ -648,7 +648,7 @@ bool typecheck_module_stmt(AstNode *node, Scope *global_scope,
       continue;
 
     if (body[i]->type != AST_PREPROCESSOR_USE) {
-      if (!typecheck(body[i], module_scope, arena)) {
+      if (!typecheck(body[i], module_scope, arena, global_scope->config)) {
         tc_error(node, "Module Error",
                  "Failed to typecheck statement in module '%s'", module_name);
         return false;

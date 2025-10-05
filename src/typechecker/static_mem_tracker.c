@@ -34,12 +34,7 @@ void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                ? arena_strdup(analyzer->arena, function_name)
                                : NULL;
     
-    // CRITICAL: Store the current module's token context
-    alloc->file_path = g_file_path ? arena_strdup(analyzer->arena, g_file_path) : NULL;
-    
-    // Create a copy of the tokens array so it doesn't get invalidated
-    alloc->tokens = tokens;
-    alloc->token_count = token_count;
+    alloc->file_path = file_path ? arena_strdup(analyzer->arena, file_path) : NULL;
     
     growable_array_init(&alloc->aliases, analyzer->arena, 4, sizeof(char *));
   }
@@ -209,8 +204,7 @@ const char *extract_variable_name_from_free(AstNode *free_expr) {
 }
 
 int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
-                                   ArenaAllocator *arena, Token *tokens,
-                                   int token_count, const char *file_path) {
+                                   ArenaAllocator *arena) {
   int issues_found = 0;
 
   for (size_t i = 0; i < analyzer->allocations.count; i++) {
@@ -222,46 +216,64 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
       continue;
     }
 
-    // DEBUG: Show what we're working with
-    // fprintf(stderr, "\n=== DEBUGGING ALLOCATION ===\n");
-    // fprintf(stderr, "Variable: %s\n", alloc->variable_name);
-    // fprintf(stderr, "File: %s\n", alloc->file_path ? alloc->file_path : "NULL");
-    // fprintf(stderr, "Line: %zu, Column: %zu\n", alloc->line, alloc->column);
-    // fprintf(stderr, "Token count: %zu\n", alloc->token_count);
-    
-    // Show first few tokens to verify they're from the right file
-    if (alloc->tokens && alloc->token_count > 0) {
-      fprintf(stderr, "First 5 tokens:\n");
-      for (size_t j = 0; j < 5 && j < alloc->token_count; j++) {
-        fprintf(stderr, "  [%zu] Line %d, Col %d: '%.*s'\n", 
-                j, alloc->tokens[j].line, alloc->tokens[j].col,
-                alloc->tokens[j].length, alloc->tokens[j].value);
+    if (alloc->free_count > 1) {
+      // Double free - need to re-read the file
+      const char *source = read_file(alloc->file_path);
+      if (!source) continue;
+      
+      Lexer temp_lexer;
+      init_lexer(&temp_lexer, source, arena);
+      
+      GrowableArray temp_tokens;
+      growable_array_init(&temp_tokens, arena, 100, sizeof(Token));
+      
+      Token tk;
+      while ((tk = next_token(&temp_lexer)).type_ != TOK_EOF) {
+        Token *slot = (Token *)growable_array_push(&temp_tokens);
+        if (slot) *slot = tk;
       }
       
-      // Find tokens on the allocation line
-      fprintf(stderr, "Tokens on line %zu:\n", alloc->line);
-      int found_count = 0;
-      for (size_t j = 0; j < alloc->token_count; j++) {
-        if (alloc->tokens[j].line == (int)alloc->line) {
-          fprintf(stderr, "  [%zu] Col %d: '%.*s'\n",
-                  j, alloc->tokens[j].col,
-                  alloc->tokens[j].length, alloc->tokens[j].value);
-          found_count++;
-        }
-      }
-      if (found_count == 0) {
-        fprintf(stderr, "  NO TOKENS FOUND ON LINE %zu!\n", alloc->line);
-      }
-    }
-    fprintf(stderr, "===========================\n\n");
+      ErrorInformation error = {0};
+      error.error_type = "Double Free";
+      error.file_path = alloc->file_path;
+      error.line = (int)alloc->line;
+      error.col = (int)alloc->column;
+      error.token_length = (int)strlen(alloc->variable_name);
+      error.note = "This memory has been freed multiple times";
+      error.help = "Remove duplicate free() calls";
 
-    if (alloc->free_count > 1) {
-      // ... double free error ...
+      char *message = arena_alloc(arena, 512, alignof(char));
+      snprintf(message, 512,
+               "Variable '%s' freed %d times (should only be freed once)",
+               alloc->variable_name, alloc->free_count);
+      error.message = message;
+      error.line_text = generate_line(arena, (Token *)temp_tokens.data, 
+                                     temp_tokens.count, error.line);
+      
+      free((void *)source);
+      error_add(error);
+      issues_found++;
+      
     } else if (!alloc->has_matching_free) {
-      // Memory leak
+      // Memory leak - re-read the file
+      const char *source = read_file(alloc->file_path);
+      if (!source) continue;
+      
+      Lexer temp_lexer;
+      init_lexer(&temp_lexer, source, arena);
+      
+      GrowableArray temp_tokens;
+      growable_array_init(&temp_tokens, arena, 100, sizeof(Token));
+      
+      Token tk;
+      while ((tk = next_token(&temp_lexer)).type_ != TOK_EOF) {
+        Token *slot = (Token *)growable_array_push(&temp_tokens);
+        if (slot) *slot = tk;
+      }
+      
       ErrorInformation error = {0};
       error.error_type = "Memory Leak";
-      error.file_path = alloc->file_path ? alloc->file_path : file_path;
+      error.file_path = alloc->file_path;
       error.line = (int)alloc->line;
       error.col = (int)alloc->column;
       error.token_length = (int)strlen(alloc->variable_name);
@@ -290,8 +302,10 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
       }
 
       error.message = message;
-      error.line_text = generate_line(arena, alloc->tokens, alloc->token_count, error.line);
-
+      error.line_text = generate_line(arena, (Token *)temp_tokens.data,
+                                     temp_tokens.count, error.line);
+      
+      free((void *)source);
       error_add(error);
       issues_found++;
     }

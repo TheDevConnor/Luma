@@ -179,7 +179,11 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
 
   TypeMatchResult match = types_match(target_type, value_type);
   if (match == TYPE_MATCH_NONE) {
-    tc_error(expr, "Type Mismatch", "Type mismatch in assignment");
+    const char *msg = "Type mismatch in assignment";
+    tc_error_help(expr, "Type Mismatch", msg,
+                  "Cannot assign value of type '%s' to variable of type '%s'",
+                  type_to_string(value_type, arena),
+                  type_to_string(target_type, arena));
     return NULL;
   }
 

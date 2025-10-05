@@ -40,8 +40,6 @@ typedef struct {
   bool reported;
   const char *function_name;
   const char *file_path;
-  Token *tokens;
-  size_t token_count;
 } StaticAllocation;
 
 typedef struct {
@@ -81,6 +79,9 @@ typedef struct Scope {
   // Memory tracking
   StaticMemoryAnalyzer *memory_analyzer;
   GrowableArray deferred_frees;
+
+  // Build configuration
+  BuildConfig *config;
 } Scope;
 
 /**
@@ -135,8 +136,7 @@ void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
                                 ArenaAllocator *arena, Token *tokens,
                                 int token_count, const char *file_path);
 int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
-                                   ArenaAllocator *arena, Token *tokens,
-                                   int token_count, const char *file_path);
+                                   ArenaAllocator *arena);
 bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
                                         const char *var_name, size_t line,
                                         size_t column, ArenaAllocator *arena,
@@ -230,7 +230,7 @@ const char *type_to_string(AstNode *type, ArenaAllocator *arena);
 // Type Checking
 // ============================================================================
 
-bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena);
+bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena, BuildConfig *config);
 AstNode *typecheck_expression(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena);
 bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena);
