@@ -14,9 +14,9 @@
 
 #pragma once
 
-#include "../helper/help.h"
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
+#include "../helper/help.h"
 #include "../lexer/lexer.h"
 
 // ============================================================================
@@ -76,6 +76,9 @@ typedef struct Scope {
   const char *module_name;
   GrowableArray imported_modules;
 
+  bool returns_ownership;
+  bool takes_ownership;
+
   // Memory tracking
   StaticMemoryAnalyzer *memory_analyzer;
   GrowableArray deferred_frees;
@@ -126,12 +129,10 @@ void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
                                  ArenaAllocator *arena);
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                size_t column, const char *var_name,
-                               const char *function_name,
-                               Token *tokens, size_t token_count,
-                               const char *file_path);
+                               const char *function_name, Token *tokens,
+                               size_t token_count, const char *file_path);
 void static_memory_track_free(StaticMemoryAnalyzer *analyzer,
-                              const char *var_name,
-                              const char *function_name);
+                              const char *var_name, const char *function_name);
 void static_memory_report_leaks(StaticMemoryAnalyzer *analyzer,
                                 ArenaAllocator *arena, Token *tokens,
                                 int token_count, const char *file_path);
@@ -142,7 +143,7 @@ bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
                                         size_t column, ArenaAllocator *arena,
                                         Token *tokens, int token_count,
                                         const char *file_path,
-                                        const char *function_name); 
+                                        const char *function_name);
 
 StaticMemoryAnalyzer *get_static_analyzer(Scope *scope);
 const char *extract_variable_name_from_free(AstNode *free_expr);
@@ -230,7 +231,8 @@ const char *type_to_string(AstNode *type, ArenaAllocator *arena);
 // Type Checking
 // ============================================================================
 
-bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena, BuildConfig *config);
+bool typecheck(AstNode *node, Scope *scope, ArenaAllocator *arena,
+               BuildConfig *config);
 AstNode *typecheck_expression(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena);
 bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena);

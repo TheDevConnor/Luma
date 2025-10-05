@@ -335,6 +335,8 @@ struct AstNode {
           AstNode *return_type; // Changed from Type* to AstNode*
           bool is_public;
           AstNode *body; // Changed from Stmt* to AstNode*
+          bool returns_ownership;
+          bool takes_ownership;
         } func_decl;
 
         // If statement
@@ -532,7 +534,8 @@ AstNode *create_var_decl_stmt(ArenaAllocator *arena, const char *name,
 AstNode *create_func_decl_stmt(ArenaAllocator *arena, const char *name,
                                char **param_names, AstNode **param_types,
                                size_t param_count, AstNode *return_type,
-                               bool is_public, AstNode *body, size_t line,
+                               bool is_public, bool returns_ownership,
+                               bool takes_ownership, AstNode *body, size_t line,
                                size_t column);
 AstNode *create_struct_decl_stmt(ArenaAllocator *arena, const char *name,
                                  AstNode **public_members, size_t public_count,

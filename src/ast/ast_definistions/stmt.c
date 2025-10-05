@@ -33,7 +33,8 @@ AstNode *create_var_decl_stmt(ArenaAllocator *arena, const char *name,
 AstNode *create_func_decl_stmt(ArenaAllocator *arena, const char *name,
                                char **param_names, AstNode **param_types,
                                size_t param_count, AstNode *return_type,
-                               bool is_public, AstNode *body, size_t line,
+                               bool is_public, bool returns_ownership,
+                               bool takes_ownership, AstNode *body, size_t line,
                                size_t column) {
   AstNode *node = create_stmt_node(arena, AST_STMT_FUNCTION, line, column);
   node->stmt.func_decl.name = name;
@@ -42,6 +43,8 @@ AstNode *create_func_decl_stmt(ArenaAllocator *arena, const char *name,
   node->stmt.func_decl.param_count = param_count;
   node->stmt.func_decl.return_type = return_type;
   node->stmt.func_decl.is_public = is_public;
+  node->stmt.func_decl.returns_ownership = returns_ownership;
+  node->stmt.func_decl.takes_ownership = takes_ownership;
   node->stmt.func_decl.body = body;
   return node;
 }
@@ -172,9 +175,9 @@ AstNode *create_defer_stmt(ArenaAllocator *arena, AstNode *statement,
   return node;
 }
 
-AstNode *create_switch_stmt(ArenaAllocator *arena, AstNode *condition, AstNode **cases,
-                            size_t case_count, AstNode *default_case,
-                            size_t line, size_t column) {
+AstNode *create_switch_stmt(ArenaAllocator *arena, AstNode *condition,
+                            AstNode **cases, size_t case_count,
+                            AstNode *default_case, size_t line, size_t column) {
   AstNode *node = create_stmt_node(arena, AST_STMT_SWITCH, line, column);
   node->stmt.switch_stmt.condition = condition;
   node->stmt.switch_stmt.case_count = case_count;
@@ -193,8 +196,8 @@ AstNode *create_case_stmt(ArenaAllocator *arena, AstNode **values,
   return node;
 }
 
-AstNode *create_default_stmt(ArenaAllocator *arena, AstNode *body, 
-                            size_t line, size_t column) {
+AstNode *create_default_stmt(ArenaAllocator *arena, AstNode *body, size_t line,
+                             size_t column) {
   AstNode *node = create_stmt(arena, AST_STMT_DEFAULT, line, column);
   node->stmt.default_clause.body = body;
   return node;

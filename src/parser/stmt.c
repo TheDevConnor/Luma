@@ -98,7 +98,8 @@ Stmt *use_stmt(Parser *parser) {
  *
  * @see fn_stmt(), struct_stmt(), enum_stmt(), create_var_decl_stmt()
  */
-Stmt *const_stmt(Parser *parser, bool is_public) {
+Stmt *const_stmt(Parser *parser, bool is_public, bool returns_ownership,
+                 bool takes_ownership) {
   int line = p_current(parser).line;
   int col = p_current(parser).col;
 
@@ -127,7 +128,7 @@ Stmt *const_stmt(Parser *parser, bool is_public) {
   // Handle complex constant types (functions, structs, enums)
   switch (p_current(parser).type_) {
   case TOK_FN:
-    return fn_stmt(parser, name, is_public);
+    return fn_stmt(parser, name, is_public, returns_ownership, takes_ownership);
   case TOK_STRUCT:
     return struct_stmt(parser, name, is_public);
   case TOK_ENUM:
@@ -159,7 +160,8 @@ Stmt *const_stmt(Parser *parser, bool is_public) {
  *
  * @see parse_type(), block_stmt(), create_func_decl_stmt()
  */
-Stmt *fn_stmt(Parser *parser, const char *name, bool is_public) {
+Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
+              bool returns_ownership, bool takes_ownership) {
   int line = p_current(parser).line;
   int col = p_current(parser).col;
 
@@ -217,7 +219,8 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public) {
 
   return create_func_decl_stmt(parser->arena, name, (char **)param_names.data,
                                (AstNode **)param_types.data, param_names.count,
-                               return_type, is_public, body, line, col);
+                               return_type, is_public, returns_ownership,
+                               takes_ownership, body, line, col);
 }
 
 /**
@@ -344,10 +347,13 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     Type *field_type = NULL;
     p_advance(parser);
 
+    // TODO: Add in a check to see if we have any function modifiers like
+    //  returns_ownership or takes_ownership
+
     // Method: field_name = fn(...)
     if (p_current(parser).type_ == TOK_EQUAL) {
       p_consume(parser, TOK_EQUAL, "Expected '=' after field name");
-      field_function = fn_stmt(parser, field_name, public_member);
+      field_function = fn_stmt(parser, field_name, public_member, false, false);
     } else {
       // Data field: field_name: Type
       p_consume(parser, TOK_COLON, "Expected ':' after field name");

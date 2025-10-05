@@ -139,7 +139,7 @@ Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config) {
     }
     *slot = stmt;
   }
-  
+
   // Update module with parsed statements
   *module_slot =
       create_module_node(parser.arena, module_name, 0, (Stmt **)stmts.data,
@@ -414,22 +414,33 @@ Expr *parse_expr(Parser *parser, BindingPower bp) {
  *      loop_stmt(), print_stmt(), break_continue_stmt(), expr_stmt()
  */
 Stmt *parse_stmt(Parser *parser) {
+  bool returns_ownership = false;
+  bool takes_ownership = false;
   bool is_public = false;
 
-  // Handle visibility modifiers
+  // Check for ownership modifiers
+  if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+    returns_ownership = true;
+    p_advance(parser); // Advance past the returns token
+  } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+    takes_ownership = true;
+    p_advance(parser); // Advance past the takes token
+  }
+
+  // Check for visibility modifiers
   if (p_current(parser).type_ == TOK_PUBLIC) {
     is_public = true;
-    p_advance(parser);
+    p_advance(parser); // Advance past the public token
   } else if (p_current(parser).type_ == TOK_PRIVATE) {
     is_public = false;
-    p_advance(parser);
+    p_advance(parser); // Advance past the private token
   }
 
   switch (p_current(parser).type_) {
   case TOK_USE:
     return use_stmt(parser);
   case TOK_CONST:
-    return const_stmt(parser, is_public);
+    return const_stmt(parser, is_public, returns_ownership, takes_ownership);
   case TOK_VAR:
     return var_stmt(parser, is_public);
   case TOK_RETURN:

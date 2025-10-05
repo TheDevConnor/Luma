@@ -87,7 +87,10 @@ static const KeywordEntry preprocessor_directives[] = {
     {"@use", TOK_USE},
 };
 
-static const KeywordEntry builtin_macros[] = {};
+static const KeywordEntry function_attributes[] = {
+    {"#returns_ownership", TOK_RETURNES_OWNERSHIP},
+    {"#takes_ownership", TOK_TAKES_OWNERSHIP},
+};
 
 /**
  * @brief Adds a lexer error to the global error list.
@@ -375,6 +378,35 @@ Token next_token(Lexer *lx) {
       return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
     }
     // Just @ by itself - treat as symbol
+    LumaTokenType single_type = lookup_symbol(start, 1);
+    return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
+  }
+
+  if (c == '#') {
+    if (isalpha(peek(lx, 0))) {
+      // Read the rest of the attribute
+      while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
+        advance(lx);
+      }
+      int len = (int)(lx->current - start);
+      for (int i = 0; i < (int)(sizeof(function_attributes) /
+                                sizeof(*function_attributes));
+           ++i) {
+        if (STR_EQUALS_LEN(start, function_attributes[i].text, len)) {
+          return MAKE_TOKEN(function_attributes[i].type, start, lx, len,
+                            wh_count);
+        }
+      }
+      // If not a known function attribute, treat as error
+      static char error_msg[64];
+      snprintf(error_msg, sizeof(error_msg),
+               "Unknown function attribute: '%.*s'", len, start);
+      report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                         get_line_text_from_source(lx->src, lx->line), lx->line,
+                         lx->col - len, len);
+      return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
+    }
+    // Just # by itself - treat as symbol
     LumaTokenType single_type = lookup_symbol(start, 1);
     return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
   }

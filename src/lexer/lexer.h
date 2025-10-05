@@ -70,6 +70,10 @@ typedef enum {
   TOK_MODULE, /**< @module */
   TOK_USE,    /**< @use */
 
+  // function attibutes
+  TOK_RETURNES_OWNERSHIP, /** #returns_ownership */
+  TOK_TAKES_OWNERSHIP,    /** #takes_ownership */
+
   // Symbols
   TOK_SYMBOL,      /**< Fallback symbol */
   TOK_LPAREN,      /**< ( */

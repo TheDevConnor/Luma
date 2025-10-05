@@ -109,7 +109,8 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       }
 
       static_memory_track_alloc(analyzer, node->line, node->column, name,
-                                func_name, g_tokens, g_token_count, g_file_path);
+                                func_name, g_tokens, g_token_count,
+                                g_file_path);
     }
   }
   // NEW: Track pointer aliasing in variable initialization
@@ -186,6 +187,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   size_t param_count = node->stmt.func_decl.param_count;
   AstNode *body = node->stmt.func_decl.body;
   bool is_public = node->stmt.func_decl.is_public;
+  scope->returns_ownership = node->stmt.func_decl.returns_ownership;
+  scope->takes_ownership = node->stmt.func_decl.takes_ownership;
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {

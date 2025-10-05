@@ -199,8 +199,10 @@ Type *array_type(Parser *parser);
 Stmt *use_stmt(Parser *parser);
 Stmt *expr_stmt(Parser *parser);
 Stmt *var_stmt(Parser *parser, bool is_public);
-Stmt *const_stmt(Parser *parser, bool is_public);
-Stmt *fn_stmt(Parser *parser, const char *name, bool is_public);
+Stmt *const_stmt(Parser *parser, bool is_public, bool returns_ownership,
+                 bool takes_ownership);
+Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
+              bool returns_ownership, bool takes_ownership);
 Stmt *enum_stmt(Parser *parser, const char *name, bool is_public);
 Stmt *struct_stmt(Parser *parser, const char *name, bool is_public);
 Stmt *print_stmt(Parser *parser, bool ln);

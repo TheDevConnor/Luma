@@ -674,6 +674,12 @@ void print_ast(const AstNode *node, const char *prefix, bool is_last,
     print_prefix(next_prefix, true);
     printf(GRAY("Is Public: %s\n"),
            node->stmt.func_decl.is_public ? "true" : "false");
+    print_prefix(next_prefix, true);
+    printf(BOLD_CYAN("Takes Ownership: %s\n"),
+           node->stmt.func_decl.takes_ownership ? "true" : "false");
+    print_prefix(next_prefix, true);
+    printf(BOLD_CYAN("Returns Ownership: %s\n"),
+           node->stmt.func_decl.returns_ownership ? "true" : "false");
     if (node->stmt.func_decl.param_count > 0) {
       print_prefix(next_prefix, true);
       printf(BOLD_CYAN("Parameters: %zu\n"), node->stmt.func_decl.param_count);

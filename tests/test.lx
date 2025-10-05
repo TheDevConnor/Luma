@@ -1,13 +1,16 @@
 @module "main"
 
-@use "math" as math
+#returns_ownership
+const from_char = fn (c: char) *char {
+  let s: *char = cast<*char>(alloc(2 * sizeof<char>));
+  s[0] = c;
+  s[1] = cast<char>(0);
+  return s;
+} 
 
 pub const main = fn () int {
-    let x: *int = cast<*int>(alloc(4 * sizeof<int>));
-    // free(x);
-
-    *x = 10;
-    output("Value of x: ", math::rand(x), "\n");
-
+    let c: *char = from_char('A');
+    defer { free(c); }
+    output(c, "\n");
     return 0;
 }
