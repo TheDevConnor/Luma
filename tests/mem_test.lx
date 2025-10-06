@@ -151,53 +151,53 @@ const test_memzero = fn () void {
     output("memzero passed!\n");
 }
 
-// const test_calloc = fn () void {
-//     let buf: *void = mem::calloc(10, sizeof<char>);
-//     defer { free(buf); }
+const test_calloc = fn () void {
+    let buf: *void = mem::calloc(10, sizeof<char>);
+    defer { free(buf); }
 
-//     if (buf == cast<*void>(0)) {
-//         output("calloc failed: returned null\n");
-//         return;
-//     }
+    if (buf == cast<*void>(0)) {
+        output("calloc failed: returned null\n");
+        return;
+    }
 
-//     // Verify all zeros
-//     loop [i: int = 0](i < 10) : (++i) {
-//         if (cast<*char>(buf)[i] != cast<char>(0)) {
-//             output("calloc failed: not zeroed at index ", i, "\n");
-//             return;
-//         }
-//     }
+    // Verify all zeros
+    loop [i: int = 0](i < 10) : (++i) {
+        if (cast<*char>(buf)[i] != cast<char>(0)) {
+            output("calloc failed: not zeroed at index ", i, "\n");
+            return;
+        }
+    }
 
-//     output("calloc passed!\n");
-// }
+    output("calloc passed!\n");
+}
 
-// const test_realloc = fn () void {
-//     let buf: *void = alloc(5 * sizeof<char>);
-    
-//     // Fill original buffer
-//     loop [i: int = 0](i < 5) : (++i) {
-//         cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, D, E
-//     }
+const test_realloc = fn () void {
+    let buf: *void = alloc(5 * sizeof<char>);
+ 
+    // Fill original buffer
+    loop [i: int = 0](i < 5) : (++i) {
+        cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, D, E
+    }
 
-//     // Expand buffer
-//     buf = mem::realloc(buf, 10);
-//     defer { free(buf); }
+    // Expand buffer
+    buf = mem::realloc(buf, 10);
+    defer { free(buf); }
 
-//     if (buf == cast<*void>(0)) {
-//         output("realloc failed: returned null\n");
-//         return;
-//     }
+    if (buf == cast<*void>(0)) {
+        output("realloc failed: returned null\n");
+        return;
+    }
 
-//     // Verify original data preserved
-//     loop [i: int = 0](i < 5) : (++i) {
-//         if (cast<*char>(buf)[i] != cast<char>(65 + i)) {
-//             output("realloc failed: data not preserved at index ", i, "\n");
-//             return;
-//         }
-//     }
+    // Verify original data preserved
+    loop [i: int = 0](i < 5) : (++i) {
+        if (cast<*char>(buf)[i] != cast<char>(65 + i)) {
+            output("realloc failed: data not preserved at index ", i, "\n");
+            return;
+        }
+    }
 
-//     output("realloc passed!\n");
-// }
+    output("realloc passed!\n");
+}
 
 const test_memswap = fn () void {
     let a: *void = alloc(5 * sizeof<char>);
@@ -348,8 +348,8 @@ const run_all_tests = fn () void {
     test_memmove();
     test_memchr();
     test_memzero();
-    // test_calloc();
-    // test_realloc();
+    test_calloc();
+    test_realloc();
     test_memswap();
     test_memrev();
     test_memcount();

@@ -419,12 +419,15 @@ Stmt *parse_stmt(Parser *parser) {
   bool is_public = false;
 
   // Check for ownership modifiers
-  if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
-    returns_ownership = true;
-    p_advance(parser); // Advance past the returns token
-  } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-    takes_ownership = true;
-    p_advance(parser); // Advance past the takes token
+  while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
+         p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+    if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+      returns_ownership = true;
+      p_advance(parser);
+    } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+      takes_ownership = true;
+      p_advance(parser);
+    }
   }
 
   // Check for visibility modifiers

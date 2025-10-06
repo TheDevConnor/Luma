@@ -73,7 +73,8 @@ void init_scope(Scope *scope, Scope *parent, const char *name,
   growable_array_init(&scope->symbols, arena, 16, sizeof(Symbol));
   growable_array_init(&scope->children, arena, 8, sizeof(Scope *));
   growable_array_init(&scope->imported_modules, arena, 4, sizeof(ModuleImport));
-  growable_array_init(&scope->deferred_frees, arena, 4, sizeof(const char*)); // NEW
+  growable_array_init(&scope->deferred_frees, arena, 4,
+                      sizeof(const char *)); // NEW
 }
 /**
  * @brief Add a symbol to the specified scope with duplicate checking
@@ -108,32 +109,34 @@ void init_scope(Scope *scope, Scope *parent, const char *name,
  *          string can be freed or modified after this call without affecting
  *          the stored symbol.
  */
-bool scope_add_symbol(Scope *scope, const char *name, AstNode *type,
-                      bool is_public, bool is_mutable, ArenaAllocator *arena) {
-  // Check for duplicate symbols in current scope only (shadowing is allowed)
-  Symbol *existing = scope_lookup_current_only(scope, name);
-  if (existing) {
-    fprintf(stderr, "Error: Symbol '%s' already declared in current scope\n",
-            name);
-    return false;
-  }
-
-  // Attempt to expand the symbols array and get a pointer to the new slot
-  Symbol *s = (Symbol *)growable_array_push(&scope->symbols);
-  if (!s) {
-    fprintf(stderr, "Out of memory while adding symbol '%s'\n", name);
-    return false;
-  }
-
-  // Initialize the new symbol with all provided information
-  s->name = arena_strdup(arena, name); // Duplicate name into arena memory
-  s->type = type;                      // Store type AST node reference
-  s->is_public = is_public;            // Set accessibility flag
-  s->is_mutable = is_mutable;          // Set mutability flag
-  s->scope_depth = scope->depth;       // Record the scope depth for debugging
-
-  return true;
-}
+// bool scope_add_symbol(Scope *scope, const char *name, AstNode *type,
+//                       bool is_public, bool is_mutable, ArenaAllocator *arena)
+//                       {
+//   // Check for duplicate symbols in current scope only (shadowing is allowed)
+//   Symbol *existing = scope_lookup_current_only(scope, name);
+//   if (existing) {
+//     fprintf(stderr, "Error: Symbol '%s' already declared in current scope\n",
+//             name);
+//     return false;
+//   }
+//
+//   // Attempt to expand the symbols array and get a pointer to the new slot
+//   Symbol *s = (Symbol *)growable_array_push(&scope->symbols);
+//   if (!s) {
+//     fprintf(stderr, "Out of memory while adding symbol '%s'\n", name);
+//     return false;
+//   }
+//
+//   // Initialize the new symbol with all provided information
+//   s->name = arena_strdup(arena, name); // Duplicate name into arena memory
+//   s->type = type;                      // Store type AST node reference
+//   s->is_public = is_public;            // Set accessibility flag
+//   s->is_mutable = is_mutable;          // Set mutability flag
+//   s->scope_depth = scope->depth;       // Record the scope depth for
+//   debugging
+//
+//   return true;
+// }
 
 Symbol *scope_lookup_with_visibility(Scope *scope, const char *name,
                                      Scope *requesting_module_scope) {
@@ -169,6 +172,53 @@ Symbol *scope_lookup_with_visibility(Scope *scope, const char *name,
   }
 
   return NULL;
+}
+
+const char *get_current_function_name(Scope *scope) {
+  Scope *current = scope;
+  while (current) {
+    if (current->is_function_scope && current->associated_node) {
+      return current->associated_node->stmt.func_decl.name;
+    }
+    current = current->parent;
+  }
+  return NULL;
+}
+
+bool scope_add_symbol_with_ownership(Scope *scope, const char *name,
+                                     AstNode *type, bool is_public,
+                                     bool is_mutable, bool returns_ownership,
+                                     bool takes_ownership,
+                                     ArenaAllocator *arena) {
+  Symbol *existing = scope_lookup_current_only(scope, name);
+  if (existing) {
+    fprintf(stderr, "Error: Symbol '%s' already declared in current scope\n",
+            name);
+    return false;
+  }
+
+  Symbol *s = (Symbol *)growable_array_push(&scope->symbols);
+  if (!s) {
+    fprintf(stderr, "Out of memory while adding symbol '%s'\n", name);
+    return false;
+  }
+
+  s->name = arena_strdup(arena, name);
+  s->type = type;
+  s->is_public = is_public;
+  s->is_mutable = is_mutable;
+  s->scope_depth = scope->depth;
+  s->returns_ownership = returns_ownership;
+  s->takes_ownership = takes_ownership;
+
+  return true;
+}
+
+// Keep the old function for backward compatibility
+bool scope_add_symbol(Scope *scope, const char *name, AstNode *type,
+                      bool is_public, bool is_mutable, ArenaAllocator *arena) {
+  return scope_add_symbol_with_ownership(scope, name, type, is_public,
+                                         is_mutable, false, false, arena);
 }
 
 /**

@@ -57,6 +57,8 @@ typedef struct {
   bool is_public;     /**< Public accessibility flag */
   bool is_mutable;    /**< Mutability flag */
   size_t scope_depth; /**< Nesting level for debugging */
+  bool returns_ownership;
+  bool takes_ownership;
 } Symbol;
 
 /**
@@ -162,6 +164,11 @@ void init_scope(Scope *scope, Scope *parent, const char *name,
                 ArenaAllocator *arena);
 bool scope_add_symbol(Scope *scope, const char *name, AstNode *type,
                       bool is_public, bool is_mutable, ArenaAllocator *arena);
+bool scope_add_symbol_with_ownership(Scope *scope, const char *name,
+                                     AstNode *type, bool is_public,
+                                     bool is_mutable, bool returns_ownership,
+                                     bool takes_ownership,
+                                     ArenaAllocator *arena);
 Symbol *scope_lookup(Scope *scope, const char *name);
 Symbol *scope_lookup_current_only(Scope *scope, const char *name);
 Symbol *scope_lookup_with_visibility(Scope *scope, const char *name,
@@ -182,6 +189,7 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
                              Scope *global_scope, ArenaAllocator *arena);
 bool typecheck_program_multipass(AstNode *program, Scope *global_scope,
                                  ArenaAllocator *arena);
+const char *get_current_function_name(Scope *scope);
 
 // ============================================================================
 // Module Management

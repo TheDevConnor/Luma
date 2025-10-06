@@ -8,9 +8,20 @@ const from_char = fn (c: char) *char {
   return s;
 } 
 
+const consume_string = fn (s: *char) void {
+  // This function takes ownership of s, so it must free it
+  output("Consuming: ", s, "\n");
+  free(s);
+}
+
 pub const main = fn () int {
     let c: *char = from_char('A');
-    defer { free(c); }
-    output(c, "\n");
+    
+    // Pass ownership to consume_string
+    consume_string(c);
+    
+    // This should trigger a "use after free" error since ownership was transferred
+    // output(c, "\n");  // Uncomment to test use-after-free detection
+    
     return 0;
 }

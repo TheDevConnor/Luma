@@ -164,13 +164,15 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
     const char *source_var = extract_variable_name(expr->expr.assignment.value);
 
     // fprintf(stderr, "DEBUG: target_var='%s', source_var='%s'\n",
-    //         target_var ? target_var : "NULL", source_var ? source_var : "NULL");
+    //         target_var ? target_var : "NULL", source_var ? source_var :
+    //         "NULL");
 
     if (target_var && source_var) {
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
       // fprintf(stderr, "DEBUG: Got analyzer: %p\n", (void *)analyzer);
       if (analyzer) {
-        // fprintf(stderr, "DEBUG: Calling track_alias('%s', '%s')\n", target_var,
+        // fprintf(stderr, "DEBUG: Calling track_alias('%s', '%s')\n",
+        // target_var,
         //         source_var);
         static_memory_track_alias(analyzer, target_var, source_var);
       }
@@ -310,6 +312,8 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
           func_symbol->is_public = true;
           func_symbol->is_mutable = false;
           func_symbol->scope_depth = 0;
+          func_symbol->returns_ownership = false; // ADD THIS
+          func_symbol->takes_ownership = false;   // ADD THIS
           func_name = member_name;
         } else if (member_type) {
           tc_error(expr, "Runtime Call Error",
@@ -378,6 +382,23 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     }
   }
 
+  // Handle ownership transfer from caller to function
+  if (func_symbol->takes_ownership) {
+    for (size_t i = 0; i < arg_count; i++) {
+      if (is_pointer_type(param_types[i])) {
+        const char *arg_var = extract_variable_name(arguments[i]);
+        if (arg_var) {
+          StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+          if (analyzer) {
+            const char *current_func = get_current_function_name(scope);
+            static_memory_track_free(analyzer, arg_var, current_func);
+          }
+        }
+      }
+    }
+  }
+  // ========== NEW CODE ENDS HERE ==========
+
   return return_type;
 }
 
@@ -392,7 +413,7 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
     StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
     if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
       const char *var_name = expr->expr.index.object->expr.identifier.name;
-      
+
       // NEW: Get current function name
       const char *func_name = NULL;
       Scope *func_scope = scope;
@@ -402,12 +423,12 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
       if (func_scope && func_scope->associated_node) {
         func_name = func_scope->associated_node->stmt.func_decl.name;
       }
-      
+
       static_memory_check_use_after_free(analyzer, var_name,
                                          expr->expr.index.object->line,
                                          expr->expr.index.object->column, arena,
                                          g_tokens, g_token_count, g_file_path,
-                                         func_name);  // PASS FUNC NAME
+                                         func_name); // PASS FUNC NAME
     }
   }
 
@@ -635,7 +656,7 @@ AstNode *typecheck_deref_expr(AstNode *expr, Scope *scope,
     StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
     if (analyzer && g_tokens && g_token_count > 0 && g_file_path) {
       const char *var_name = expr->expr.deref.object->expr.identifier.name;
-      
+
       // Get current function name
       const char *func_name = NULL;
       Scope *func_scope = scope;
@@ -645,12 +666,12 @@ AstNode *typecheck_deref_expr(AstNode *expr, Scope *scope,
       if (func_scope && func_scope->associated_node) {
         func_name = func_scope->associated_node->stmt.func_decl.name;
       }
-      
+
       static_memory_check_use_after_free(analyzer, var_name,
                                          expr->expr.deref.object->line,
                                          expr->expr.deref.object->column, arena,
                                          g_tokens, g_token_count, g_file_path,
-                                         func_name);  // ADD THIS PARAMETER
+                                         func_name); // ADD THIS PARAMETER
     }
   }
 
@@ -740,7 +761,8 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
     if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
       const char *var_name = expr->expr.free.ptr->expr.identifier.name;
       static_memory_track_free(analyzer, var_name, NULL);
-      // Error already reported if use-after-free detected, continue typechecking
+      // Error already reported if use-after-free detected, continue
+      // typechecking
     }
   }
 

@@ -77,34 +77,37 @@ pub const memchr = fn (ptr: *void, value: int, n: int) *void {
 pub const memzero = fn (dest: *void, n: int) *void { return memset(dest, 0, n); }
 
 // Allocate and zero memory (calloc equivalent)
-// pub const calloc = fn (count: int, size: int) *void {
-//     let total_size: int = count * size;
-//     let ptr: *void = alloc(total_size);
-    
-//     if (ptr != cast<*void>(0)) {
-//         memzero(ptr, total_size);
-//     }
-    
-//     return ptr;
-// }
+#returns_ownership
+pub const calloc = fn (count: int, size: int) *void {
+    let total_size: int = count * size;
+    let ptr: *void = alloc(total_size);
+ 
+    if (ptr != cast<*void>(0)) {
+        memzero(ptr, total_size);
+    }
+ 
+    return ptr;
+}
 
 // Reallocate memory (simplified version - allocates new and copies)
-// pub const realloc = fn (ptr: *void, new_size: int) *void {
-//     if (ptr == cast<*void>(0)) {
-//         return alloc(new_size);
-//     }
-    
-//     if (new_size == 0) {
-//         free(ptr);
-//         return cast<*void>(0);
-//     }
-    
-//     let new_ptr: *void = alloc(new_size);
-//     memcpy(new_ptr, ptr, new_size);
-//     free(ptr);
-    
-//     return new_ptr;
-// }
+#takes_ownership
+#returns_ownership
+pub const realloc = fn (ptr: *void, new_size: int) *void {
+    if (ptr == cast<*void>(0)) {
+        return alloc(new_size);
+    }
+ 
+    if (new_size == 0) {
+        free(ptr);
+        return cast<*void>(0);
+    }
+ 
+    let new_ptr: *void = alloc(new_size);
+    memcpy(new_ptr, ptr, new_size);
+    free(ptr);
+ 
+    return new_ptr;
+}
 
 // Memory swap (swap contents of two memory regions)
 pub const memswap = fn (a: *void, b: *void, n: int) void {

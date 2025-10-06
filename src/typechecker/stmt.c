@@ -113,13 +113,41 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                                 g_file_path);
     }
   }
-  // NEW: Track pointer aliasing in variable initialization
+  // Track pointer aliasing in variable initialization
   else if (initializer && declared_type && is_pointer_type(declared_type)) {
     const char *source_var = extract_variable_name(initializer);
     if (source_var) {
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
       if (analyzer) {
         static_memory_track_alias(analyzer, name, source_var);
+      }
+    }
+  }
+
+  // Track ownership transfer from function return values
+  if (initializer && initializer->type == AST_EXPR_CALL) {
+    AstNode *callee = initializer->expr.call.callee;
+    Symbol *func_symbol = NULL;
+
+    // Look up the function symbol
+    if (callee->type == AST_EXPR_IDENTIFIER) {
+      func_symbol = scope_lookup(scope, callee->expr.identifier.name);
+    } else if (callee->type == AST_EXPR_MEMBER) {
+      const char *base_name = callee->expr.member.object->expr.identifier.name;
+      const char *member_name = callee->expr.member.member;
+      if (callee->expr.member.is_compiletime) {
+        func_symbol = lookup_qualified_symbol(scope, base_name, member_name);
+      }
+    }
+
+    // If function returns ownership, track as allocation
+    if (func_symbol && func_symbol->returns_ownership) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+        static_memory_track_alloc(analyzer, node->line, node->column, name,
+                                  func_name, g_tokens, g_token_count,
+                                  g_file_path);
       }
     }
   }
@@ -187,8 +215,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   size_t param_count = node->stmt.func_decl.param_count;
   AstNode *body = node->stmt.func_decl.body;
   bool is_public = node->stmt.func_decl.is_public;
-  scope->returns_ownership = node->stmt.func_decl.returns_ownership;
-  scope->takes_ownership = node->stmt.func_decl.takes_ownership;
+  bool returns_ownership = node->stmt.func_decl.returns_ownership;
+  bool takes_ownership = node->stmt.func_decl.takes_ownership;
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {
@@ -231,12 +259,21 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   AstNode *func_type = create_function_type(
       arena, param_types, param_count, return_type, node->line, node->column);
 
-  // Add function to current scope with proper visibility
-  if (!scope_add_symbol(scope, name, func_type, is_public, false, arena)) {
+  // Add function to scope WITH ownership flags
+  if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public, false,
+                                       returns_ownership, takes_ownership,
+                                       arena)) {
     tc_error_id(node, name, "Duplicate Symbol",
                 "Function '%s' is already declared in this scope", name);
     return false;
   }
+
+  // REMOVE THIS DUPLICATE CALL - DELETE THE FOLLOWING LINES:
+  // if (!scope_add_symbol(scope, name, func_type, is_public, false, arena)) {
+  //   tc_error_id(node, name, "Duplicate Symbol",
+  //               "Function '%s' is already declared in this scope", name);
+  //   return false;
+  // }
 
   // Create function scope for parameters and body
   Scope *func_scope = create_child_scope(scope, name, arena);
@@ -251,6 +288,17 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                "Could not add parameter '%s' to function '%s' scope",
                param_names[i], name);
       return false;
+    }
+
+    // If this function takes ownership of a pointer parameter, track it as an
+    // allocation
+    if (takes_ownership && is_pointer_type(param_types[i])) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
+      if (analyzer) {
+        static_memory_track_alloc(analyzer, node->line, node->column,
+                                  param_names[i], name, g_tokens, g_token_count,
+                                  g_file_path);
+      }
     }
   }
 
@@ -568,6 +616,31 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
           type_to_string(expected_return_type, arena),
           type_to_string(actual_return_type, arena));
       return false;
+    }
+
+    // If function returns ownership and we're returning a pointer variable,
+    // mark it as freed (ownership transferred to caller)
+    Scope *func_scope = scope;
+    while (func_scope && !func_scope->is_function_scope) {
+      func_scope = func_scope->parent;
+    }
+
+    if (func_scope && func_scope->associated_node) {
+      bool returns_ownership =
+          func_scope->associated_node->stmt.func_decl.returns_ownership;
+
+      if (returns_ownership && is_pointer_type(actual_return_type)) {
+        const char *returned_var = extract_variable_name(return_value);
+        if (returned_var) {
+          StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+          if (analyzer) {
+            const char *func_name =
+                func_scope->associated_node->stmt.func_decl.name;
+            // Mark as freed since ownership is transferred to caller
+            static_memory_track_free(analyzer, returned_var, func_name);
+          }
+        }
+      }
     }
   }
 
