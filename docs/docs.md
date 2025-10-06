@@ -40,7 +40,7 @@ const Point = struct {
     distance_to = fn (other: Point) float {
         let dx: int = other.x - x;
         let dy: int = other.y - y;
-        return sqrt(cast<float>(dx * dx + dy * dy));
+        return sqrt(cast(dx * dx + dy * dy));
     }
 };
 
@@ -143,7 +143,7 @@ const player: Player = Player {
 };
 ```
 
-## Generics
+## Generics (Not yet implemented.)
 
 Luma supports generic programming through templates, enabling you to write code that works with multiple types while maintaining type safety and zero-cost abstractions.
 
@@ -221,14 +221,14 @@ const Pair = struct<T, U> {
 // Usage
 const main = fn() int {
     // Box holding an integer
-    let int_box: Box<int> = Box<int> { value: 42 };
+    let int_box: Box<int> = Box { value: 42 };
     outputln("Box contains: ", int_box.get());
     
     // Box holding a float
-    let float_box: Box<float> = Box<float> { value: 3.14 };
+    let float_box: Box<float> = Box { value: 3.14 };
     
     // Pair with different types
-    let pair: Pair<int, str> = Pair<int, str> { 
+    let pair: Pair<int, str> = Pair { 
         first: 1, 
         second: "hello" 
     };
@@ -274,7 +274,7 @@ const DynamicArray = struct<T> {
 };
 
 const main = fn() int {
-    let numbers: DynamicArray<int> = DynamicArray<int> {
+    let numbers: DynamicArray<int> = DynamicArray {
         data: null,
         size: 0,
         capacity: 0
@@ -392,7 +392,7 @@ outputln(point.x);  // Access field at runtime
 let distance: float = origin.distance_to(destination);
 
 // Generic struct field access
-let box: Box<int> = Box<int> { value: 42 };
+let box: Box<int> = Box { value: 42 };
 outputln(box.value);
 ```
 
@@ -555,6 +555,7 @@ Use the `@use` directive to import other modules:
 
 ```luma
 @module "main"
+
 @use "math" as math
 @use "fib" as fibonacci
 
@@ -598,6 +599,7 @@ pub const pow = fn (base: float, exp: float) float {
 ```luma
 // File: main.lx
 @module "main"
+
 @use "math" as math
 
 const main = fn () int {
@@ -617,8 +619,162 @@ Luma provides explicit memory management with safety-oriented features. While ma
 ```luma
 alloc(size: uint) -> *void    // Allocate memory
 free(ptr: *void)              // Deallocate memory
-cast<T>(ptr: *void) -> *T     // Type casting
-sizeof<type> -> uint          // Size of type in bytes
+cast<*T>(ptr: *void) -> *T    // Type casting
+sizeof<T> -> uint             // Size of type in bytes
+```
+
+### Ownership Transfer Attributes
+
+Luma provides function attributes that explicitly document and enforce ownership transfer semantics for pointers. These attributes help both programmers and the static analyzer understand memory ownership flow.
+
+#### `#returns_ownership`
+
+Marks functions that allocate and return pointers, transferring ownership to the caller:
+
+```luma
+#returns_ownership
+const create_buffer = fn (size: int) *int {
+    let buffer: *int = cast<*int>(alloc(size * sizeof<int>));
+    // Initialize buffer...
+    return buffer;  // Caller now owns this memory
+}
+
+const main = fn () int {
+    let data: *int = create_buffer(100);
+    defer free(data);  // Caller must free
+    
+    // Use data...
+    return 0;
+}
+```
+
+#### `#takes_ownership`
+
+Marks functions that take ownership of pointer arguments, becoming responsible for freeing them:
+
+```luma
+#takes_ownership
+const consume_buffer = fn (buffer: *int) void {
+    // Process buffer...
+    outputln("Processing: ", *buffer);
+    
+    // Function owns the buffer and must free it
+    free(buffer);
+}
+
+const main = fn () int {
+    let data: *int = cast<*int>(alloc(sizeof<int>));
+    *data = 42;
+    
+    consume_buffer(data);  // Ownership transferred
+    
+    // ❌ Error: use after free
+    // outputln(*data);  // data was freed inside consume_buffer
+    
+    return 0;
+}
+```
+
+#### Combining Both Attributes
+
+Functions can both take and return ownership, enabling transformation patterns:
+
+```luma
+#takes_ownership
+#returns_ownership
+const transform_buffer = fn (input: *int, new_size: int) *int {
+    // Takes ownership of input
+    outputln("Transforming: ", *input);
+    free(input);  // Free the old buffer
+    
+    // Create and return new buffer (transfers ownership)
+    let output: *int = cast<*int>(alloc(new_size * sizeof<int>));
+    // Initialize output...
+    return output;
+}
+
+const main = fn () int {
+    let buffer: *int = cast<*int>(alloc(sizeof<int>));
+    *buffer = 10;
+    
+    // Ownership flows: we lose ownership of buffer, gain ownership of result
+    let result: *int = transform_buffer(buffer, 20);
+    
+    // ❌ Error: buffer was freed inside transform_buffer
+    // outputln(*buffer);
+    
+    // ✅ We own result and must free it
+    defer free(result);
+    
+    return 0;
+}
+```
+
+### Ownership Attribute Benefits
+
+**Explicit ownership transfer**: Functions clearly document their memory ownership semantics, making it obvious who is responsible for freeing memory.
+
+**Static analysis integration**: The compiler uses these attributes to track ownership flow and detect use-after-free errors at compile time.
+
+**Self-documenting code**: Reading the function signature immediately tells you the ownership contract without needing to inspect the implementation.
+
+**Prevents common bugs**: By making ownership explicit, these attributes help prevent:
+- Use-after-free (accessing memory that's been freed)
+- Double-free (freeing the same pointer twice)
+- Memory leaks (forgetting to free transferred ownership)
+
+### Ownership Tracking Example
+
+```luma
+#returns_ownership
+const from_char = fn (c: char) *char {
+    let s: *char = cast<*char>(alloc(2 * sizeof<char>));
+    s[0] = c;
+    s[1] = cast<char>(0);
+    return s;  // ✅ Ownership transferred to caller
+}
+
+#takes_ownership
+#returns_ownership
+const transform_string = fn (s: *char) *char {
+    outputln("Transforming: ", s);
+    
+    free(s);  // ✅ We own the input, so we free it
+    
+    // Create and return new string
+    let result: *char = cast<*char>(alloc(10 * sizeof<char>));
+    result[0] = cast<char>(88);
+    result[1] = cast<char>(0);
+    return result;  // ✅ Ownership transferred to caller
+}
+
+pub const main = fn () int {
+    let c: *char = from_char(cast<char>(65));  // We receive ownership
+    
+    // Pass ownership to transform_string, get new ownership back
+    let transformed: *char = transform_string(c);
+    
+    // ❌ Compiler error: use after free
+    // outputln("Original: ", c);  // c was freed inside transform_string
+    
+    outputln("Result: ", transformed);
+    free(transformed);  // ✅ We own this, must free it
+    
+    return 0;
+}
+```
+
+The static analyzer will detect the use-after-free and report:
+
+```
+Error: Use After Free
+  --> main.lx:XX:XX
+   |
+   | outputln("Original: ", c);
+   |                        ^ variable 'c' used after free
+   |
+Note: Variable 'c' was freed when passed to 'transform_string' at line XX
+Help: Remove this use or restructure your code to avoid accessing freed memory
 ```
 
 ### Example Usage
@@ -626,7 +782,7 @@ sizeof<type> -> uint          // Size of type in bytes
 ```luma
 const main = fn () int {
     // Allocate memory for an integer
-    let ptr: *int = cast<*int>(alloc(sizeof(int)));
+    let ptr: *int = cast<*int>(alloc(sizeof<int>));
     
     // Use the memory
     *ptr = 42;
@@ -644,7 +800,7 @@ To prevent memory leaks and ensure cleanup, Luma provides `defer` statements tha
 
 ```luma
 const process_data = fn () {
-    let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+    let buffer: *int = cast<*int>(alloc(sizeof<int> * 100));
     defer free(buffer);  // Guaranteed to run when function exits
     
     let file: *File = open_file("data.txt");
@@ -682,8 +838,8 @@ defer {
 const check_sizes = fn () {
     outputln("int size: ", sizeof<int>);            // 8 bytes
     outputln("Point size: ", sizeof<Point>);        // 16 bytes
-    outputln("Direction size: ", sizeof<Directio>); // 4 bytes
-    outputln("Box<int> size: ", sizeof<Box<int>>);  // Size of int
+    outputln("Direction size: ", sizeof<Direction>); // 4 bytes
+    outputln("Box size: ", sizeof<Box<int>>);  // Size of int
 }
 ```
 
@@ -698,12 +854,13 @@ Luma's compiler includes a powerful static analyzer that tracks memory allocatio
 - **Memory Leaks**: Identifies allocated memory that's never freed
 - **Variable-Level Tracking**: Associates allocations with specific variable names
 - **Cross-Function Analysis**: Tracks memory through function calls and returns
+- **Ownership Transfer**: Monitors ownership flow through `#returns_ownership` and `#takes_ownership` attributes
 
 #### Example: Static Analysis in Action
 
 ```luma
 const good_memory_usage = fn () {
-    let ptr: *int = cast<*int>(alloc(sizeof(int)));
+    let ptr: *int = cast<*int>(alloc(sizeof<int>));
     defer free(ptr);  // ✅ Analyzer sees this will always execute
     
     *ptr = 42;
@@ -712,7 +869,7 @@ const good_memory_usage = fn () {
 }
 
 const problematic_memory_usage = fn () {
-    let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+    let buffer: *int = cast<*int>(alloc(sizeof<int> * 100));
     
     if some_condition {
         free(buffer);
@@ -725,7 +882,7 @@ const problematic_memory_usage = fn () {
 }
 
 const double_free_example = fn () {
-    let data: *int = cast<*int>(alloc(sizeof(int)));
+    let data: *int = cast<*int>(alloc(sizeof<int>));
     *data = 42;
     
     free(data);
@@ -744,6 +901,8 @@ const double_free_example = fn () {
 
 **Integration with `defer`**: The analyzer recognizes that `defer` statements provide guaranteed cleanup, making them the preferred pattern for memory management.
 
+**Ownership tracking**: The analyzer uses `#returns_ownership` and `#takes_ownership` attributes to track ownership transfer across function boundaries.
+
 **Precise error reporting**: Memory issues are reported with exact line numbers, variable names, and helpful suggestions for fixes.
 
 #### Compiler Messages
@@ -754,7 +913,7 @@ The analyzer provides clear, actionable error messages with precise source locat
 Error: Memory leak detected
   --> main.lx:15:5
    |
-15 |     let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+15 |     let buffer: *int = cast<*int>(alloc(sizeof<int> * 100));
    |         ^^^^^^ allocated here
 ...
 23 |     return;
@@ -771,6 +930,15 @@ Error: Double free detected
    |
 Note: Memory was already freed previously
 Help: Remove the duplicate free() call or check your control flow
+
+Error: Use After Free
+  --> main.lx:25:5
+   |
+25 |     outputln(*data);
+   |              ^^^^^ variable 'data' used after free
+   |
+Note: Variable 'data' was freed when passed to 'consume_buffer' at line 23
+Help: Remove this use or restructure your code
 ```
 
 #### Best Practices for Static Analysis
@@ -778,11 +946,12 @@ Help: Remove the duplicate free() call or check your control flow
 1. **Use `defer` for cleanup**: This guarantees the analyzer can verify proper cleanup
 2. **Keep allocation scope small**: Allocate and free in the same function when possible  
 3. **Explicit null checks**: Use explicit null checks rather than assuming validity
-4. **Document ownership**: Use clear variable names and comments about ownership transfer
+4. **Document ownership**: Use `#returns_ownership` and `#takes_ownership` attributes
+5. **Clear variable names**: Use descriptive names that indicate ownership and purpose
 
 ```luma
 const recommended_pattern = fn () {
-    let buffer: *int = cast<*int>(alloc(sizeof(int) * 100));
+    let buffer: *int = cast<*int>(alloc(sizeof<int> * 100));
     defer free(buffer);  // Guaranteed cleanup - analyzer approves ✅
     
     if buffer == null {  // Explicit null check
@@ -797,7 +966,7 @@ const recommended_pattern = fn () {
 
 const tracking_example = fn () {
     // Analyzer associates allocation with variable 'data'
-    let data: *int = cast<*int>(alloc(sizeof(int)));
+    let data: *int = cast<*int>(alloc(sizeof<int>));
     *data = 42;
     
     if should_cleanup {

@@ -182,6 +182,7 @@ pub const aligned_alloc = fn (alignment: int, size: int) *void {
     return cast<*void>(aligned_addr);
 }
 
+#takes_ownership
 pub const aligned_free = fn (ptr: *void) void {
     // fetch the original pointer that we stored at (aligned - sizeof(void*))
     let aligned_ptr: **void = cast<**void>(cast<int>(ptr));
