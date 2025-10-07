@@ -34,6 +34,7 @@ typedef enum {
   AST_EXPR_MEMCPY,
   AST_EXPR_FREE,
   AST_EXPR_CAST,
+  AST_EXPR_INPUT,
   AST_EXPR_SIZEOF,
 
   // Statement nodes
@@ -261,6 +262,12 @@ struct AstNode {
           AstNode *type;
           AstNode *castee;
         } cast;
+
+        // input expression
+        struct {
+          AstNode *type;
+          AstNode *msg;
+        } input;
 
         // sizeof expression
         struct {
@@ -519,6 +526,8 @@ AstNode *create_free_expr(ArenaAllocator *arena, Expr *ptr, size_t line,
                           size_t col);
 AstNode *create_cast_expr(ArenaAllocator *arena, Expr *type, Expr *castee,
                           size_t line, size_t col);
+AstNode *create_input_expr(ArenaAllocator *arena, Expr *type, Expr *msg,
+                           size_t line, size_t col);
 AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type,
                             size_t line, size_t col);
 

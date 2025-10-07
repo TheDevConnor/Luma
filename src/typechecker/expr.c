@@ -791,6 +791,82 @@ AstNode *typecheck_cast_expr(AstNode *expr, Scope *scope,
   return expr->expr.cast.type;
 }
 
+// Add this function to expr.c
+
+AstNode *typecheck_input_expr(AstNode *expr, Scope *scope,
+                              ArenaAllocator *arena) {
+  if (expr->type != AST_EXPR_INPUT) {
+    tc_error(expr, "Internal Error", "Expected input expression node");
+    return NULL;
+  }
+
+  AstNode *input_type = expr->expr.input.type;
+  AstNode *msg = expr->expr.input.msg;
+
+  // Validate that a type is provided
+  if (!input_type) {
+    tc_error(expr, "Input Error", "Input expression must specify a type");
+    return NULL;
+  }
+
+  // Validate that the type is actually a type node
+  if (input_type->category != Node_Category_TYPE) {
+    tc_error(expr, "Input Error", "Input type parameter must be a valid type");
+    return NULL;
+  }
+
+  // Validate the message expression if provided
+  if (msg) {
+    AstNode *msg_type = typecheck_expression(msg, scope, arena);
+    if (!msg_type) {
+      tc_error(expr, "Input Error",
+               "Failed to determine type of input message");
+      return NULL;
+    }
+
+    // Check that message is a string type
+    AstNode *expected_string = create_basic_type(arena, "string", 0, 0);
+    TypeMatchResult match = types_match(expected_string, msg_type);
+
+    if (match == TYPE_MATCH_NONE) {
+      tc_error_help(
+          expr, "Input Message Type Error", "Input message must be a string",
+          "Expected 'string', got '%s'", type_to_string(msg_type, arena));
+      return NULL;
+    }
+  }
+
+  // Validate that the input type is a supported type for input operations
+  // Typically, input should work with basic types (int, float, string, etc.)
+  if (input_type->type == AST_TYPE_BASIC) {
+    const char *type_name = input_type->type_data.basic.name;
+
+    // Check if it's a supported input type
+    bool is_supported =
+        strcmp(type_name, "int") == 0 || strcmp(type_name, "float") == 0 ||
+        strcmp(type_name, "double") == 0 || strcmp(type_name, "string") == 0 ||
+        strcmp(type_name, "char") == 0 || strcmp(type_name, "bool") == 0;
+
+    if (!is_supported) {
+      tc_error_help(expr, "Unsupported Input Type",
+                    "Input only supports basic types (int, float, double, "
+                    "string, char, bool)",
+                    "Cannot read input as type '%s'", type_name);
+      return NULL;
+    }
+  } else {
+    // Complex types (pointers, arrays, structs) are not supported for input
+    tc_error_help(expr, "Unsupported Input Type",
+                  "Input only supports basic types",
+                  "Cannot read input as complex type '%s'",
+                  type_to_string(input_type, arena));
+    return NULL;
+  }
+
+  // Return the specified input type
+  return input_type;
+}
+
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   // sizeof always returns size_t (or int in simplified systems)

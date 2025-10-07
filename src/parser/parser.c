@@ -289,6 +289,8 @@ Expr *nud(Parser *parser) {
     return free_expr(parser);
   case TOK_CAST:
     return cast_expr(parser);
+  case TOK_INPUT:
+    return input_expr(parser);
 
   // Compile time
   case TOK_SIZE_OF:

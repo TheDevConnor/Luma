@@ -187,6 +187,7 @@ Expr *addr_expr(Parser *parser);
 Expr *alloc_expr(Parser *parser);
 Expr *free_expr(Parser *parser);
 Expr *cast_expr(Parser *parser);
+Expr *input_expr(Parser *parser);
 Expr *sizeof_expr(Parser *parser);
 
 Type *tnud(Parser *parser);

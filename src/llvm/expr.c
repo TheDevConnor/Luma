@@ -589,14 +589,17 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       // NEW: Check if element_type is a struct - this is likely an error
       if (element_type && LLVMGetTypeKind(element_type) == LLVMStructTypeKind) {
         if (LLVMGetTypeKind(value_type) != LLVMStructTypeKind) {
-          const char *var_name = target->expr.index.object->type == AST_EXPR_IDENTIFIER
-              ? target->expr.index.object->expr.identifier.name
-              : "pointer";
-          fprintf(stderr, 
-                  "Error: Cannot assign scalar value to struct pointer element.\n"
-                  "  Variable '%s' is a pointer to struct, not an array of values.\n"
-                  "  Did you mean to use a different pointer variable?\n",
-                  var_name);
+          const char *var_name =
+              target->expr.index.object->type == AST_EXPR_IDENTIFIER
+                  ? target->expr.index.object->expr.identifier.name
+                  : "pointer";
+          fprintf(
+              stderr,
+              "Error: Cannot assign scalar value to struct pointer element.\n"
+              "  Variable '%s' is a pointer to struct, not an array of "
+              "values.\n"
+              "  Did you mean to use a different pointer variable?\n",
+              var_name);
           return NULL;
         }
       }
@@ -655,8 +658,9 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
                                         "int_to_float_for_store");
         } else {
           // NEW: Better error for incompatible types
-          fprintf(stderr, 
-                  "Error: Cannot convert value type (kind %d) to pointer element type (kind %d)\n",
+          fprintf(stderr,
+                  "Error: Cannot convert value type (kind %d) to pointer "
+                  "element type (kind %d)\n",
                   LLVMGetTypeKind(value_type), LLVMGetTypeKind(element_type));
           return NULL;
         }
@@ -1092,6 +1096,179 @@ LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node) {
 
   // Fallback to bitcast (use sparingly)
   return LLVMBuildBitCast(ctx->builder, value, target_type, "bitcast");
+}
+
+// Add this function to expr.c (LLVM codegen)
+
+LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node) {
+  if (!node || node->type != AST_EXPR_INPUT) {
+    fprintf(stderr, "Error: Expected input expression node\n");
+    return NULL;
+  }
+
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+
+  // Get the target type for the input
+  LLVMTypeRef target_type = codegen_type(ctx, node->expr.input.type);
+  if (!target_type) {
+    fprintf(stderr, "Error: Failed to generate type for input expression\n");
+    return NULL;
+  }
+
+  // Determine the type kind
+  LLVMTypeKind type_kind = LLVMGetTypeKind(target_type);
+
+  // Print the message if provided
+  if (node->expr.input.msg) {
+    LLVMValueRef printf_func =
+        LLVMGetNamedFunction(current_llvm_module, "printf");
+    LLVMTypeRef printf_type = NULL;
+
+    if (!printf_func) {
+      LLVMTypeRef printf_arg_types[] = {
+          LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0)};
+      printf_type = LLVMFunctionType(LLVMInt32TypeInContext(ctx->context),
+                                     printf_arg_types, 1, true);
+      printf_func = LLVMAddFunction(current_llvm_module, "printf", printf_type);
+    } else {
+      printf_type = LLVMGlobalGetValueType(printf_func);
+    }
+
+    // Generate and print the message
+    LLVMValueRef msg_value = codegen_expr(ctx, node->expr.input.msg);
+    if (msg_value) {
+      LLVMValueRef args[] = {msg_value};
+      LLVMBuildCall2(ctx->builder, printf_type, printf_func, args, 1, "");
+    }
+  }
+
+  // Declare scanf if not already declared
+  LLVMValueRef scanf_func = LLVMGetNamedFunction(current_llvm_module, "scanf");
+  LLVMTypeRef scanf_type = NULL;
+
+  if (!scanf_func) {
+    LLVMTypeRef scanf_arg_types[] = {
+        LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0)};
+    scanf_type = LLVMFunctionType(LLVMInt32TypeInContext(ctx->context),
+                                  scanf_arg_types, 1, true);
+    scanf_func = LLVMAddFunction(current_llvm_module, "scanf", scanf_type);
+    LLVMSetLinkage(scanf_func, LLVMExternalLinkage);
+  } else {
+    scanf_type = LLVMGlobalGetValueType(scanf_func);
+  }
+
+  // Allocate space for the input value
+  LLVMValueRef input_alloca =
+      LLVMBuildAlloca(ctx->builder, target_type, "input_temp");
+
+  // Determine the scanf format string based on type
+  const char *format_str = NULL;
+  LLVMValueRef result;
+
+  if (type_kind == LLVMIntegerTypeKind) {
+    unsigned bits = LLVMGetIntTypeWidth(target_type);
+
+    if (bits == 1) {
+      // bool: read as int, then convert
+      LLVMTypeRef int_type = LLVMInt32TypeInContext(ctx->context);
+      LLVMValueRef int_alloca =
+          LLVMBuildAlloca(ctx->builder, int_type, "bool_temp");
+
+      format_str = "%d";
+      LLVMValueRef format_str_val =
+          LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+      LLVMValueRef scanf_args[] = {format_str_val, int_alloca};
+      LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+
+      // Load int and convert to bool
+      LLVMValueRef int_val =
+          LLVMBuildLoad2(ctx->builder, int_type, int_alloca, "int_val");
+      LLVMValueRef zero = LLVMConstInt(int_type, 0, false);
+      result =
+          LLVMBuildICmp(ctx->builder, LLVMIntNE, int_val, zero, "bool_val");
+
+    } else if (bits == 8) {
+      // char
+      format_str = " %c"; // Space before %c to skip whitespace
+      LLVMValueRef format_str_val =
+          LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+      LLVMValueRef scanf_args[] = {format_str_val, input_alloca};
+      LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+      result =
+          LLVMBuildLoad2(ctx->builder, target_type, input_alloca, "input_val");
+
+    } else if (bits <= 32) {
+      // int (32-bit or less)
+      format_str = "%d";
+      LLVMValueRef format_str_val =
+          LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+      LLVMValueRef scanf_args[] = {format_str_val, input_alloca};
+      LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+      result =
+          LLVMBuildLoad2(ctx->builder, target_type, input_alloca, "input_val");
+
+    } else {
+      // int (64-bit)
+      format_str = "%lld";
+      LLVMValueRef format_str_val =
+          LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+      LLVMValueRef scanf_args[] = {format_str_val, input_alloca};
+      LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+      result =
+          LLVMBuildLoad2(ctx->builder, target_type, input_alloca, "input_val");
+    }
+
+  } else if (type_kind == LLVMFloatTypeKind) {
+    // float
+    format_str = "%f";
+    LLVMValueRef format_str_val =
+        LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+    LLVMValueRef scanf_args[] = {format_str_val, input_alloca};
+    LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+    result =
+        LLVMBuildLoad2(ctx->builder, target_type, input_alloca, "input_val");
+
+  } else if (type_kind == LLVMDoubleTypeKind) {
+    // double
+    format_str = "%lf";
+    LLVMValueRef format_str_val =
+        LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+    LLVMValueRef scanf_args[] = {format_str_val, input_alloca};
+    LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+    result =
+        LLVMBuildLoad2(ctx->builder, target_type, input_alloca, "input_val");
+
+  } else if (type_kind == LLVMPointerTypeKind) {
+    // string: allocate buffer and read line
+    // Allocate a 256-byte buffer for string input
+    LLVMTypeRef char_type = LLVMInt8TypeInContext(ctx->context);
+    LLVMTypeRef buffer_type = LLVMArrayType(char_type, 256);
+    LLVMValueRef buffer_alloca =
+        LLVMBuildAlloca(ctx->builder, buffer_type, "str_buffer");
+
+    // Get pointer to first element
+    LLVMValueRef indices[2] = {
+        LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false),
+        LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false)};
+    LLVMValueRef buffer_ptr = LLVMBuildGEP2(
+        ctx->builder, buffer_type, buffer_alloca, indices, 2, "buffer_ptr");
+
+    // Read string (max 255 chars + null terminator)
+    format_str = "%255s";
+    LLVMValueRef format_str_val =
+        LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
+    LLVMValueRef scanf_args[] = {format_str_val, buffer_ptr};
+    LLVMBuildCall2(ctx->builder, scanf_type, scanf_func, scanf_args, 2, "");
+
+    result = buffer_ptr;
+
+  } else {
+    fprintf(stderr, "Error: Unsupported input type kind %d\n", type_kind);
+    return NULL;
+  }
+
+  return result;
 }
 
 // sizeof<type || expr>

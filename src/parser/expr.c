@@ -328,6 +328,28 @@ Expr *cast_expr(Parser *parser) {
   return create_cast_expr(parser->arena, cast_type, castee, line, col);
 }
 
+// input<TYPE>(msg);
+Expr *input_expr(Parser *parser) {
+  p_advance(parser); // Advance past the cast
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+
+  p_consume(parser, TOK_LT,
+            "Expected a '<' before you declare the type you want to cast too.");
+  Type *type = parse_type(parser);
+  p_advance(parser);
+  p_consume(parser, TOK_GT,
+            "Expected a '>' after defining the type you want to cast too, but "
+            "before defining what you are casting");
+  p_consume(parser, TOK_LPAREN,
+            "Expected a '(' before defining what you are casting");
+  Expr *msg = parse_expr(parser, BP_NONE);
+  p_consume(parser, TOK_RPAREN,
+            "Expected a ')' after defining what you are casting");
+
+  return create_input_expr(parser->arena, type, msg, line, col);
+}
+
 // size_t sizeof(TYPE);
 // sizeof<int>         Compile-time constant
 // sizeof<[10]int>     Compile-time constant

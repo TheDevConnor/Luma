@@ -7,7 +7,7 @@ Luma is a statically typed, compiled programming language designed for systems p
 - [Language Philosophy](#language-philosophy)
 - [Quick Start](#quick-start)
 - [Type System](#type-system)
-- [Generics](#generics)
+- [Generics (Not yet implemented)](#generics)
 - [Top-Level Bindings with `const`](#top-level-bindings-with-const)
 - [Name Resolution](#name-resolution)
 - [Control Flow](#control-flow)
@@ -29,7 +29,7 @@ Luma is built on three core principles:
 ## Quick Start
 
 Here's a complete Luma program that demonstrates the core language features:
-
+NOTE: Functions that are declared inside of structs and struct initialize exprs are not implemented yet!
 ```luma
 @module "main"
 

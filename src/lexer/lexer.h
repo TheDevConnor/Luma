@@ -57,6 +57,7 @@ typedef enum {
   TOK_FN,       /**< fn keyword */
   TOK_PRINT,    /**< output keyword */
   TOK_PRINTLN,  /**< println keyword */
+  TOK_INPUT,    /**< input keyword */
   TOK_ALLOC,    /**< alloc(size_t size) */
   TOK_FREE,     /**< free(void *ptr, size_t size) */
   TOK_CAST,     /**< cast<Type>(value you want to cast too) */

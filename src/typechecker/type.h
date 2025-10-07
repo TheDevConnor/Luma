@@ -299,6 +299,8 @@ AstNode *typecheck_memcpy_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena);
 AstNode *typecheck_cast_expr(AstNode *expr, Scope *scope,
                              ArenaAllocator *arena);
+AstNode *typecheck_input_expr(AstNode *expr, Scope *scope,
+                              ArenaAllocator *arena);
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena);
 AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,

@@ -1,40 +1,22 @@
 @module "main"
 
-#returns_ownership
-const from_char = fn (c: char) *char {
-  let s: *char = cast<*char>(alloc(2 * sizeof<char>));
-  s[0] = c;
-  s[1] = cast<char>(0);
-  return s;
-}
+@use "string" as string
 
-#takes_ownership
-#returns_ownership
-const transform_string = fn (s: *char) *char {
-  // Takes ownership of input string
-  output("Transforming: ", s, "\n");
-  
-  // Free the input (we own it now)
-  free(s);
-  
-  // Create and return a new string (transferring ownership to caller)
-  let result: *char = cast<*char>(alloc(10 * sizeof<char>));
-  result[0] = cast<char>(cast<char>(88));
-  result[1] = cast<char>(0);
-  return result;
-}
+const Error = enum {
+  SUCCESS,
+  FAIL
+};
 
 pub const main = fn () int {
-    let c: *char = from_char('A');
+    let x: int = input<int>("Please enter a valid positive integer: ");
+    let c: char = input<char>("Please enter a single character: ");
     
-    // Pass ownership to transform_string, get new ownership back
-    let transformed: *char = transform_string(c);
-    
-    // This should error - c was freed inside transform_string
-    // output("Original: ", c, "\n");  // Uncomment to test use-after-free
-    
-    output("Result: ", transformed, "\n");
-    free(transformed);  // We own this, must free it
-    
-    return 0;
+    if (x < 0) {
+      output(x, " is not a valid positive integer!\n");
+      return Error::FAIL; 
+    } else {
+      output(x, "\n", string::from_char(c), "\n");
+    }
+
+    return Error::SUCCESS;
 }

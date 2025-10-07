@@ -287,6 +287,7 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_free(CodeGenContext *ctx, AstNode *node);
