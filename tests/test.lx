@@ -25,7 +25,7 @@ const transform_string = fn (s: *char) *char {
 }
 
 pub const main = fn () int {
-    let c: *char = from_char(cast<char>(65));
+    let c: *char = from_char('A');
     
     // Pass ownership to transform_string, get new ownership back
     let transformed: *char = transform_string(c);
