@@ -95,6 +95,7 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   bool is_mutable = node->stmt.var_decl.is_mutable;
 
   // Track memory allocation
+  // Track memory allocation
   if (initializer && contains_alloc_expression(initializer)) {
     StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
     if (analyzer) {
@@ -106,11 +107,25 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       }
       if (func_scope && func_scope->associated_node) {
         func_name = func_scope->associated_node->stmt.func_decl.name;
+
+        // NEW: Check if this function returns ownership
+        bool returns_ownership =
+            func_scope->associated_node->stmt.func_decl.returns_ownership;
+
+        // If the function returns ownership, we assume any allocation
+        // will be returned and ownership transferred to the caller
+        // So we DON'T track it as a potential leak within this function
+        if (returns_ownership) {
+          // Skip tracking - ownership will be transferred to caller
+          goto skip_allocation_tracking;
+        }
       }
 
       static_memory_track_alloc(analyzer, node->line, node->column, name,
                                 func_name, g_tokens, g_token_count,
                                 g_file_path);
+
+    skip_allocation_tracking:;
     }
   }
   // Track pointer aliasing in variable initialization
@@ -267,13 +282,6 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                 "Function '%s' is already declared in this scope", name);
     return false;
   }
-
-  // REMOVE THIS DUPLICATE CALL - DELETE THE FOLLOWING LINES:
-  // if (!scope_add_symbol(scope, name, func_type, is_public, false, arena)) {
-  //   tc_error_id(node, name, "Duplicate Symbol",
-  //               "Function '%s' is already declared in this scope", name);
-  //   return false;
-  // }
 
   // Create function scope for parameters and body
   Scope *func_scope = create_child_scope(scope, name, arena);
@@ -618,8 +626,6 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       return false;
     }
 
-    // If function returns ownership and we're returning a pointer variable,
-    // mark it as freed (ownership transferred to caller)
     Scope *func_scope = scope;
     while (func_scope && !func_scope->is_function_scope) {
       func_scope = func_scope->parent;
@@ -636,8 +642,25 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
           if (analyzer) {
             const char *func_name =
                 func_scope->associated_node->stmt.func_decl.name;
-            // Mark as freed since ownership is transferred to caller
-            static_memory_track_free(analyzer, returned_var, func_name);
+
+            // ONLY mark as freed if this variable came from a parameter
+            // (ownership transfer from caller), NOT if it's a fresh allocation
+            // Check if this variable is a parameter
+            bool is_parameter = false;
+            AstNode *func_node = func_scope->associated_node;
+            for (size_t i = 0; i < func_node->stmt.func_decl.param_count; i++) {
+              if (strcmp(func_node->stmt.func_decl.param_names[i],
+                         returned_var) == 0) {
+                is_parameter = true;
+                break;
+              }
+            }
+
+            // Only track as freed if it's a parameter (ownership passthrough)
+            // Don't track if it's a local allocation (fresh ownership)
+            if (is_parameter) {
+              static_memory_track_free(analyzer, returned_var, func_name);
+            }
           }
         }
       }

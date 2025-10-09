@@ -1,7 +1,7 @@
 @module "main"
 
 // Compile this with the following command
-// ./luma tests/str_test.lx -name string_test -l std/string.lx std/memory.lx -no-sanitize && ./string_test
+// ./luma tests/str_test.lx -name string_test -l std/string.lx std/memory.lx && ./string_test
 
 @use "string" as string
 @use "memory" as mem

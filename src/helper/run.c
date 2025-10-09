@@ -75,7 +75,8 @@ void save_module_output_files(CodeGenContext *ctx, const char *output_dir) {
 
 // Update your generate_llvm_code_modules function:
 bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
-                                ArenaAllocator *allocator, int *step) {
+                                ArenaAllocator *allocator, int *step,
+                                CompileTimer *timer) { // ADD TIMER PARAM
   CodeGenContext *ctx = init_codegen_context(allocator);
   if (!ctx) {
     return false;
@@ -84,7 +85,6 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   const char *base_name = config.name ? config.name : "output";
   const char *output_dir = config.save ? "output" : "obj";
 
-  // Create output directory
   if (!create_directory(output_dir)) {
     fprintf(stderr, "Failed to create output directory: %s\n", output_dir);
     cleanup_codegen_context(ctx);
@@ -94,7 +94,6 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   signal(SIGSEGV, handle_segfault);
   signal(SIGILL, handle_illegal_instruction);
 
-  // Generate LLVM IR for all modules using the new multi-module system
   bool success = generate_program_modules(ctx, root, output_dir);
   if (!success) {
     fprintf(stderr, "Failed to generate LLVM modules\n");
@@ -102,36 +101,23 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
     return false;
   }
 
-  print_progress(++(*step), 9, "LLVM IR Generation");
+  print_progress_with_time(++(*step), 9, "LLVM IR Generation",
+                           timer); // USE TIMER
 
   if (config.save) {
-    // Save detailed output files for debugging
     save_module_output_files(ctx, output_dir);
-
-    // Print module information for debugging
-    print_module_info(ctx);
-
-    // Debug object files
     debug_object_files(output_dir);
   }
 
-  // Link all object files together to create final executable
   char exe_file[256];
   snprintf(exe_file, sizeof(exe_file), "%s", base_name);
 
-  // printf("Linking modules into executable: %s\n", exe_file);
   if (!link_object_files(output_dir, exe_file)) {
-    // fprintf(stderr, "Failed to link object files\n");
-
-    // Try to provide more helpful error information
-    // printf("\nTrying to diagnose linking issues...\n");
-    // debug_object_files(output_dir);
-
     cleanup_codegen_context(ctx);
     return false;
   }
 
-  print_progress(++(*step), 9, "Linking");
+  print_progress_with_time(++(*step), 9, "Linking", timer); // USE TIMER
 
   cleanup_codegen_context(ctx);
   return true;
@@ -341,13 +327,17 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   int total_stages = 10;
   int step = 0;
 
+  // START TIMER
+  CompileTimer timer;
+  timer_start(&timer);
+
   GrowableArray modules;
   if (!growable_array_init(&modules, allocator, 16, sizeof(AstNode *))) {
     return false;
   }
 
   // Stage 1: Lexing
-  print_progress(++step, total_stages, "Lexing");
+  print_progress_with_time(++step, total_stages, "Lexing", &timer);
 
   for (size_t i = 0; i < config.file_count; i++) {
     char **files_array = (char **)config.files.data;
@@ -360,11 +350,10 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
     if (!slot)
       goto cleanup;
     *slot = (AstNode *)module;
-    // Tokens are already set in parse_file_to_module!
   }
 
   // Stage 2: Parsing
-  print_progress(++step, total_stages, "Parsing");
+  print_progress_with_time(++step, total_stages, "Parsing", &timer);
 
   Stmt *main_module = parse_file_to_module(config.filepath, config.file_count,
                                            allocator, &config);
@@ -377,17 +366,15 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   *main_slot = (AstNode *)main_module;
 
   // Stage 3: Combining modules
-  print_progress(++step, total_stages, "Module Combination");
+  print_progress_with_time(++step, total_stages, "Module Combination", &timer);
 
   AstNode *combined_program = create_program_node(
       allocator, (AstNode **)modules.data, modules.count, 0, 0);
   if (!combined_program)
     goto cleanup;
 
-  // print_ast(combined_program, "", false, false);
-
   // Stage 4: Typechecking
-  print_progress(++step, total_stages, "Typechecking");
+  print_progress_with_time(++step, total_stages, "Typechecking", &timer);
 
   Scope root_scope;
   init_scope(&root_scope, NULL, "global", allocator);
@@ -399,18 +386,27 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   }
 
   if (tc) {
-    // Stage 6: LLVM IR (UPDATED - now uses module system)
-    print_progress(++step, total_stages, "LLVM IR");
+    // Stage 6: LLVM IR
+    print_progress_with_time(++step, total_stages, "LLVM IR", &timer);
 
-    success =
-        generate_llvm_code_modules(combined_program, config, allocator, &step);
+    success = generate_llvm_code_modules(combined_program, config, allocator,
+                                         &step, &timer);
   }
 
   // Stage 7: Finalizing
-  print_progress(++step, total_stages, "Finalizing");
-  print_progress(++step, total_stages, "Completed");
-  printf("Build succeeded! Written to '%s'\n",
-         config.name ? config.name : "output");
+  print_progress_with_time(++step, total_stages, "Finalizing", &timer);
+  print_progress_with_time(++step, total_stages, "Completed", &timer);
+
+  // STOP TIMER AND PRINT FINAL TIME
+  timer_stop(&timer);
+
+  if (timer.elapsed_ms < 1000.0) {
+    printf("Build succeeded! Written to '%s' (%.0fms)\n",
+           config.name ? config.name : "output", timer.elapsed_ms);
+  } else {
+    printf("Build succeeded! Written to '%s' (%.2fs)\n",
+           config.name ? config.name : "output", timer.elapsed_ms / 1000.0);
+  }
 
 cleanup:
   return success;

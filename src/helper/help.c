@@ -9,16 +9,16 @@
 
 // Platform-specific includes
 #if defined(__MINGW32__) || defined(_WIN32)
-    #include <windows.h>
-    #include <process.h>  // For _spawnvp on Windows
+#include <process.h> // For _spawnvp on Windows
+#include <windows.h>
 #else
-    #include <sys/wait.h>
-    #include <unistd.h>
-    #include <sys/stat.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
-#include "../lsp/formatter/formatter.h"
 #include "../c_libs/color/color.h"
+#include "../lsp/formatter/formatter.h"
 #include "help.h"
 
 /**
@@ -47,7 +47,7 @@ bool check_argc(int argc, int expected) {
  * @return Pointer to null-terminated file content, or NULL on failure.
  */
 const char *read_file(const char *filename) {
-  FILE *file = fopen(filename, "rb");  // Use "rb" instead of "r"
+  FILE *file = fopen(filename, "rb"); // Use "rb" instead of "r"
   if (!file) {
     perror("Failed to open file");
     return NULL;
@@ -65,7 +65,7 @@ const char *read_file(const char *filename) {
   }
 
   size_t bytes_read = fread(buffer, 1, size, file);
-  buffer[bytes_read] = '\0';  // Use bytes_read instead of size
+  buffer[bytes_read] = '\0'; // Use bytes_read instead of size
 
   fclose(file);
   return buffer;
@@ -118,26 +118,29 @@ int print_license() {
 
 // Platform-specific file system functions
 #if defined(__MINGW32__) || defined(_WIN32)
-    bool PathExist(const char* p){
-        DWORD attr = GetFileAttributes(p);
-        if (attr == INVALID_FILE_ATTRIBUTES) return false;
-        return true;
-    };
-    bool PathIsDir(const char* p){
-        DWORD attr = GetFileAttributes(p);
-        return attr & FILE_ATTRIBUTE_DIRECTORY;
-    };
+bool PathExist(const char *p) {
+  DWORD attr = GetFileAttributes(p);
+  if (attr == INVALID_FILE_ATTRIBUTES)
+    return false;
+  return true;
+};
+bool PathIsDir(const char *p) {
+  DWORD attr = GetFileAttributes(p);
+  return attr & FILE_ATTRIBUTE_DIRECTORY;
+};
 #else
-    bool PathExist(const char* p){
-        struct stat FileAttrstat;
-        if(stat(p, &FileAttrstat) != 0) return false;
-        return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
-    };
-    bool PathIsDir(const char* p){
-        struct stat FileAttrstat;
-        if(stat(p, &FileAttrstat) != 0) return false;
-        return S_ISDIR(FileAttrstat.st_mode);
-    };
+bool PathExist(const char *p) {
+  struct stat FileAttrstat;
+  if (stat(p, &FileAttrstat) != 0)
+    return false;
+  return S_ISREG(FileAttrstat.st_mode) || S_ISDIR(FileAttrstat.st_mode);
+};
+bool PathIsDir(const char *p) {
+  struct stat FileAttrstat;
+  if (stat(p, &FileAttrstat) != 0)
+    return false;
+  return S_ISDIR(FileAttrstat.st_mode);
+};
 #endif
 
 bool run_formatter(BuildConfig config, ArenaAllocator *allocator) {
@@ -148,23 +151,25 @@ bool run_formatter(BuildConfig config, ArenaAllocator *allocator) {
 
   // Set up formatter config with reasonable defaults
   FormatterConfig fmt_config = {
-    .indent_size = 2,
-    .use_tabs = false,
-    .max_line_length = 100,
-    .space_around_operator = true,
-    .space_after_comma = true,
-    .compact_blocks = false,
-    .check_only = config.format_check,
-    .write_in_place = config.format_in_place,
-    .output_file = NULL,
+      .indent_size = 2,
+      .use_tabs = false,
+      .max_line_length = 100,
+      .space_around_operator = true,
+      .space_after_comma = true,
+      .compact_blocks = false,
+      .check_only = config.format_check,
+      .write_in_place = config.format_in_place,
+      .output_file = NULL,
   };
 
   if (config.format_check) {
     // Check if file needs formatting
-    bool needs_formatting = check_formatting(config.filepath, fmt_config, allocator);
+    bool needs_formatting =
+        check_formatting(config.filepath, fmt_config, allocator);
     if (needs_formatting) {
       printf("File needs formatting: %s\n", config.filepath);
-      return false; // Return false to indicate file needs formatting (exit code 1)
+      return false; // Return false to indicate file needs formatting (exit code
+                    // 1)
     } else {
       printf("File is already formatted: %s\n", config.filepath);
       return true;
@@ -172,9 +177,10 @@ bool run_formatter(BuildConfig config, ArenaAllocator *allocator) {
   }
 
   // Format the file
-  const char* output_path = config.format_in_place ? config.filepath : NULL;
-  bool success = format_luma_code(config.filepath, output_path, fmt_config, allocator);
-  
+  const char *output_path = config.format_in_place ? config.filepath : NULL;
+  bool success =
+      format_luma_code(config.filepath, output_path, fmt_config, allocator);
+
   if (!success) {
     fprintf(stderr, "Error: Failed to format file: %s\n", config.filepath);
     return false;
@@ -211,9 +217,9 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
   config->format = false;
   config->format_check = false;
   config->format_in_place = false;
-  
+
   for (int i = 1; i < argc; i++) {
-    if(!PathExist(argv[i]) || argv[i][0] == '-'){
+    if (!PathExist(argv[i]) || argv[i][0] == '-') {
       if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
         return print_version(), false;
       else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
@@ -230,16 +236,18 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
                strcmp(argv[i], "-no-sanitize") == 0) {
         config->check_mem = false;
       } else if (strcmp(argv[i], "-debug") == 0) {
-            // Placeholder for debug flag
-      } else if (strcmp(argv[i], "fmt") == 0 || strcmp(argv[i], "format") == 0) {
+        // Placeholder for debug flag
+      } else if (strcmp(argv[i], "fmt") == 0 ||
+                 strcmp(argv[i], "format") == 0) {
         config->format = true;
-      } else if (strcmp(argv[i], "-fc") == 0 || strcmp(argv[i], "--format-check") == 0) {
+      } else if (strcmp(argv[i], "-fc") == 0 ||
+                 strcmp(argv[i], "--format-check") == 0) {
         config->format_check = true;
-      } else if (strcmp(argv[i], "-fi") == 0 || strcmp(argv[i], "--format-in-place") == 0) {
+      } else if (strcmp(argv[i], "-fi") == 0 ||
+                 strcmp(argv[i], "--format-in-place") == 0) {
         config->format_in_place = true;
-      } else if (strcmp(argv[i], "-l") == 0 ||
-                strcmp(argv[i], "-link") == 0) {
-            // Collect files until next flag or end of args
+      } else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "-link") == 0) {
+        // Collect files until next flag or end of args
         int start = i + 1;
         while (start < argc && argv[start][0] != '-') {
           char **slot = (char **)growable_array_push(&config->files);
@@ -253,18 +261,18 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
         }
         i = start - 1;
       } else {
-        if(argv[i][0] == '-'){
+        if (argv[i][0] == '-') {
           fprintf(stderr, "Unknown build option: %s\n", argv[i]);
           return false;
-        }else{
+        } else {
           fprintf(stderr, "%s: No such file or directory\n", argv[i]);
           return false;
         }
-      }  
-    }else if (PathIsDir(argv[i])) {
+      }
+    } else if (PathIsDir(argv[i])) {
       fprintf(stderr, "%s: Is a directory\n", argv[i]);
       return false;
-    }else{
+    } else {
       config->filepath = argv[i];
     }
   }
@@ -309,10 +317,11 @@ void print_token(const Token *t) {
  */
 bool link_with_ld(const char *obj_filename, const char *exe_filename) {
   char command[1024];
-  
+
   // On Windows, we'll use gcc for linking as it's simpler and more reliable
-  snprintf(command, sizeof(command), "gcc \"%s\" -o \"%s\"", obj_filename, exe_filename);
-  
+  snprintf(command, sizeof(command), "gcc \"%s\" -o \"%s\"", obj_filename,
+           exe_filename);
+
   printf("Linking with: %s\n", command);
   return system(command) == 0;
 }
@@ -326,7 +335,7 @@ bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size) {
   char command[256];
   snprintf(command, sizeof(command), "gcc -print-file-name=%s", filename);
 
-  FILE *fp = _popen(command, "r");  // Use _popen on Windows
+  FILE *fp = _popen(command, "r"); // Use _popen on Windows
   if (!fp)
     return false;
 
@@ -336,7 +345,7 @@ bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size) {
     if (len > 0 && buffer[len - 1] == '\n') {
       buffer[len - 1] = '\0';
     }
-    _pclose(fp);  // Use _pclose on Windows
+    _pclose(fp); // Use _pclose on Windows
 
     // Check if gcc actually found the file
     return strcmp(buffer, filename) != 0;
@@ -597,4 +606,49 @@ void print_progress(int step, int total, const char *stage) {
 void ensure_clean_line() {
   printf("\n");
   fflush(stdout);
+}
+
+void timer_start(CompileTimer *timer) { timer->start_time = clock(); }
+
+void timer_stop(CompileTimer *timer) {
+  timer->end_time = clock();
+  timer->elapsed_ms =
+      ((double)(timer->end_time - timer->start_time) / CLOCKS_PER_SEC) * 1000.0;
+}
+
+double timer_get_elapsed_ms(CompileTimer *timer) {
+  clock_t current = clock();
+  return ((double)(current - timer->start_time) / CLOCKS_PER_SEC) * 1000.0;
+}
+
+void print_progress_with_time(int step, int total, const char *stage,
+                              CompileTimer *timer) {
+  float ratio = (float)step / total;
+  int filled = (int)(ratio * BAR_WIDTH);
+
+  double elapsed = timer_get_elapsed_ms(timer);
+
+  printf("\r[");
+  for (int i = 0; i < BAR_WIDTH; i++) {
+    if (i < filled)
+      putchar('=');
+    else if (i == filled)
+      putchar('>');
+    else
+      putchar(' ');
+  }
+
+  // Format time nicely
+  if (elapsed < 1000.0) {
+    printf("] %d%% - %s (%.0fms)", (int)(ratio * 100), stage, elapsed);
+  } else {
+    printf("] %d%% - %s (%.2fs)", (int)(ratio * 100), stage, elapsed / 1000.0);
+  }
+
+  printf("\033[K"); // Clear rest of line
+  fflush(stdout);
+
+  if (step == total) {
+    printf("\n");
+  }
 }

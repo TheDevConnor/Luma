@@ -1,7 +1,7 @@
 @module "main"
 
 // Compile this with the following command
-// ./luma tests/mem_test.lx -name mem_test -l std/memory.lx -no-sanitize && ./mem_test  
+// ./luma tests/mem_test.lx -name mem_test -l std/memory.lx && valgrind --leak-check=full ./mem_test  
 
 @use "memory" as mem
 
@@ -179,14 +179,15 @@ const test_realloc = fn () void {
         cast<*char>(buf)[i] = cast<char>(65 + i); // A, B, C, D, E
     }
 
-    // Expand buffer
+    // Expand buffer (realloc frees the old buffer internally)
     buf = mem::realloc(buf, 10);
-    defer { free(buf); }
-
+    
     if (buf == cast<*void>(0)) {
         output("realloc failed: returned null\n");
         return;
     }
+    
+    defer { free(buf); }  // <-- Add defer AFTER realloc and null check
 
     // Verify original data preserved
     loop [i: int = 0](i < 5) : (++i) {
@@ -272,32 +273,6 @@ const test_memcount = fn () void {
     output("memcount passed!\n");
 }
 
-const test_aligned_alloc = fn () void {
-    let p: *void = mem::aligned_alloc(64, 100);
-    defer { mem::aligned_free(p); }
-
-    if (p == cast<*void>(0)) {
-        output("aligned_alloc failed: returned null\n");
-        return;
-    }
-
-    // Check alignment
-    let addr: int = cast<int>(p);
-    if ((addr % 64) != 0) {
-        output("aligned_alloc failed: not aligned to 64 bytes\n");
-        return;
-    }
-
-    // Test we can write to the memory
-    mem::memset(p, 42, 100);
-    if (cast<*char>(p)[0] != cast<char>(42)) {
-        output("aligned_alloc failed: memory not writable\n");
-        return;
-    }
-
-    output("aligned_alloc passed!\n");
-}
-
 const test_align = fn () void {
     let arr: *int;
     {
@@ -353,7 +328,6 @@ const run_all_tests = fn () void {
     test_memswap();
     test_memrev();
     test_memcount();
-    // test_aligned_alloc();
     test_align();
     
     output("=== All Tests Complete ===\n");

@@ -90,16 +90,10 @@ pub const calloc = fn (count: int, size: int) *void {
 }
 
 // Reallocate memory (simplified version - allocates new and copies)
-#takes_ownership
-#returns_ownership
+#returns_ownership 
 pub const realloc = fn (ptr: *void, new_size: int) *void {
     if (ptr == cast<*void>(0)) {
         return alloc(new_size);
-    }
- 
-    if (new_size == 0) {
-        free(ptr);
-        return cast<*void>(0);
     }
  
     let new_ptr: *void = alloc(new_size);
@@ -160,32 +154,4 @@ pub const align = fn (member_alignments: *int, count: int) int {
         }
     }
     return max;
-}
-
-// Existing aligned allocation functions
-pub const aligned_alloc = fn (alignment: int, size: int) *void {
-    if (alignment < sizeof<*void>) {
-        alignment = sizeof<*void>;
-    }
-
-    // allocate: size + padding + space to store original pointer
-    let raw: *void = alloc(size + alignment - 1 + sizeof<*void>);    
-
-    // compute aligned address using bitwise rounding
-    let raw_addr: int = cast<int>(raw) + sizeof<*void>;
-    let aligned_addr: int = ((raw_addr + alignment - 1) / alignment) * alignment;
-
-    // store original raw pointer right before aligned block
-    let aligned_ptr: **void = cast<**void>(aligned_addr);
-    aligned_ptr[-1] = raw;
-
-    return cast<*void>(aligned_addr);
-}
-
-#takes_ownership
-pub const aligned_free = fn (ptr: *void) void {
-    // fetch the original pointer that we stored at (aligned - sizeof(void*))
-    let aligned_ptr: **void = cast<**void>(cast<int>(ptr));
-    let raw: *void = aligned_ptr[-1];
-    free(raw);
 }

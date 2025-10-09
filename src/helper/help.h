@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "../ast/ast.h"
 #include "../c_libs/memory/memory.h"
@@ -48,15 +49,21 @@ typedef struct {
   bool save;
   bool clean;
   bool check_mem;
-  bool format;        // Add format flag
-  bool format_check;  // Add format check flag
+  bool format;          // Add format flag
+  bool format_check;    // Add format check flag
   bool format_in_place; // Add in-place formatting flag
-  GrowableArray files; // Change from char** to GrowableArray
-  size_t file_count;   // Keep for convenience, or remove and use files.count
+  GrowableArray files;  // Change from char** to GrowableArray
+  size_t file_count;    // Keep for convenience, or remove and use files.count
 
   GrowableArray tokens;
   size_t token_count;
 } BuildConfig;
+
+typedef struct {
+  clock_t start_time;
+  clock_t end_time;
+  double elapsed_ms;
+} CompileTimer;
 
 bool check_argc(int argc, int expected);
 const char *read_file(const char *filename);
@@ -68,17 +75,24 @@ int print_license();
 AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
                             BuildConfig *config);
 
-bool PathExist(const char* p);
-bool PathIsDir(const char* p);
+bool PathExist(const char *p);
+bool PathIsDir(const char *p);
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena);
 bool run_build(BuildConfig config, ArenaAllocator *allocator);
-bool run_formatter(BuildConfig config, ArenaAllocator *allocator); // Add formatter function
+bool run_formatter(BuildConfig config,
+                   ArenaAllocator *allocator); // Add formatter function
 
 void print_token(const Token *t);
 
 void print_progress(int step, int total, const char *stage);
 void ensure_clean_line();
+
+void timer_start(CompileTimer *timer);
+void timer_stop(CompileTimer *timer);
+double timer_get_elapsed_ms(CompileTimer *timer);
+void print_progress_with_time(int step, int total, const char *stage,
+                              CompileTimer *timer);
 
 bool link_with_ld(const char *obj_filename, const char *exe_filename);
 bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size);
