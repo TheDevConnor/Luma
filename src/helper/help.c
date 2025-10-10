@@ -19,6 +19,7 @@
 
 #include "../c_libs/color/color.h"
 #include "../lsp/formatter/formatter.h"
+#include "../lsp/lsp.h"
 #include "help.h"
 
 /**
@@ -77,22 +78,31 @@ const char *read_file(const char *filename) {
  * @return Always returns 0.
  */
 int print_help() {
-  printf("Usage: lux [options] <source_file>\n");
+  printf("Usage: compiler [options] <source_file>\n\n");
   printf("Options:\n");
-  printf("  -v, --version      Show version information\n");
-  printf("  -h, --help         Show this help message\n");
-  printf("  -lc, --license     Show license information\n");
-  printf("Crust Compiler Options:\n");
-  printf("  -name <name>       Set the name of the build target\n");
-  printf("  -save              Save the outputed llvm file\n");
-  printf("  build <target>     Build the specified target\n");
-  printf("  clean              Clean the build artifacts\n");
-  printf("  -debug             builds a debug version and shows the allocators "
-         "trace\n");
-  printf("  -l, -link          Link lux files so that they can be used in "
-         "other lux files\n");
-  printf(
-      "  --no-sanitize      Disable memory safety checks during compilation\n");
+  printf("  -h, --help              Show this help message\n");
+  printf("  -v, --version           Show version information\n");
+  printf("  -lc, --license          Show license information\n");
+  printf("  -lsp, --lsp             Run as Language Server Protocol server\n");
+  printf("  -name <name>            Set output binary name\n");
+  printf("  -save                   Save intermediate files\n");
+  printf("  -clean                  Clean build artifacts\n");
+  printf("  -debug                  Enable debug mode\n");
+  printf("  --no-sanitize           Disable memory sanitization\n");
+  printf("  -l, -link <files...>    Link additional files\n");
+  printf("\nFormatting:\n");
+  printf("  fmt, format             Format source code\n");
+  printf("  -fc, --format-check     Check formatting without modifying\n");
+  printf("  -fi, --format-in-place  Format file in-place\n");
+  printf("\nLSP Mode:\n");
+  printf("  When running with -lsp, the compiler acts as a language server.\n");
+  printf("  This mode is used by editors/IDEs for:\n");
+  printf("    - Code completion\n");
+  printf("    - Hover information\n");
+  printf("    - Go to definition\n");
+  printf("    - Real-time diagnostics\n");
+  printf("    - Document symbols\n");
+
   return 0;
 }
 
@@ -217,6 +227,7 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
   config->format = false;
   config->format_check = false;
   config->format_in_place = false;
+  config->lsp_mode = false; // Add this field to BuildConfig
 
   for (int i = 1; i < argc; i++) {
     if (!PathExist(argv[i]) || argv[i][0] == '-') {
@@ -226,7 +237,26 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
         return print_help(), false;
       else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
         return print_license(), false;
-      else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
+      else if (strcmp(argv[i], "-lsp") == 0 || strcmp(argv[i], "--lsp") == 0) {
+        config->lsp_mode = true;
+        fprintf(stderr, "Starting Language Server Protocol mode...\n");
+
+        // Initialize LSP server
+        LSPServer server;
+        if (!lsp_server_init(&server, arena)) {
+          fprintf(stderr, "Failed to initialize LSP server\n");
+          arena_destroy(arena);
+          return 1;
+        }
+
+        // Run LSP server (blocks until shutdown)
+        lsp_server_run(&server);
+
+        // Cleanup
+        lsp_server_shutdown(&server);
+        arena_destroy(arena);
+        return true;
+      } else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
         config->name = argv[++i];
       else if (strcmp(argv[i], "-save") == 0)
         config->save = true;
@@ -278,7 +308,6 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
   }
   return true;
 }
-
 /**
  * @brief Prints a token's text and its token type with color formatting.
  *

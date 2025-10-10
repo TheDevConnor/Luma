@@ -24,6 +24,7 @@
 
 #include "c_libs/memory/memory.h"
 #include "helper/help.h"
+#include "lsp/lsp.h"
 
 /**
  * @brief Program entry point.

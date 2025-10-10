@@ -52,6 +52,7 @@ typedef struct {
   bool format;          // Add format flag
   bool format_check;    // Add format check flag
   bool format_in_place; // Add in-place formatting flag
+  bool lsp_mode;        // Run as Language Server
   GrowableArray files;  // Change from char** to GrowableArray
   size_t file_count;    // Keep for convenience, or remove and use files.count
 
