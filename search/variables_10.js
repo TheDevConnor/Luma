@@ -1,0 +1,28 @@
+var searchData=
+[
+  ['save_0',['save',['../structBuildConfig.html#aa98d594debd07e0aac8e2a121f0cc790',1,'BuildConfig']]],
+  ['scope_1',['scope',['../structLSPDocument.html#a14002478103100436fa1b4980a9326bb',1,'LSPDocument']]],
+  ['scope_5fdepth_2',['scope_depth',['../structSymbol.html#a89059e54ec22298bd8c4c814fa718d30',1,'Symbol']]],
+  ['scope_5fname_3',['scope_name',['../structScope.html#a4c832bd86ec643e3a848710fb74cacc4',1,'Scope']]],
+  ['selection_5frange_4',['selection_range',['../structLSPDocumentSymbol.html#a7f5db6134f1af59459b8f4506aae2946',1,'LSPDocumentSymbol']]],
+  ['severity_5',['severity',['../structLSPDiagnostic.html#afad29d8bb3bdf8f7292f48e0129e51ad',1,'LSPDiagnostic']]],
+  ['size_6',['size',['../structAstNode.html#aaf2282696fca57ffad7bb5bb1273fdfd',1,'AstNode::size'],['../structBuffer.html#a24e94f119f4b386771c78cf37aaff41b',1,'Buffer::size']]],
+  ['size_5fof_7',['size_of',['../structAstNode.html#ade44855001ecf7633a68906a98db308f',1,'AstNode']]],
+  ['skip_5fmemory_5ftracking_8',['skip_memory_tracking',['../structStaticMemoryAnalyzer.html#aa9a3cb0f3eca038f637d31b9b5e67cd3',1,'StaticMemoryAnalyzer']]],
+  ['source_9',['source',['../structLSPDiagnostic.html#a2df00a921c427773e4dd613615444c87',1,'LSPDiagnostic']]],
+  ['space_5fafter_5fcomma_10',['space_after_comma',['../structFormatterConfig.html#ae098cea498c9fe5a4fc2b5c5c4a494ac',1,'FormatterConfig']]],
+  ['space_5faround_5foperator_11',['space_around_operator',['../structFormatterConfig.html#adc53458b9b489142d813e2bf5c5e07be',1,'FormatterConfig']]],
+  ['src_12',['src',['../structLexer.html#a3401563c6c2af46bce8d2ee6da777ded',1,'Lexer']]],
+  ['start_13',['start',['../structLSPRange.html#a388b4fe2c0667e7bd1090c44850d4c81',1,'LSPRange']]],
+  ['start_5ftime_14',['start_time',['../structCompileTimer.html#add27feb6f82119f6cb4e436fe6637dd6',1,'CompileTimer']]],
+  ['statement_15',['statement',['../structAstNode.html#a1250a0f43821bf46d89e786b669d3220',1,'AstNode::statement'],['../structDeferredStatement.html#a726731d8a6615fb02f759d57dbaeb115',1,'DeferredStatement::statement']]],
+  ['statements_16',['statements',['../structAstNode.html#af1664b5613246cb2c5b6ce66bbf6598d',1,'AstNode']]],
+  ['stmt_17',['stmt',['../structAstNode.html#a0718e5f4003e48b7efd913e2caa7c63e',1,'AstNode']]],
+  ['stmt_5fcount_18',['stmt_count',['../structAstNode.html#aa036bc0416ba3ba87a10435aa4ce7a04',1,'AstNode']]],
+  ['string_5fval_19',['string_val',['../structAstNode.html#a7d0f3d41dcd42b2b98136cfc7adfbbb0',1,'AstNode']]],
+  ['struct_5fdecl_20',['struct_decl',['../structAstNode.html#ac24268a1558a290e5e1dd814d6cc11af',1,'AstNode']]],
+  ['struct_5ftype_21',['struct_type',['../structAstNode.html#aada0bb7c8623e3be70c58dfa7287e23e',1,'AstNode']]],
+  ['struct_5ftypes_22',['struct_types',['../structCodeGenContext.html#aaf9d0d0ce19cce47197bfba5f439e643',1,'CodeGenContext']]],
+  ['switch_5fstmt_23',['switch_stmt',['../structAstNode.html#a5520800e73f0420945e35c366d5f7741',1,'AstNode']]],
+  ['symbols_24',['symbols',['../structModuleCompilationUnit.html#ade8e57274f6747f9a829168ba54bf137',1,'ModuleCompilationUnit::symbols'],['../structScope.html#a2820ae6ef6b77a8ab4c5da25e372e636',1,'Scope::symbols']]]
+];

@@ -1,0 +1,33 @@
+<map id="src/typechecker/type.h" name="src/typechecker/type.h">
+<area shape="rect" id="Node000001" title="Type checking and symbol table management for AST nodes with memory tracking." alt="" coords="995,5,1164,31"/>
+<area shape="rect" id="Node000002" href="$run_8c.html" title=" " alt="" coords="35,86,158,111"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="980,23,824,26,622,35,397,53,170,81,137,89,135,83,170,76,396,48,622,30,824,21,980,17"/>
+<area shape="rect" id="Node000003" href="$lsp_8h.html" title=" " alt="" coords="182,86,281,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="981,23,844,26,672,36,482,53,293,81,265,88,263,83,292,76,482,48,672,30,844,21,980,17"/>
+<area shape="rect" id="Node000007" href="$array_8c.html" title=" " alt="" coords="305,86,475,111"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="981,29,756,49,489,81,446,89,445,83,488,76,755,44,981,24"/>
+<area shape="rect" id="Node000008" href="$typechecker_2error_8c.html" title=" " alt="" coords="500,86,669,111"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="983,35,682,81,642,89,641,83,682,76,983,30"/>
+<area shape="rect" id="Node000009" href="$typechecker_2expr_8c.html" title=" " alt="" coords="693,86,860,111"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="1023,37,821,89,820,83,1022,31"/>
+<area shape="rect" id="Node000010" href="$typechecker_2lookup_8c.html" title=" " alt="" coords="884,86,1067,111"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="1055,41,992,88,989,84,1052,37"/>
+<area shape="rect" id="Node000011" href="$module_8c.html" title=" " alt="" coords="1091,86,1279,111"/>
+<area shape="poly" id="edge10_Node000001_Node000011" title=" " alt="" coords="1107,37,1171,84,1167,88,1104,41"/>
+<area shape="rect" id="Node000012" href="$scope_8c.html" title="Implementation of scope and symbol table management functions." alt="" coords="1303,86,1480,111"/>
+<area shape="poly" id="edge11_Node000001_Node000012" title=" " alt="" coords="1138,31,1347,83,1345,89,1137,37"/>
+<area shape="rect" id="Node000013" href="$static__mem__tracker_8c.html" title=" " alt="" coords="1504,79,1668,119"/>
+<area shape="poly" id="edge12_Node000001_Node000013" title=" " alt="" coords="1178,29,1493,76,1504,78,1503,83,1492,81,1177,35"/>
+<area shape="rect" id="Node000014" href="$typechecker_2stmt_8c.html" title=" " alt="" coords="1692,86,1861,111"/>
+<area shape="poly" id="edge13_Node000001_Node000014" title=" " alt="" coords="1178,24,1408,43,1681,76,1723,83,1723,89,1680,81,1408,49,1177,29"/>
+<area shape="rect" id="Node000015" href="$tc_8c.html" title=" " alt="" coords="1885,86,2036,111"/>
+<area shape="poly" id="edge14_Node000001_Node000015" title=" " alt="" coords="1178,20,1489,36,1682,53,1874,76,1914,83,1913,89,1874,81,1681,58,1489,42,1178,25"/>
+<area shape="rect" id="Node000016" href="$typechecker_2type_8c.html" title="Implementation of type checking and symbol table management functions." alt="" coords="2061,86,2229,111"/>
+<area shape="poly" id="edge15_Node000001_Node000016" title=" " alt="" coords="1179,18,1561,34,1804,51,2049,76,2093,83,2092,89,2048,81,1804,56,1561,39,1178,24"/>
+<area shape="rect" id="Node000004" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="5,167,135,192"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="197,120,95,169,92,164,195,115"/>
+<area shape="rect" id="Node000005" href="$lsp__server_8c.html" title="Language Server Protocol implementation &#45; UPDATED VERSION." alt="" coords="159,167,304,192"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="234,125,234,166,229,166,229,125"/>
+<area shape="rect" id="Node000006" href="$main_8c.html" title="Entry point for the Lux compiler/interpreter build process." alt="" coords="328,167,417,192"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="265,116,353,164,350,169,263,120"/>
+</map>

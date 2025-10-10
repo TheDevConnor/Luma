@@ -1,0 +1,10 @@
+<map id="ModuleDependency" name="ModuleDependency">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,284,156,309"/>
+<area shape="rect" id="Node000002" href="$structGrowableArray.html" title="Growable array backed by an arena allocator." alt="" coords="21,196,140,221"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="83,235,83,283,78,283,78,235"/>
+<area shape="rect" id="Node000003" href="$structArenaAllocator.html" title="Arena allocator structure." alt="" coords="21,108,140,133"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="83,147,83,195,78,195,78,147"/>
+<area shape="rect" id="Node000004" href="$structBuffer.html" title="Represents a memory buffer in the arena." alt="" coords="50,5,111,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="83,45,83,108,78,108,78,45"/>
+<area shape="poly" id="edge4_Node000004_Node000004" title=" " alt="" coords="126,7,134,11,138,18,129,28,112,30,111,25,127,23,133,18,131,15,124,12"/>
+</map>
