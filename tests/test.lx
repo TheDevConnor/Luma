@@ -1,22 +1,53 @@
 @module "main"
 
-@use "string" as string
+const bubble_sort = fn (n: int, arr: *int) void {
+  loop [i: int = 0](i < n-1) : (++i) {
+    let swapped: int = 0;
 
-const Error = enum {
-  SUCCESS,
-  FAIL
-};
+    loop [j: int = 0](j < n-1) : (++j) {
+      if (arr[j] > arr[j + 1]) {
+        let temp: int = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
 
-pub const main = fn () int {
-    let x: int = input<int>("Please enter a valid positive integer: ");
-    let c: char = input<char>("Please enter a single character: ");
-    
-    if (x < 0) {
-      output(x, " is not a valid positive integer!\n");
-      return Error::FAIL; 
-    } else {
-      output(x, "\n", string::from_char(c), "\n");
+        swapped = 1;
+      }
     }
 
-    return Error::SUCCESS;
+    if (swapped == 0) { break; }
+  }
+}
+
+const print_arr = fn (n: int, arr: *int) void {
+  loop [i: int = 0](i < n) : (++i) {
+    output(arr[i], " ");
+  }
+  output("\n");
+}
+
+#takes_ownership 
+const free_arr = fn (arr: *int) void { free(arr); }
+
+pub const main = fn () int {
+  let arr: *int = cast<*int>(alloc(7 * sizeof<int>));
+  let n: int = 7;
+
+  arr[0] = 64;
+  arr[1] = 34;
+  arr[2] = 25;
+  arr[3] = 12;
+  arr[4] = 22;
+  arr[5] = 11;
+  arr[6] = 90;
+
+  output("Unsorted Array: ");
+  print_arr(n, arr);
+
+  bubble_sort(n, arr);
+
+  output("Sorted Array: ");
+  print_arr(n, arr);
+  
+  free_arr(arr);
+  return 0;
 }

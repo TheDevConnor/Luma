@@ -1,16 +1,87 @@
 /**
  * @file lsp_server.c
- * @brief Language Server Protocol implementation
+ * @brief Language Server Protocol implementation - UPDATED VERSION
  */
 
 #include "lsp.h"
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 // ============================================================================
-// JSON-RPC Helpers
+// JSON Parsing Utilities
+// ============================================================================
+
+// Simple JSON string extraction (handles escaped quotes)
+static char *extract_string(const char *json, const char *key,
+                            ArenaAllocator *arena) {
+  char search[256];
+  snprintf(search, sizeof(search), "\"%s\"", key);
+
+  const char *found = strstr(json, search);
+  if (!found)
+    return NULL;
+
+  // Find the value after the colon
+  const char *colon = strchr(found + strlen(search), ':');
+  if (!colon)
+    return NULL;
+
+  // Skip whitespace and find opening quote
+  const char *start = colon + 1;
+  while (*start && isspace(*start))
+    start++;
+  if (*start != '"')
+    return NULL;
+  start++;
+
+  // Find closing quote (handle escapes)
+  const char *end = start;
+  while (*end && (*end != '"' || *(end - 1) == '\\'))
+    end++;
+
+  size_t len = end - start;
+  char *result = arena_alloc(arena, len + 1, 1);
+  memcpy(result, start, len);
+  result[len] = '\0';
+
+  return result;
+}
+
+// Extract integer from JSON
+static int extract_int(const char *json, const char *key) {
+  char search[256];
+  snprintf(search, sizeof(search), "\"%s\"", key);
+
+  const char *found = strstr(json, search);
+  if (!found)
+    return -1;
+
+  const char *colon = strchr(found + strlen(search), ':');
+  if (!colon)
+    return -1;
+
+  return atoi(colon + 1);
+}
+
+// Extract position from JSON
+static LSPPosition extract_position(const char *json) {
+  LSPPosition pos = {0, 0};
+
+  // Find the position object
+  const char *position_obj = strstr(json, "\"position\"");
+  if (!position_obj)
+    return pos;
+
+  pos.line = extract_int(position_obj, "line");
+  pos.character = extract_int(position_obj, "character");
+  return pos;
+}
+
+// ============================================================================
+// JSON-RPC Helpers (FIXED)
 // ============================================================================
 
 LSPMethod lsp_parse_method(const char *json) {
@@ -45,24 +116,36 @@ LSPMethod lsp_parse_method(const char *json) {
   return LSP_METHOD_UNKNOWN;
 }
 
+// FIXED: Calculate exact Content-Length
 void lsp_send_response(int id, const char *result) {
-  printf("Content-Length: %zu\r\n\r\n", strlen(result) + 50);
-  printf("{\"jsonrpc\":\"2.0\",\"id\":%d,\"result\":%s}\n", id, result);
+  char json_msg[8192];
+  int msg_len =
+      snprintf(json_msg, sizeof(json_msg),
+               "{\"jsonrpc\":\"2.0\",\"id\":%d,\"result\":%s}", id, result);
+
+  printf("Content-Length: %d\r\n\r\n%s", msg_len, json_msg);
   fflush(stdout);
 }
 
+// FIXED: Calculate exact Content-Length
 void lsp_send_notification(const char *method, const char *params) {
-  printf("Content-Length: %zu\r\n\r\n", strlen(method) + strlen(params) + 50);
-  printf("{\"jsonrpc\":\"2.0\",\"method\":\"%s\",\"params\":%s}\n", method,
-         params);
+  char json_msg[8192];
+  int msg_len = snprintf(
+      json_msg, sizeof(json_msg),
+      "{\"jsonrpc\":\"2.0\",\"method\":\"%s\",\"params\":%s}", method, params);
+
+  printf("Content-Length: %d\r\n\r\n%s", msg_len, json_msg);
   fflush(stdout);
 }
 
 void lsp_send_error(int id, int code, const char *message) {
-  printf("Content-Length: %zu\r\n\r\n", strlen(message) + 100);
-  printf("{\"jsonrpc\":\"2.0\",\"id\":%d,\"error\":{\"code\":%d,\"message\":\"%"
-         "s\"}}\n",
-         id, code, message);
+  char json_msg[8192];
+  int msg_len = snprintf(json_msg, sizeof(json_msg),
+                         "{\"jsonrpc\":\"2.0\",\"id\":%d,\"error\":{\"code\":%"
+                         "d,\"message\":\"%s\"}}",
+                         id, code, message);
+
+  printf("Content-Length: %d\r\n\r\n%s", msg_len, json_msg);
   fflush(stdout);
 }
 
@@ -77,8 +160,8 @@ const char *lsp_uri_to_path(const char *uri, ArenaAllocator *arena) {
   // Handle file:// URIs
   if (strncmp(uri, "file://", 7) == 0) {
     const char *path = uri + 7;
-// On Windows, remove leading slash from /C:/path
 #ifdef _WIN32
+    // On Windows, remove leading slash from /C:/path
     if (path[0] == '/' && path[2] == ':') {
       path++;
     }
@@ -162,8 +245,8 @@ LSPDocument *lsp_document_open(LSPServer *server, const char *uri,
   // Create arena for document-specific allocations
   doc->arena = arena_alloc(server->arena, sizeof(ArenaAllocator),
                            alignof(ArenaAllocator));
-  // init_arena(doc->arena, 1024 * 1024); // 1MB for document analysis
-  arena_alloc(doc->arena, 1024 * 1024, sizeof(LSPDocument));
+  arena_allocator_init(doc->arena,
+                       1024 * 1024); // FIXED: Actually initialize it!
 
   server->documents[server->document_count++] = doc;
 
@@ -195,7 +278,7 @@ bool lsp_document_close(LSPServer *server, const char *uri) {
     if (strcmp(server->documents[i]->uri, uri) == 0) {
       // Clean up document arena
       if (server->documents[i]->arena) {
-        // cleanup_arena(server->documents[i]->arena);
+        arena_destroy(server->documents[i]->arena);
       }
 
       // Remove from array by shifting
@@ -318,7 +401,7 @@ const char *lsp_hover(LSPDocument *doc, LSPPosition position,
   size_t len = strlen(symbol->name) + strlen(type_str) + 50;
   char *hover = arena_alloc(arena, len, 1);
 
-  snprintf(hover, len, "```\n%s: %s\n```\n%s%s", symbol->name, type_str,
+  snprintf(hover, len, "```\\n%s: %s\\n```\\n%s%s", symbol->name, type_str,
            symbol->is_public ? "public " : "",
            symbol->is_mutable ? "mutable" : "immutable");
 
@@ -366,66 +449,195 @@ LSPDiagnostic *lsp_diagnostics(LSPDocument *doc, size_t *diagnostic_count,
 }
 
 // ============================================================================
-// Main Message Handler
+// Main Message Handler (COMPLETELY REWRITTEN)
 // ============================================================================
 
 void lsp_handle_message(LSPServer *server, const char *message) {
   if (!server || !message)
     return;
 
+  fprintf(stderr, "[LSP] Received message: %.100s...\n", message);
+
   LSPMethod method = lsp_parse_method(message);
+  int request_id = extract_int(message, "id");
+
+  // Create temporary arena for parsing
+  ArenaAllocator temp_arena;
+  arena_allocator_init(&temp_arena, 64 * 1024);
 
   switch (method) {
   case LSP_METHOD_INITIALIZE: {
+    fprintf(stderr, "[LSP] Handling initialize\n");
     server->initialized = true;
     const char *capabilities =
-        "{\"capabilities\":{"
+        "{"
+        "\"capabilities\":{"
         "\"textDocumentSync\":1,"
         "\"hoverProvider\":true,"
         "\"definitionProvider\":true,"
         "\"completionProvider\":{\"triggerCharacters\":[\".\",\":\"]},"
         "\"documentSymbolProvider\":true"
-        "}}";
-    lsp_send_response(1, capabilities);
+        "},"
+        "\"serverInfo\":{\"name\":\"Luma LSP\",\"version\":\"0.1.0\"}"
+        "}";
+    lsp_send_response(request_id, capabilities);
     break;
   }
 
   case LSP_METHOD_INITIALIZED:
-    // Nothing to do
+    fprintf(stderr, "[LSP] Client initialized\n");
     break;
 
+  case LSP_METHOD_TEXT_DOCUMENT_DID_OPEN: {
+    fprintf(stderr, "[LSP] Handling didOpen\n");
+
+    // Extract document info
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    const char *text = extract_string(message, "text", &temp_arena);
+    int version = extract_int(message, "version");
+
+    if (uri && text) {
+      fprintf(stderr, "[LSP] Opening document: %s (version %d)\n", uri,
+              version);
+
+      LSPDocument *doc = lsp_document_open(server, uri, text, version);
+      if (doc) {
+        // Analyze and send diagnostics
+        BuildConfig config = {0}; // Initialize your config properly
+        lsp_document_analyze(doc, &config);
+
+        size_t diag_count;
+        lsp_diagnostics(doc, &diag_count, &temp_arena);
+
+        // Send diagnostics notification
+        char params[4096];
+        snprintf(params, sizeof(params), "{\"uri\":\"%s\",\"diagnostics\":[]}",
+                 uri);
+        lsp_send_notification("textDocument/publishDiagnostics", params);
+      }
+    }
+    break;
+  }
+
+  case LSP_METHOD_TEXT_DOCUMENT_DID_CHANGE: {
+    fprintf(stderr, "[LSP] Handling didChange\n");
+
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    const char *text = extract_string(message, "text", &temp_arena);
+    int version = extract_int(message, "version");
+
+    if (uri && text) {
+      lsp_document_update(server, uri, text, version);
+
+      // Re-analyze
+      LSPDocument *doc = lsp_document_find(server, uri);
+      if (doc) {
+        BuildConfig config = {0};
+        lsp_document_analyze(doc, &config);
+
+        // Send updated diagnostics
+        char params[4096];
+        snprintf(params, sizeof(params), "{\"uri\":\"%s\",\"diagnostics\":[]}",
+                 uri);
+        lsp_send_notification("textDocument/publishDiagnostics", params);
+      }
+    }
+    break;
+  }
+
+  case LSP_METHOD_TEXT_DOCUMENT_DID_CLOSE: {
+    fprintf(stderr, "[LSP] Handling didClose\n");
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    if (uri) {
+      lsp_document_close(server, uri);
+    }
+    break;
+  }
+
+  case LSP_METHOD_TEXT_DOCUMENT_HOVER: {
+    fprintf(stderr, "[LSP] Handling hover\n");
+
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    LSPPosition position = extract_position(message);
+
+    if (uri) {
+      LSPDocument *doc = lsp_document_find(server, uri);
+
+      if (doc) {
+        const char *hover_text = lsp_hover(doc, position, &temp_arena);
+        if (hover_text) {
+          char result[2048];
+          snprintf(result, sizeof(result),
+                   "{\"contents\":{\"kind\":\"markdown\",\"value\":\"%s\"}}",
+                   hover_text);
+          lsp_send_response(request_id, result);
+        } else {
+          lsp_send_response(request_id, "null");
+        }
+      } else {
+        lsp_send_response(request_id, "null");
+      }
+    }
+    break;
+  }
+
+  case LSP_METHOD_TEXT_DOCUMENT_DEFINITION: {
+    fprintf(stderr, "[LSP] Handling definition\n");
+
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    LSPPosition position = extract_position(message);
+
+    if (uri) {
+      LSPDocument *doc = lsp_document_find(server, uri);
+
+      if (doc) {
+        LSPLocation *loc = lsp_definition(doc, position, &temp_arena);
+        if (loc) {
+          char result[1024];
+          snprintf(result, sizeof(result),
+                   "{\"uri\":\"%s\",\"range\":{\"start\":{\"line\":%d,"
+                   "\"character\":%d},"
+                   "\"end\":{\"line\":%d,\"character\":%d}}}",
+                   loc->uri, loc->range.start.line, loc->range.start.character,
+                   loc->range.end.line, loc->range.end.character);
+          lsp_send_response(request_id, result);
+        } else {
+          lsp_send_response(request_id, "null");
+        }
+      } else {
+        lsp_send_response(request_id, "null");
+      }
+    }
+    break;
+  }
+
   case LSP_METHOD_SHUTDOWN:
-    lsp_send_response(2, "null");
+    fprintf(stderr, "[LSP] Handling shutdown\n");
+    lsp_send_response(request_id, "null");
     break;
 
   case LSP_METHOD_EXIT:
+    fprintf(stderr, "[LSP] Exiting\n");
     exit(0);
     break;
 
-  case LSP_METHOD_TEXT_DOCUMENT_DID_OPEN:
-    // Parse document from message
-    // lsp_document_open(server, uri, content, version);
-    break;
-
-  case LSP_METHOD_TEXT_DOCUMENT_DID_CHANGE:
-    // Parse updates from message
-    // lsp_document_update(server, uri, content, version);
-    break;
-
-  case LSP_METHOD_TEXT_DOCUMENT_DID_CLOSE:
-    // Parse URI from message
-    // lsp_document_close(server, uri);
-    break;
-
   default:
-    fprintf(stderr, "Unhandled method\n");
+    fprintf(stderr, "[LSP] Unhandled method\n");
     break;
   }
+
+  arena_destroy(&temp_arena);
 }
+
+// ============================================================================
+// Main Loop
+// ============================================================================
 
 void lsp_server_run(LSPServer *server) {
   if (!server)
     return;
+
+  fprintf(stderr, "[LSP] Server started, waiting for messages...\n");
 
   char buffer[65536];
 
@@ -440,6 +652,7 @@ void lsp_server_run(LSPServer *server) {
     }
 
     int content_length = atoi(buffer + 15);
+    fprintf(stderr, "[LSP] Content-Length: %d\n", content_length);
 
     // Skip empty line
     fgets(buffer, sizeof(buffer), stdin);
