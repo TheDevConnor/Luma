@@ -13,10 +13,12 @@ syn region luxComment start="/\*" end="\*/" contains=NONE containedin=ALL
 hi def luxComment guifg=#928374 gui=italic
 
 " =====================
-" PREPROCESSORS
+" PREPROCESSORS & ATTRIBUTES
 " =====================
 syn match luxPreprocessor /@\w\+/
+syn match luxAttribute /#returns_ownership\|#takes_ownership/
 hi def luxPreprocessor guifg=#d3869b gui=bold
+hi def luxAttribute guifg=#8ec07c gui=bold,italic
 
 " =====================
 " KEYWORDS & TYPES

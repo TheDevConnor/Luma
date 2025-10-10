@@ -7,6 +7,9 @@
       "include": "#comments"
     },
     {
+      "include": "#attributes"
+    },
+    {
       "include": "#preprocessor"
     },
     {
@@ -48,6 +51,14 @@
               "include": "#comments"
             }
           ]
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "storage.modifier.attribute.lux",
+          "match": "#(returns_ownership|takes_ownership)\\b"
         }
       ]
     },
@@ -138,7 +149,7 @@
       "patterns": [
         {
           "name": "support.type.primitive.lux",
-          "match": "\\b(int|uint|float|bool|str|void)\\b"
+          "match": "\\b(int|uint|float|double|bool|str|void|char|short|long|nil)\\b"
         },
         {
           "name": "entity.name.type.lux",

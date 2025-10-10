@@ -32,6 +32,14 @@
       }
     },
     {
+      "name": "Function Attributes",
+      "scope": "storage.modifier.attribute.lux",
+      "settings": {
+        "foreground": "#7aa2f7",
+        "fontStyle": "bold italic"
+      }
+    },
+    {
       "name": "Keywords",
       "scope": [
         "keyword.control.lux",

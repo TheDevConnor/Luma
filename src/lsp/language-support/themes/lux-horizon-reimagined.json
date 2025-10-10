@@ -36,6 +36,10 @@
       "settings": { "foreground": "#FAB795", "fontStyle": "bold" }
     },
     {
+      "scope": "storage.modifier.attribute.lux",
+      "settings": { "foreground": "#25B2BC", "fontStyle": "bold italic" }
+    },
+    {
       "scope": [
         "variable.other.lux",
         "variable.parameter.lux",
