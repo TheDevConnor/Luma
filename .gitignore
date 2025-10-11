@@ -21,3 +21,7 @@ docs/xml/
 *.ll
 *.o
 *.s
+
+# ignore the lsp-client server node modules
+src/lsp/vscode-server/node_modules
+src/lsp/vscode-server/client/node_modules
