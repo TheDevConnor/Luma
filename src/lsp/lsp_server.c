@@ -728,7 +728,7 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
       // Memory management
       {"alloc", "cast<*${1:Type}>(alloc(sizeof<${1:Type}>))",
        "Allocate memory"},
-      {"defer", "defer free(${1:ptr});$0", "Defer statement"},
+      {"defer", "defer { free(${1:ptr});$0 }", "Defer statement"},
       {"defer block", "defer {\n\t${1:cleanup()};\n\t$0\n}", "Defer block"},
 
       // Module system
@@ -747,9 +747,9 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
        "Struct with access modifiers"},
 
       // Common patterns
-      {"main", "const main = fn () int {\n\t$0\n\treturn 0;\n};",
+      {"main", "pub const main = fn () int {\n\t$0\n\treturn 0;\n};",
        "Main function"},
-      {"outputln", "outputln(${1:message});$0", "Output with newline"},
+      {"output", "output(${1:message});$0", "Output"},
       {"cast", "cast<${1:Type}>(${2:value})$0", "Type cast"},
       {"sizeof", "sizeof<${1:Type}>$0", "Size of type"},
   };
