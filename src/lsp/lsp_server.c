@@ -611,6 +611,34 @@ void lsp_handle_message(LSPServer *server, const char *message) {
     break;
   }
 
+  case LSP_METHOD_TEXT_DOCUMENT_COMPLETION: {
+    fprintf(stderr, "[LSP] Handling completion\n");
+
+    const char *uri = extract_string(message, "uri", &temp_arena);
+    LSPPosition position = extract_position(message);
+
+    if (uri) {
+      LSPDocument *doc = lsp_document_find(server, uri);
+
+      if (doc) {
+        size_t count;
+        LSPCompletionItem *items =
+            lsp_completion(doc, position, &count, &temp_arena);
+
+        if (items && count > 0) {
+          char result[16384];
+          serialize_completion_items(items, count, result, sizeof(result));
+          lsp_send_response(request_id, result);
+        } else {
+          lsp_send_response(request_id, "{\"items\":[]}");
+        }
+      } else {
+        lsp_send_response(request_id, "{\"items\":[]}");
+      }
+    }
+    break;
+  }
+
   case LSP_METHOD_SHUTDOWN:
     fprintf(stderr, "[LSP] Handling shutdown\n");
     lsp_send_response(request_id, "null");
@@ -627,6 +655,217 @@ void lsp_handle_message(LSPServer *server, const char *message) {
   }
 
   arena_destroy(&temp_arena);
+}
+
+// ============================================================================
+// LSP Features - Completion with Snippets
+// ============================================================================
+
+LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
+                                  size_t *completion_count,
+                                  ArenaAllocator *arena) {
+  if (!doc || !completion_count)
+    return NULL;
+
+  // Determine context (what triggered completion)
+  Token *token = lsp_token_at_position(doc, position);
+
+  GrowableArray completions;
+  growable_array_init(&completions, arena, 32, sizeof(LSPCompletionItem));
+
+  const struct {
+    const char *label;
+    const char *snippet;
+    const char *detail;
+  } keywords[] = {
+      // Top-level declarations
+      {"const fn", "const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "Function declaration"},
+      {"const struct",
+       "const ${1:Name} = struct {\n\t${2:field}: ${3:Type}$0\n};",
+       "Struct definition"},
+      {"const enum", "const ${1:Name} = enum {\n\t${2:Variant}$0\n};",
+       "Enum definition"},
+      {"const var", "const ${1:name}: ${2:Type} = ${3:value};$0",
+       "Top-level constant"},
+
+      // Function attributes for memory management
+      {"#returns_ownership",
+       "#returns_ownership\nconst ${1:name} = fn (${2:params}) *${3:Type} "
+       "{\n\tlet ${4:ptr}: *${3:Type} = "
+       "cast<*${3:Type}>(alloc(sizeof<${3:Type}>));\n\t$0\n\treturn "
+       "${4:ptr};\n};",
+       "Function that returns owned pointer"},
+      {"#takes_ownership",
+       "#takes_ownership\nconst ${1:name} = fn (${2:ptr}: *${3:Type}) "
+       "${4:void} {\n\t$0\n\tfree(${2:ptr});\n};",
+       "Function that takes ownership and frees"},
+
+      // Control flow
+      {"if", "if ${1:condition} {\n\t$0\n}", "If statement"},
+      {"if else", "if ${1:condition} {\n\t${2}\n} else {\n\t$0\n}",
+       "If-else statement"},
+      {"if elif",
+       "if ${1:condition} {\n\t${2}\n} elif ${3:condition} {\n\t${4}\n} else "
+       "{\n\t$0\n}",
+       "If-elif-else statement"},
+
+      // Loop constructs
+      {"loop", "loop {\n\t$0\n}", "Infinite loop"},
+      {"loop for",
+       "loop [${1:i}: int = 0](${1:i} < ${2:10}) : (++${1:i}) {\n\t$0\n}",
+       "For-style loop"},
+      {"loop while", "loop (${1:condition}) {\n\t$0\n}", "While-style loop"},
+
+      // Switch statement
+      {"switch", "switch (${1:value}) {\n\t${2:case} => ${3:result};$0\n}",
+       "Switch statement"},
+
+      // Variables
+      {"let", "let ${1:name}: ${2:Type} = ${3:value};$0",
+       "Variable declaration"},
+
+      // Memory management
+      {"alloc", "cast<*${1:Type}>(alloc(sizeof<${1:Type}>))",
+       "Allocate memory"},
+      {"defer", "defer free(${1:ptr});$0", "Defer statement"},
+      {"defer block", "defer {\n\t${1:cleanup()};\n\t$0\n}", "Defer block"},
+
+      // Module system
+      {"@module", "@module \"${1:name}\"$0", "Module declaration"},
+      {"@use", "@use \"${1:module}\" as ${2:alias}$0", "Import module"},
+
+      // Other statements
+      {"return", "return ${1:value};$0", "Return statement"},
+      {"break", "break;$0", "Break statement"},
+      {"continue", "continue;$0", "Continue statement"},
+
+      // Struct with access modifiers
+      {"struct pub/priv",
+       "const ${1:Name} = struct {\npub:\n\t${2:public_field}: "
+       "${3:Type},\npriv:\n\t${4:private_field}: ${5:Type}$0\n};",
+       "Struct with access modifiers"},
+
+      // Common patterns
+      {"main", "const main = fn () int {\n\t$0\n\treturn 0;\n};",
+       "Main function"},
+      {"outputln", "outputln(${1:message});$0", "Output with newline"},
+      {"cast", "cast<${1:Type}>(${2:value})$0", "Type cast"},
+      {"sizeof", "sizeof<${1:Type}>$0", "Size of type"},
+  };
+  for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+    LSPCompletionItem *item =
+        (LSPCompletionItem *)growable_array_push(&completions);
+    if (item) {
+      item->label = arena_strdup(arena, keywords[i].label);
+      item->kind = LSP_COMPLETION_SNIPPET;
+      item->insert_text = arena_strdup(arena, keywords[i].snippet);
+      item->format = LSP_INSERT_FORMAT_SNIPPET;
+      item->detail = arena_strdup(arena, keywords[i].detail);
+      item->documentation = NULL;
+      item->sort_text = NULL;
+      item->filter_text = NULL;
+    }
+  }
+
+  // Add symbols from scope (variables, functions, etc.)
+  if (doc->scope) {
+    Scope *current_scope = doc->scope;
+    while (current_scope) {
+      for (size_t i = 0; i < current_scope->depth; i++) {
+        Symbol *sym = &current_scope->symbols.data[i];
+
+        LSPCompletionItem *item =
+            (LSPCompletionItem *)growable_array_push(&completions);
+        if (item) {
+          item->label = arena_strdup(arena, sym->name);
+
+          // Determine kind based on symbol type
+          if (sym->type->type == AST_STMT_FUNCTION) {
+            item->kind = LSP_COMPLETION_FUNCTION;
+            // Create function call snippet
+            char snippet[512];
+            snprintf(snippet, sizeof(snippet), "%s($0)", sym->name);
+            item->insert_text = arena_strdup(arena, snippet);
+            item->format = LSP_INSERT_FORMAT_SNIPPET;
+          } else if (sym->type->type == AST_STMT_STRUCT) {
+            item->kind = LSP_COMPLETION_STRUCT;
+            item->insert_text = arena_strdup(arena, sym->name);
+            item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+          } else {
+            item->kind = LSP_COMPLETION_VARIABLE;
+            item->insert_text = arena_strdup(arena, sym->name);
+            item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+          }
+
+          item->detail = type_to_string(sym->type, arena);
+          item->documentation = NULL;
+          item->sort_text = NULL;
+          item->filter_text = NULL;
+        }
+      }
+      current_scope = current_scope->parent;
+    }
+  }
+
+  *completion_count = completions.count;
+  return (LSPCompletionItem *)completions.data;
+}
+
+// Helper to serialize completion items to JSON
+void serialize_completion_items(LSPCompletionItem *items, size_t count,
+                                char *output, size_t output_size) {
+  size_t offset = 0;
+  offset += snprintf(output + offset, output_size - offset, "{\"items\":[");
+
+  for (size_t i = 0; i < count; i++) {
+    LSPCompletionItem *item = &items[i];
+
+    if (i > 0) {
+      offset += snprintf(output + offset, output_size - offset, ",");
+    }
+
+    offset +=
+        snprintf(output + offset, output_size - offset,
+                 "{\"label\":\"%s\",\"kind\":%d", item->label, item->kind);
+
+    if (item->insert_text) {
+      // Escape special characters in snippet
+      char escaped[1024];
+      const char *src = item->insert_text;
+      char *dst = escaped;
+      while (*src && (dst - escaped) < (int)sizeof(escaped) - 1) {
+        if (*src == '"' || *src == '\\') {
+          *dst++ = '\\';
+        } else if (*src == '\n') {
+          *dst++ = '\\';
+          *dst++ = 'n';
+          src++;
+          continue;
+        } else if (*src == '\t') {
+          *dst++ = '\\';
+          *dst++ = 't';
+          src++;
+          continue;
+        }
+        *dst++ = *src++;
+      }
+      *dst = '\0';
+
+      offset += snprintf(output + offset, output_size - offset,
+                         ",\"insertText\":\"%s\",\"insertTextFormat\":%d",
+                         escaped, item->format);
+    }
+
+    if (item->detail) {
+      offset += snprintf(output + offset, output_size - offset,
+                         ",\"detail\":\"%s\"", item->detail);
+    }
+
+    offset += snprintf(output + offset, output_size - offset, "}");
+  }
+
+  offset += snprintf(output + offset, output_size - offset, "]}");
 }
 
 // ============================================================================

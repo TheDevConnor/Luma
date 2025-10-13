@@ -92,6 +92,22 @@ typedef enum {
   LSP_SYMBOL_STRUCT = 23
 } LSPSymbolKind;
 
+typedef enum {
+  LSP_COMPLETION_TEXT = 1,
+  LSP_COMPLETION_METHOD = 2,
+  LSP_COMPLETION_FUNCTION = 3,
+  LSP_COMPLETION_CONSTRUCTOR = 4,
+  LSP_COMPLETION_FIELD = 5,
+  LSP_COMPLETION_VARIABLE = 6,
+  LSP_COMPLETION_CLASS = 7,
+  LSP_COMPLETION_INTERFACE = 8,
+  LSP_COMPLETION_MODULE = 9,
+  LSP_COMPLETION_PROPERTY = 10,
+  LSP_COMPLETION_KEYWORD = 14,
+  LSP_COMPLETION_SNIPPET = 15,
+  LSP_COMPLETION_STRUCT = 22
+} LSPCompletionItemKind;
+
 typedef struct LSPDocumentSymbol {
   const char *name;
   LSPSymbolKind kind;
@@ -100,6 +116,22 @@ typedef struct LSPDocumentSymbol {
   struct LSPDocumentSymbol **children;
   size_t child_count;
 } LSPDocumentSymbol;
+
+typedef enum {
+  LSP_INSERT_FORMAT_PLAIN_TEXT = 1,
+  LSP_INSERT_FORMAT_SNIPPET = 2
+} LSPInsertTextFormat;
+
+typedef struct {
+  const char *label;          // What user sees
+  LSPCompletionItemKind kind; // Icon/type
+  const char *insert_text;    // Text to insert
+  LSPInsertTextFormat format; // Plain or snippet
+  const char *detail;         // Type signature
+  const char *documentation;  // Description
+  const char *sort_text;      // For ordering
+  const char *filter_text;    // For filtering
+} LSPCompletionItem;
 
 // ============================================================================
 // Document Management
@@ -206,8 +238,11 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 /**
  * @brief Get completions at position
  */
-const char **lsp_completion(LSPDocument *doc, LSPPosition position,
-                            size_t *completion_count, ArenaAllocator *arena);
+LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
+                                  size_t *completion_count,
+                                  ArenaAllocator *arena);
+void serialize_completion_items(LSPCompletionItem *items, size_t count,
+                                char *output, size_t output_size);
 
 /**
  * @brief Get document symbols (outline)

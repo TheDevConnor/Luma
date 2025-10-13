@@ -47,7 +47,7 @@ pub const main = fn () int {
 
   output("Sorted Array: ");
   print_arr(n, arr);
-  
+
   free_arr(arr);
-  return 0;
+  return 0.0;
 }
