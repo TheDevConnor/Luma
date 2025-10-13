@@ -92,6 +92,19 @@ typedef enum {
   LSP_SYMBOL_STRUCT = 23
 } LSPSymbolKind;
 
+typedef struct LSPDocumentSymbol {
+  const char *name;
+  LSPSymbolKind kind;
+  LSPRange range;
+  LSPRange selection_range;
+  struct LSPDocumentSymbol **children;
+  size_t child_count;
+} LSPDocumentSymbol;
+
+// ============================================================================
+// Completion Types
+// ============================================================================
+
 typedef enum {
   LSP_COMPLETION_TEXT = 1,
   LSP_COMPLETION_METHOD = 2,
@@ -107,15 +120,6 @@ typedef enum {
   LSP_COMPLETION_SNIPPET = 15,
   LSP_COMPLETION_STRUCT = 22
 } LSPCompletionItemKind;
-
-typedef struct LSPDocumentSymbol {
-  const char *name;
-  LSPSymbolKind kind;
-  LSPRange range;
-  LSPRange selection_range;
-  struct LSPDocumentSymbol **children;
-  size_t child_count;
-} LSPDocumentSymbol;
 
 typedef enum {
   LSP_INSERT_FORMAT_PLAIN_TEXT = 1,
@@ -241,8 +245,6 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena);
-void serialize_completion_items(LSPCompletionItem *items, size_t count,
-                                char *output, size_t output_size);
 
 /**
  * @brief Get document symbols (outline)
@@ -255,6 +257,12 @@ LSPDocumentSymbol **lsp_document_symbols(LSPDocument *doc, size_t *symbol_count,
  */
 LSPDiagnostic *lsp_diagnostics(LSPDocument *doc, size_t *diagnostic_count,
                                ArenaAllocator *arena);
+
+/**
+ * @brief Convert error system errors to LSP diagnostics
+ */
+LSPDiagnostic *convert_errors_to_diagnostics(size_t *diagnostic_count,
+                                             ArenaAllocator *arena);
 
 // ============================================================================
 // JSON-RPC Helpers
@@ -308,3 +316,6 @@ AstNode *lsp_node_at_position(LSPDocument *doc, LSPPosition position);
  * @brief Get symbol at position
  */
 Symbol *lsp_symbol_at_position(LSPDocument *doc, LSPPosition position);
+
+void serialize_completion_items(LSPCompletionItem *items, size_t count,
+                                char *output, size_t output_size);

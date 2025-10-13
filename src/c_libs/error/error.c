@@ -331,3 +331,13 @@ int error_get_count(void) { return error_count; }
  * @brief Checks if there are any errors.
  */
 bool error_has_errors(void) { return error_count > 0; }
+
+/**
+ * @brief Gets the error at the specified index.
+ */
+ErrorInformation *error_get_at_index(int index) {
+  if (index < 0 || index >= error_count) {
+    return NULL;
+  }
+  return &error_list[index];
+}

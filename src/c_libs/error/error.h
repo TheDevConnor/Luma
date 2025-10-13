@@ -59,7 +59,30 @@ typedef struct {
  * @return Pointer to a null-terminated string containing the line text,
  *         allocated in the arena. Returns NULL if the line is not found.
  */
-const char *generate_line(ArenaAllocator *arena, Token *tokens, int token_count, int target_line);
+const char *generate_line(ArenaAllocator *arena, Token *tokens, int token_count,
+                          int target_line);
+
+/**
+ * @brief Gets the current error count.
+ *
+ * @return Number of errors currently accumulated.
+ */
+int error_get_count(void);
+
+/**
+ * @brief Gets the error at the specified index.
+ *
+ * @param index Index of the error to retrieve (0-based).
+ * @return Pointer to the ErrorInformation struct, or NULL if index is invalid.
+ */
+ErrorInformation *error_get_at_index(int index);
+
+/**
+ * @brief Checks if there are any errors.
+ *
+ * @return true if there are errors, false otherwise.
+ */
+bool error_has_errors(void);
 
 /**
  * @brief Adds a new error to the internal error list.
