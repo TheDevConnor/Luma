@@ -188,24 +188,35 @@ Expr *prefix_expr(Parser *parser, Expr *left, BindingPower bp) {
     p_advance(parser); // Consume the '[' token
     Expr *index = parse_expr(parser, BP_LOWEST);
     if (!index) {
-      fprintf(stderr, "Expected expression inside index\n");
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected expression inside index", p_current(parser).line,
+                   p_current(parser).col, p_current(parser).length);
       return NULL;
     }
     p_consume(parser, TOK_RBRACKET, "Expected ']' to close index expression");
     return create_index_expr(parser->arena, left, index, line, col);
+
   case TOK_DOT:
-  case TOK_RESOLVE:
+  case TOK_RESOLVE: {
     bool is_compiletime =
         (p_current(parser).type_ == TOK_RESOLVE) ? true : false;
+    Token op_token = p_current(parser);
     p_advance(parser); // Consume the '.' or '::' token
+
     if (p_current(parser).type_ != TOK_IDENTIFIER) {
-      fprintf(stderr, "Expected identifier after '.' for member access\n");
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected identifier after '::' or '.' for member access",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
       return NULL;
     }
+
     char *member = get_name(parser);
     p_advance(parser); // Consume the identifier token
-    return create_member_expr(parser->arena, left, is_compiletime, member, line,
-                              col);
+    return create_member_expr(parser->arena, left, is_compiletime, member,
+                              op_token.line, op_token.col);
+  }
+
   case TOK_PLUSPLUS:
   case TOK_MINUSMINUS: {
     UnaryOp op =
@@ -213,10 +224,16 @@ Expr *prefix_expr(Parser *parser, Expr *left, BindingPower bp) {
     p_advance(parser); // Consume the token
     return create_unary_expr(parser->arena, op, left, line, col);
   }
-  default:
-    fprintf(stderr, "Unexpected token for prefix expression: %s\n",
-            current.value);
-    return NULL; // Handle unexpected token
+
+  default: {
+    char error_msg[256];
+    snprintf(error_msg, sizeof(error_msg),
+             "Unexpected token for prefix expression: %s", current.value);
+
+    parser_error(parser, "SyntaxError", parser->file_path, error_msg,
+                 current.line, current.col, current.length);
+    return NULL;
+  }
   }
 }
 

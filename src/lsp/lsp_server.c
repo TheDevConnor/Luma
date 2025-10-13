@@ -6,10 +6,253 @@
 #include "../c_libs/error/error.h"
 #include "lsp.h"
 #include <ctype.h>
+#include <dirent.h> // For Unix
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+// Add these functions to lsp_server.c:
+
+// Extract @module declaration from file content
+static const char *extract_module_name(const char *content,
+                                       ArenaAllocator *arena) {
+  if (!content)
+    return NULL;
+
+  const char *src = content;
+
+  // Look for @module directive (usually at the top)
+  while (*src) {
+    // Skip whitespace and comments
+    while (*src && (isspace(*src) || *src == '/' || *src == '#')) {
+      if (*src == '/' && *(src + 1) == '/') {
+        // Skip line comment
+        while (*src && *src != '\n')
+          src++;
+      } else if (*src == '/' && *(src + 1) == '*') {
+        // Skip block comment
+        src += 2;
+        while (*src && !(*src == '*' && *(src + 1) == '/'))
+          src++;
+        if (*src)
+          src += 2;
+      } else {
+        src++;
+      }
+    }
+
+    // Check for @module
+    if (strncmp(src, "@module", 7) == 0) {
+      src += 7;
+
+      // Skip whitespace
+      while (*src && isspace(*src))
+        src++;
+
+      // Extract module name in quotes
+      if (*src == '"') {
+        src++;
+        const char *name_start = src;
+        while (*src && *src != '"')
+          src++;
+
+        size_t name_len = src - name_start;
+        char *module_name = arena_alloc(arena, name_len + 1, 1);
+        memcpy(module_name, name_start, name_len);
+        module_name[name_len] = '\0';
+
+        fprintf(stderr, "[LSP] Found @module \"%s\"\n", module_name);
+        return module_name;
+      }
+    }
+
+    // If we hit a non-whitespace, non-comment, non-@module token, stop looking
+    if (*src && !isspace(*src) && *src != '@') {
+      break;
+    }
+
+    if (*src)
+      src++;
+  }
+
+  return NULL;
+}
+
+// Scan a single file and register its module
+static void scan_file_for_module(LSPServer *server, const char *file_uri,
+                                 ArenaAllocator *temp_arena) {
+  const char *file_path = lsp_uri_to_path(file_uri, temp_arena);
+  if (!file_path)
+    return;
+
+  FILE *f = fopen(file_path, "r");
+  if (!f)
+    return;
+
+  // Read first 1KB to check for @module (should be at the top)
+  char buffer[1024];
+  size_t read = fread(buffer, 1, sizeof(buffer) - 1, f);
+  buffer[read] = '\0';
+  fclose(f);
+
+  const char *module_name = extract_module_name(buffer, temp_arena);
+  if (!module_name)
+    return;
+
+  // Check if already registered
+  for (size_t i = 0; i < server->module_registry.count; i++) {
+    if (strcmp(server->module_registry.entries[i].module_name, module_name) ==
+        0) {
+      // Already registered, update URI
+      server->module_registry.entries[i].file_uri =
+          arena_strdup(server->arena, file_uri);
+      fprintf(stderr, "[LSP] Updated module '%s' -> %s\n", module_name,
+              file_uri);
+      return;
+    }
+  }
+
+  // Add new entry
+  if (server->module_registry.count >= server->module_registry.capacity) {
+    // Grow registry
+    size_t new_capacity = server->module_registry.capacity * 2;
+    if (new_capacity == 0)
+      new_capacity = 32;
+
+    ModuleRegistryEntry *new_entries =
+        arena_alloc(server->arena, new_capacity * sizeof(ModuleRegistryEntry),
+                    alignof(ModuleRegistryEntry));
+
+    if (server->module_registry.entries) {
+      memcpy(new_entries, server->module_registry.entries,
+             server->module_registry.count * sizeof(ModuleRegistryEntry));
+    }
+
+    server->module_registry.entries = new_entries;
+    server->module_registry.capacity = new_capacity;
+  }
+
+  ModuleRegistryEntry *entry =
+      &server->module_registry.entries[server->module_registry.count++];
+  entry->module_name = arena_strdup(server->arena, module_name);
+  entry->file_uri = arena_strdup(server->arena, file_uri);
+
+  fprintf(stderr, "[LSP] Registered module '%s' -> %s\n", module_name,
+          file_uri);
+}
+
+// Recursively scan directory for .lx files
+static void scan_directory_recursive(LSPServer *server, const char *dir_path,
+                                     ArenaAllocator *temp_arena) {
+#ifdef _WIN32
+  WIN32_FIND_DATA find_data;
+  char search_path[512];
+  snprintf(search_path, sizeof(search_path), "%s\\*", dir_path);
+
+  HANDLE hFind = FindFirstFile(search_path, &find_data);
+  if (hFind == INVALID_HANDLE_VALUE)
+    return;
+
+  do {
+    if (strcmp(find_data.cFileName, ".") == 0 ||
+        strcmp(find_data.cFileName, "..") == 0) {
+      continue;
+    }
+
+    char full_path[512];
+    snprintf(full_path, sizeof(full_path), "%s\\%s", dir_path,
+             find_data.cFileName);
+
+    if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+      scan_directory_recursive(server, full_path, temp_arena);
+    } else {
+      // Check if .lx file
+      const char *ext = strrchr(find_data.cFileName, '.');
+      if (ext && strcmp(ext, ".lx") == 0) {
+        const char *uri = lsp_path_to_uri(full_path, temp_arena);
+        if (uri) {
+          scan_file_for_module(server, uri, temp_arena);
+        }
+      }
+    }
+  } while (FindNextFile(hFind, &find_data));
+
+  FindClose(hFind);
+#else
+  // Unix/Linux implementation
+  DIR *dir = opendir(dir_path);
+  if (!dir)
+    return;
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL) {
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+      continue;
+    }
+
+    char full_path[512];
+    snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+
+    struct stat st;
+    if (stat(full_path, &st) == 0) {
+      if (S_ISDIR(st.st_mode)) {
+        scan_directory_recursive(server, full_path, temp_arena);
+      } else if (S_ISREG(st.st_mode)) {
+        // Check if .lx file
+        const char *ext = strrchr(entry->d_name, '.');
+        if (ext && strcmp(ext, ".lx") == 0) {
+          const char *uri = lsp_path_to_uri(full_path, temp_arena);
+          if (uri) {
+            scan_file_for_module(server, uri, temp_arena);
+          }
+        }
+      }
+    }
+  }
+
+  closedir(dir);
+#endif
+}
+
+// Build module registry by scanning workspace
+static void build_module_registry(LSPServer *server,
+                                  const char *workspace_uri) {
+  fprintf(stderr, "[LSP] Building module registry for workspace: %s\n",
+          workspace_uri);
+
+  ArenaAllocator temp_arena;
+  arena_allocator_init(&temp_arena, 64 * 1024);
+
+  const char *workspace_path = lsp_uri_to_path(workspace_uri, &temp_arena);
+  if (!workspace_path) {
+    arena_destroy(&temp_arena);
+    return;
+  }
+
+  scan_directory_recursive(server, workspace_path, &temp_arena);
+
+  fprintf(stderr, "[LSP] Module registry built: %zu modules\n",
+          server->module_registry.count);
+
+  arena_destroy(&temp_arena);
+}
+
+// Look up module in registry
+static const char *lookup_module(LSPServer *server, const char *module_name) {
+  for (size_t i = 0; i < server->module_registry.count; i++) {
+    if (strcmp(server->module_registry.entries[i].module_name, module_name) ==
+        0) {
+      fprintf(stderr, "[LSP] Lookup: '%s' -> %s\n", module_name,
+              server->module_registry.entries[i].file_uri);
+      return server->module_registry.entries[i].file_uri;
+    }
+  }
+
+  fprintf(stderr, "[LSP] Lookup: '%s' not found\n", module_name);
+  return NULL;
+}
 
 // ============================================================================
 // JSON Parsing Utilities
@@ -70,18 +313,29 @@ static char *extract_string(const char *json, const char *key,
 }
 
 static int extract_int(const char *json, const char *key) {
+  // Build search patterns for both "key": value and "key" : value (with spaces)
   char search[256];
   snprintf(search, sizeof(search), "\"%s\"", key);
 
   const char *found = strstr(json, search);
-  if (!found)
+  if (!found) {
     return -1;
+  }
 
-  const char *colon = strchr(found + strlen(search), ':');
-  if (!colon)
+  // Find the colon after the key
+  const char *colon = found + strlen(search);
+
+  // Skip whitespace and colon
+  while (*colon && (isspace(*colon) || *colon == ':')) {
+    colon++;
+  }
+
+  // Now we should be at the number
+  if (!*colon || !isdigit(*colon)) {
     return -1;
+  }
 
-  return atoi(colon + 1);
+  return atoi(colon);
 }
 
 static LSPPosition extract_position(const char *json) {
@@ -104,14 +358,11 @@ LSPMethod lsp_parse_method(const char *json) {
   if (!json)
     return LSP_METHOD_UNKNOWN;
 
-  if (strstr(json, "initialize"))
-    return LSP_METHOD_INITIALIZE;
-  if (strstr(json, "initialized"))
-    return LSP_METHOD_INITIALIZED;
-  if (strstr(json, "shutdown"))
-    return LSP_METHOD_SHUTDOWN;
-  if (strstr(json, "exit"))
-    return LSP_METHOD_EXIT;
+  // CHECK LONGER STRINGS FIRST!
+  if (strstr(json, "textDocument/documentSymbol"))
+    return LSP_METHOD_TEXT_DOCUMENT_DOCUMENT_SYMBOL;
+  if (strstr(json, "textDocument/semanticTokens"))
+    return LSP_METHOD_TEXT_DOCUMENT_SEMANTIC_TOKENS;
   if (strstr(json, "textDocument/didOpen"))
     return LSP_METHOD_TEXT_DOCUMENT_DID_OPEN;
   if (strstr(json, "textDocument/didChange"))
@@ -124,10 +375,17 @@ LSPMethod lsp_parse_method(const char *json) {
     return LSP_METHOD_TEXT_DOCUMENT_DEFINITION;
   if (strstr(json, "textDocument/completion"))
     return LSP_METHOD_TEXT_DOCUMENT_COMPLETION;
-  if (strstr(json, "textDocument/documentSymbol"))
-    return LSP_METHOD_TEXT_DOCUMENT_DOCUMENT_SYMBOL;
-  if (strstr(json, "textDocument/semanticTokens"))
-    return LSP_METHOD_TEXT_DOCUMENT_SEMANTIC_TOKENS;
+
+  // Check "initialized" BEFORE "initialize"!
+  if (strstr(json, "initialized"))
+    return LSP_METHOD_INITIALIZED;
+  if (strstr(json, "initialize"))
+    return LSP_METHOD_INITIALIZE;
+
+  if (strstr(json, "shutdown"))
+    return LSP_METHOD_SHUTDOWN;
+  if (strstr(json, "exit"))
+    return LSP_METHOD_EXIT;
 
   return LSP_METHOD_UNKNOWN;
 }
@@ -253,6 +511,213 @@ static void serialize_diagnostics_to_json(const char *uri,
   offset += snprintf(output + offset, output_size - offset, "]}");
 }
 
+// Extract @use declarations from source code
+void extract_imports(LSPDocument *doc, ArenaAllocator *arena) {
+  if (!doc || !doc->content)
+    return;
+
+  GrowableArray imports;
+  growable_array_init(&imports, arena, 4, sizeof(ImportedModule));
+
+  const char *src = doc->content;
+  while (*src) {
+    // Find @use directive
+    if (strncmp(src, "@use", 4) == 0) {
+      src += 4;
+
+      // Skip whitespace
+      while (*src && isspace(*src))
+        src++;
+
+      // Extract module path in quotes
+      if (*src == '"') {
+        src++;
+        const char *path_start = src;
+        while (*src && *src != '"')
+          src++;
+
+        size_t path_len = src - path_start;
+        char *module_path = arena_alloc(arena, path_len + 1, 1);
+        memcpy(module_path, path_start, path_len);
+        module_path[path_len] = '\0';
+
+        if (*src == '"')
+          src++;
+
+        // Skip whitespace and look for "as"
+        while (*src && isspace(*src))
+          src++;
+
+        const char *alias = NULL;
+        if (strncmp(src, "as", 2) == 0) {
+          src += 2;
+          while (*src && isspace(*src))
+            src++;
+
+          // Extract alias identifier
+          const char *alias_start = src;
+          while (*src && (isalnum(*src) || *src == '_'))
+            src++;
+
+          size_t alias_len = src - alias_start;
+          char *alias_buf = arena_alloc(arena, alias_len + 1, 1);
+          memcpy(alias_buf, alias_start, alias_len);
+          alias_buf[alias_len] = '\0';
+          alias = alias_buf;
+        }
+
+        ImportedModule *import =
+            (ImportedModule *)growable_array_push(&imports);
+        if (import) {
+          import->module_path = module_path;
+          import->alias = alias;
+          import->scope = NULL; // Will be resolved later
+        }
+      }
+    }
+    src++;
+  }
+
+  doc->imports = (ImportedModule *)imports.data;
+  doc->import_count = imports.count;
+}
+
+// Resolve module path relative to current document
+const char *resolve_module_path(const char *current_uri,
+                                const char *module_path,
+                                ArenaAllocator *arena) {
+  // Convert URI to path
+  const char *current_path = lsp_uri_to_path(current_uri, arena);
+  if (!current_path)
+    return NULL;
+
+  // Find directory of current file
+  const char *last_slash = strrchr(current_path, '/');
+  if (!last_slash)
+    last_slash = strrchr(current_path, '\\');
+
+  size_t dir_len = last_slash ? (last_slash - current_path + 1) : 0;
+
+  // Build full path
+  size_t total_len = dir_len + strlen(module_path) + 4; // +4 for ".lx"
+  char *full_path = arena_alloc(arena, total_len, 1);
+
+  if (dir_len > 0) {
+    memcpy(full_path, current_path, dir_len);
+  }
+  strcpy(full_path + dir_len, module_path);
+
+  // Add .lx extension if not present
+  if (!strstr(module_path, ".lx")) {
+    strcat(full_path, ".lx");
+  }
+
+  return lsp_path_to_uri(full_path, arena);
+}
+
+// Update parse_imported_module to return the parsed module AST, not just scope
+static AstNode *parse_imported_module_ast(LSPServer *server,
+                                          const char *module_uri,
+                                          BuildConfig *config,
+                                          ArenaAllocator *arena) {
+  // Check if already opened
+  LSPDocument *module_doc = lsp_document_find(server, module_uri);
+  if (module_doc && module_doc->ast) {
+    return module_doc->ast;
+  }
+
+  // Try to read file from disk
+  const char *file_path = lsp_uri_to_path(module_uri, arena);
+  if (!file_path)
+    return NULL;
+
+  FILE *f = fopen(file_path, "r");
+  if (!f) {
+    fprintf(stderr, "[LSP] Failed to open module: %s\n", file_path);
+    return NULL;
+  }
+
+  fseek(f, 0, SEEK_END);
+  long size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+
+  char *content = arena_alloc(arena, size + 1, 1);
+  fread(content, 1, size, f);
+  content[size] = '\0';
+  fclose(f);
+
+  // Lex the module
+  Lexer lexer;
+  init_lexer(&lexer, content, arena);
+
+  GrowableArray tokens;
+  growable_array_init(&tokens, arena, 256, sizeof(Token));
+
+  Token token;
+  while ((token = next_token(&lexer)).type_ != TOK_EOF) {
+    Token *slot = (Token *)growable_array_push(&tokens);
+    if (slot)
+      *slot = token;
+  }
+
+  // Parse the module
+  AstNode *module_ast = parse(&tokens, arena, config);
+
+  if (!module_ast) {
+    fprintf(stderr, "[LSP] Failed to parse imported module: %s\n", file_path);
+    return NULL;
+  }
+
+  // Extract the first module from the program if it's a program node
+  if (module_ast->type == AST_PROGRAM &&
+      module_ast->stmt.program.module_count > 0) {
+    return module_ast->stmt.program.modules[0];
+  }
+
+  return module_ast;
+}
+
+// Update resolve_imports to collect module ASTs instead of just scopes
+static void resolve_imports(LSPServer *server, LSPDocument *doc,
+                            BuildConfig *config,
+                            GrowableArray *imported_modules) {
+  if (!doc || !doc->imports || doc->import_count == 0)
+    return;
+
+  fprintf(stderr, "[LSP] Resolving %zu imports for %s\n", doc->import_count,
+          doc->uri);
+
+  for (size_t i = 0; i < doc->import_count; i++) {
+    ImportedModule *import = &doc->imports[i];
+
+    // Look up module in registry by name
+    const char *resolved_uri = lookup_module(server, import->module_path);
+
+    if (!resolved_uri) {
+      fprintf(stderr, "[LSP] Module '%s' not found in registry\n",
+              import->module_path);
+      continue;
+    }
+
+    fprintf(stderr, "[LSP] Resolved '%s' -> %s\n", import->module_path,
+            resolved_uri);
+
+    // Parse module and get its AST
+    AstNode *module_ast =
+        parse_imported_module_ast(server, resolved_uri, config, doc->arena);
+
+    if (module_ast) {
+      // Add to the list of modules
+      AstNode **slot = (AstNode **)growable_array_push(imported_modules);
+      if (slot) {
+        *slot = module_ast;
+        fprintf(stderr, "[LSP] Successfully loaded module: %s (alias: %s)\n",
+                import->module_path, import->alias ? import->alias : "none");
+      }
+    }
+  }
+}
+
 // ============================================================================
 // Document Management
 // ============================================================================
@@ -270,6 +735,11 @@ bool lsp_server_init(LSPServer *server, ArenaAllocator *arena) {
   server->documents =
       arena_alloc(arena, server->document_capacity * sizeof(LSPDocument *),
                   alignof(LSPDocument *));
+
+  // Initialize module registry
+  server->module_registry.entries = NULL;
+  server->module_registry.count = 0;
+  server->module_registry.capacity = 0;
 
   return server->documents != NULL;
 }
@@ -363,7 +833,8 @@ LSPDocument *lsp_document_find(LSPServer *server, const char *uri) {
   return NULL;
 }
 
-bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config) {
+bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
+                          BuildConfig *config) {
   if (!doc || !doc->needs_reanalysis)
     return true;
 
@@ -378,6 +849,8 @@ bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config) {
   }
 
   fprintf(stderr, "[LSP] Analyzing document: %s\n", file_path);
+
+  extract_imports(doc, doc->arena);
 
   Lexer lexer;
   init_lexer(&lexer, doc->content, doc->arena);
@@ -401,10 +874,41 @@ bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config) {
 
   fprintf(stderr, "[LSP] Parse result: %s\n", doc->ast ? "success" : "failed");
 
-  if (!doc->ast) {
-    fprintf(stderr, "[LSP] Parse errors: %d\n", error_get_count());
+  // ADD THIS CHECK: If parse failed or has errors, return early with
+  // diagnostics
+  if (!doc->ast || error_get_count() > 0) {
+    fprintf(stderr, "[LSP] Parse has %d errors, skipping typecheck\n",
+            error_get_count());
     doc->diagnostics =
         convert_errors_to_diagnostics(&doc->diagnostic_count, doc->arena);
+    doc->needs_reanalysis = false;
+    return false;
+  }
+
+  GrowableArray all_modules;
+  growable_array_init(&all_modules, doc->arena, 8, sizeof(AstNode *));
+
+  resolve_imports(server, doc, config, &all_modules);
+
+  AstNode *main_module = doc->ast;
+  if (doc->ast->type == AST_PROGRAM &&
+      doc->ast->stmt.program.module_count > 0) {
+    main_module = doc->ast->stmt.program.modules[0];
+  }
+
+  AstNode **main_slot = (AstNode **)growable_array_push(&all_modules);
+  if (main_slot) {
+    *main_slot = main_module;
+  }
+
+  fprintf(stderr, "[LSP] Combined %zu modules for typechecking\n",
+          all_modules.count);
+
+  AstNode *combined_program = create_program_node(
+      doc->arena, (AstNode **)all_modules.data, all_modules.count, 0, 0);
+
+  if (!combined_program) {
+    fprintf(stderr, "[LSP] Failed to create combined program\n");
     doc->needs_reanalysis = false;
     return false;
   }
@@ -416,9 +920,16 @@ bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config) {
 
   tc_error_init(doc->tokens, doc->token_count, file_path, doc->arena);
 
-  fprintf(stderr, "[LSP] Starting typecheck...\n");
+  fprintf(stderr, "[LSP] Starting typecheck with %zu modules...\n",
+          all_modules.count);
 
-  bool success = typecheck(doc->ast, &global_scope, doc->arena, config);
+  // ADD ERROR HANDLER: Wrap typecheck in error checking
+  bool success = false;
+
+  // Try to typecheck, but catch if it fails catastrophically
+  if (combined_program && all_modules.count > 0) {
+    success = typecheck(combined_program, &global_scope, doc->arena, config);
+  }
 
   fprintf(stderr, "[LSP] Typecheck result: %s, errors: %d\n",
           success ? "success" : "failed", error_get_count());
@@ -429,6 +940,7 @@ bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config) {
   fprintf(stderr, "[LSP] Generated %zu diagnostics\n", doc->diagnostic_count);
 
   doc->needs_reanalysis = false;
+
   return success;
 }
 
@@ -756,6 +1268,45 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
     }
   }
 
+  // NEW: Add symbols from imported modules
+  for (size_t i = 0; i < doc->import_count; i++) {
+    ImportedModule *import = &doc->imports[i];
+    if (!import->scope)
+      continue;
+
+    // Add symbols with prefix (e.g., "string::strlen")
+    const char *prefix = import->alias ? import->alias : "module";
+
+    for (size_t j = 0; j < import->scope->symbols.count; j++) {
+      Symbol *sym =
+          (Symbol *)((char *)import->scope->symbols.data + j * sizeof(Symbol));
+
+      // Only include public symbols
+      if (!sym->is_public)
+        continue;
+
+      LSPCompletionItem *item =
+          (LSPCompletionItem *)growable_array_push(&completions);
+      if (item) {
+        // Format: "alias::name"
+        size_t label_len = strlen(prefix) + strlen(sym->name) + 3;
+        char *label = arena_alloc(arena, label_len, 1);
+        snprintf(label, label_len, "%s::%s", prefix, sym->name);
+
+        item->label = label;
+        item->kind = (sym->type->type == AST_TYPE_FUNCTION)
+                         ? LSP_COMPLETION_FUNCTION
+                         : LSP_COMPLETION_VARIABLE;
+        item->insert_text = arena_strdup(arena, label);
+        item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+        item->detail = type_to_string(sym->type, arena);
+        item->documentation = NULL;
+        item->sort_text = NULL;
+        item->filter_text = NULL;
+      }
+    }
+  }
+
   *completion_count = completions.count;
   return (LSPCompletionItem *)completions.data;
 }
@@ -768,10 +1319,14 @@ void lsp_handle_message(LSPServer *server, const char *message) {
   if (!server || !message)
     return;
 
-  fprintf(stderr, "[LSP] Received message: %.100s...\n", message);
+  // DON'T truncate the log - show more of the message to debug
+  fprintf(stderr, "[LSP] Received message: %.500s...\n",
+          message); // Changed from 100 to 500
 
   LSPMethod method = lsp_parse_method(message);
   int request_id = extract_int(message, "id");
+
+  fprintf(stderr, "[LSP] Extracted request_id: %d\n", request_id); // ADD THIS
 
   ArenaAllocator temp_arena;
   arena_allocator_init(&temp_arena, 64 * 1024);
@@ -779,24 +1334,36 @@ void lsp_handle_message(LSPServer *server, const char *message) {
   switch (method) {
   case LSP_METHOD_INITIALIZE: {
     fprintf(stderr, "[LSP] Handling initialize\n");
-    server->initialized = true;
-    const char *capabilities =
-        "{"
-        "\"capabilities\":{"
-        "\"textDocumentSync\":1,"
-        "\"hoverProvider\":true,"
-        "\"definitionProvider\":true,"
-        "\"completionProvider\":{\"triggerCharacters\":[\".\",\":\"]},"
-        "\"documentSymbolProvider\":true"
-        "},"
-        "\"serverInfo\":{\"name\":\"Luma LSP\",\"version\":\"0.1.0\"}"
-        "}";
-    lsp_send_response(request_id, capabilities);
+
+    // Only respond if we have a valid ID
+    if (request_id >= 0) {
+      const char *workspace_uri = extract_string(message, "uri", &temp_arena);
+      if (workspace_uri) {
+        build_module_registry(server, workspace_uri);
+      }
+
+      server->initialized = true;
+      const char *capabilities =
+          "{"
+          "\"capabilities\":{"
+          "\"textDocumentSync\":1,"
+          "\"hoverProvider\":true,"
+          "\"definitionProvider\":true,"
+          "\"completionProvider\":{\"triggerCharacters\":[\".\",\":\"]},"
+          "\"documentSymbolProvider\":true"
+          "},"
+          "\"serverInfo\":{\"name\":\"Luma LSP\",\"version\":\"0.1.0\"}"
+          "}";
+      lsp_send_response(request_id, capabilities);
+    } else {
+      fprintf(stderr, "[LSP] ERROR: No valid request_id for initialize!\n");
+    }
     break;
   }
 
   case LSP_METHOD_INITIALIZED:
     fprintf(stderr, "[LSP] Client initialized\n");
+    // This is a notification, no response needed
     break;
 
   case LSP_METHOD_TEXT_DOCUMENT_DID_OPEN: {
@@ -815,7 +1382,7 @@ void lsp_handle_message(LSPServer *server, const char *message) {
       if (doc) {
         BuildConfig config = {0};
         config.check_mem = true;
-        lsp_document_analyze(doc, &config);
+        lsp_document_analyze(doc, server, &config); // ADD server parameter
 
         size_t diag_count;
         LSPDiagnostic *diagnostics =
@@ -849,7 +1416,7 @@ void lsp_handle_message(LSPServer *server, const char *message) {
       if (doc) {
         BuildConfig config = {0};
         config.check_mem = true;
-        lsp_document_analyze(doc, &config);
+        lsp_document_analyze(doc, server, &config); // ADD server parameter
 
         size_t diag_count;
         LSPDiagnostic *diagnostics =

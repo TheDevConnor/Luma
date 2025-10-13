@@ -1,12 +1,12 @@
 @module "main"
 
 const bubble_sort = fn (n: int, arr: *int) void {
-  loop [i: int = 0](i < n-1)  (++i) {
+  loop [i: int = 0](i < n-1) : (++i) {
     let swapped: int = 0;
 
     loop [j: int = 0](j < n-1) : (++j) {
       if (arr[j] > arr[j + 1]) {
-        let temp int = arr[j];
+        let temp: int = arr[j];
         arr[j] = arr[j + 1];
         arr[j + 1] = temp;
 
@@ -22,7 +22,7 @@ const print_arr = fn (n: int, arr: *int) void {
   loop [i: int = 0](i < n) : (++i) {
     output(arr[i], " ");
   }
-  output("\n")
+  output("\n");
 }
 
 #takes_ownership 
@@ -49,5 +49,5 @@ pub const main = fn () int {
   print_arr(n, arr);
 
   free_arr(arr);
-  return 0.0;
+  return 0;
 }

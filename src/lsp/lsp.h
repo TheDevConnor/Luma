@@ -142,6 +142,23 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
+  const char *module_path; // Resolved file path
+  const char *alias;       // Import alias (e.g., "string", "mem")
+  Scope *scope;            // Parsed scope from that module
+} ImportedModule;
+
+typedef struct {
+  const char *module_name; // e.g., "math", "string", "std/memory"
+  const char *file_uri;    // Full file URI where this module is defined
+} ModuleRegistryEntry;
+
+typedef struct {
+  ModuleRegistryEntry *entries;
+  size_t count;
+  size_t capacity;
+} ModuleRegistry;
+
+typedef struct {
   const char *uri;
   const char *content;
   int version;
@@ -156,6 +173,9 @@ typedef struct {
 
   ArenaAllocator *arena;
   bool needs_reanalysis;
+
+  ImportedModule *imports;
+  size_t import_count;
 } LSPDocument;
 
 typedef struct {
@@ -163,6 +183,7 @@ typedef struct {
   size_t document_count;
   size_t document_capacity;
 
+  ModuleRegistry module_registry;
   ArenaAllocator *arena;
   bool initialized;
   int client_process_id;
@@ -221,7 +242,8 @@ LSPDocument *lsp_document_find(LSPServer *server, const char *uri);
 /**
  * @brief Analyze document (lex, parse, typecheck)
  */
-bool lsp_document_analyze(LSPDocument *doc, BuildConfig *config);
+bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
+                          BuildConfig *config);
 
 // ============================================================================
 // LSP Feature Implementations
