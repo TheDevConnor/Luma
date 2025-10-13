@@ -208,6 +208,12 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     }
   }
 
+  // NEW: Store the module scope in the AST node so LSP can access it later
+  module->preprocessor.module.scope = (void *)module_scope;  // Cast to void*
+  
+  // fprintf(stderr, "[LSP] Stored scope with %zu symbols in module '%s'\n",
+  //         module_scope->symbols.count, module_name);
+
   StaticMemoryAnalyzer *analyzer = get_static_analyzer(module_scope);
   if (analyzer && g_tokens && g_token_count > 0 && g_file_path && global_scope->config->check_mem) {
     static_memory_check_and_report(analyzer, arena);

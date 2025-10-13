@@ -143,6 +143,7 @@ struct AstNode {
           const char *file_path;
           Token *tokens;
           size_t token_count;
+          void *scope;  // NEW: Add this field
         } module;
 
         // @use "module_name" as module;

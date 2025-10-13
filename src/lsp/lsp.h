@@ -1,13 +1,6 @@
 /**
- * @file lsp_server.h
- * @brief Language Server Protocol implementation for your language
- *
- * This LSP server provides IDE features like:
- * - Diagnostics (errors, warnings)
- * - Hover information
- * - Go to definition
- * - Code completion
- * - Document symbols
+ * @file lsp.h
+ * @brief Language Server Protocol implementation for Luma language
  */
 
 #pragma once
@@ -20,10 +13,14 @@
 #include <stddef.h>
 
 // ============================================================================
-// LSP Message Types
+// CORE LSP TYPES
 // ============================================================================
 
-typedef enum { LSP_REQUEST, LSP_RESPONSE, LSP_NOTIFICATION } LSPMessageType;
+typedef enum { 
+  LSP_REQUEST, 
+  LSP_RESPONSE, 
+  LSP_NOTIFICATION 
+} LSPMessageType;
 
 typedef enum {
   LSP_METHOD_INITIALIZE,
@@ -41,6 +38,10 @@ typedef enum {
   LSP_METHOD_UNKNOWN
 } LSPMethod;
 
+// ============================================================================
+// LSP PROTOCOL STRUCTURES (Position, Range, Location)
+// ============================================================================
+
 typedef struct {
   int line;
   int character;
@@ -56,6 +57,10 @@ typedef struct {
   LSPRange range;
 } LSPLocation;
 
+// ============================================================================
+// DIAGNOSTICS
+// ============================================================================
+
 typedef enum {
   LSP_DIAGNOSTIC_ERROR = 1,
   LSP_DIAGNOSTIC_WARNING = 2,
@@ -69,6 +74,10 @@ typedef struct {
   const char *message;
   const char *source;
 } LSPDiagnostic;
+
+// ============================================================================
+// DOCUMENT SYMBOLS
+// ============================================================================
 
 typedef enum {
   LSP_SYMBOL_FILE = 1,
@@ -102,7 +111,7 @@ typedef struct LSPDocumentSymbol {
 } LSPDocumentSymbol;
 
 // ============================================================================
-// Completion Types
+// COMPLETION
 // ============================================================================
 
 typedef enum {
@@ -127,29 +136,29 @@ typedef enum {
 } LSPInsertTextFormat;
 
 typedef struct {
-  const char *label;          // What user sees
-  LSPCompletionItemKind kind; // Icon/type
-  const char *insert_text;    // Text to insert
-  LSPInsertTextFormat format; // Plain or snippet
-  const char *detail;         // Type signature
-  const char *documentation;  // Description
-  const char *sort_text;      // For ordering
-  const char *filter_text;    // For filtering
+  const char *label;
+  LSPCompletionItemKind kind;
+  const char *insert_text;
+  LSPInsertTextFormat format;
+  const char *detail;
+  const char *documentation;
+  const char *sort_text;
+  const char *filter_text;
 } LSPCompletionItem;
 
 // ============================================================================
-// Document Management
+// MODULE SYSTEM
 // ============================================================================
 
 typedef struct {
-  const char *module_path; // Resolved file path
-  const char *alias;       // Import alias (e.g., "string", "mem")
-  Scope *scope;            // Parsed scope from that module
+  const char *module_path;  // e.g., "string", "std/memory"
+  const char *alias;        // Import alias (e.g., "str")
+  Scope *scope;             // Parsed scope from that module
 } ImportedModule;
 
 typedef struct {
-  const char *module_name; // e.g., "math", "string", "std/memory"
-  const char *file_uri;    // Full file URI where this module is defined
+  const char *module_name;  // e.g., "math", "string"
+  const char *file_uri;     // Full file URI where module is defined
 } ModuleRegistryEntry;
 
 typedef struct {
@@ -159,11 +168,22 @@ typedef struct {
 } ModuleRegistry;
 
 typedef struct {
+  AstNode *ast;           // The module AST node
+  Scope *scope;           // The scope created during typecheck
+  const char *module_uri; // URI of the module file
+} ModuleInfo;
+
+// ============================================================================
+// DOCUMENT & SERVER STATE
+// ============================================================================
+
+typedef struct {
+  // Document identity
   const char *uri;
   const char *content;
   int version;
 
-  // Cached analysis results
+  // Analysis results (cached)
   Token *tokens;
   size_t token_count;
   AstNode *ast;
@@ -171,173 +191,115 @@ typedef struct {
   LSPDiagnostic *diagnostics;
   size_t diagnostic_count;
 
-  ArenaAllocator *arena;
-  bool needs_reanalysis;
-
+  // Module imports
   ImportedModule *imports;
   size_t import_count;
+
+  // Memory & state
+  ArenaAllocator *arena;
+  bool needs_reanalysis;
 } LSPDocument;
 
 typedef struct {
+  // Document tracking
   LSPDocument **documents;
   size_t document_count;
   size_t document_capacity;
 
+  // Module registry for workspace
   ModuleRegistry module_registry;
+
+  // Server state
   ArenaAllocator *arena;
   bool initialized;
   int client_process_id;
 } LSPServer;
 
 // ============================================================================
-// Core LSP Server Functions
+// SERVER LIFECYCLE
 // ============================================================================
 
-/**
- * @brief Initialize the LSP server
- */
 bool lsp_server_init(LSPServer *server, ArenaAllocator *arena);
-
-/**
- * @brief Main message processing loop
- */
 void lsp_server_run(LSPServer *server);
-
-/**
- * @brief Handle incoming LSP message
- */
+void lsp_server_shutdown(LSPServer *server);
 void lsp_handle_message(LSPServer *server, const char *message);
 
-/**
- * @brief Shutdown the server
- */
-void lsp_server_shutdown(LSPServer *server);
-
 // ============================================================================
-// Document Management Functions
+// DOCUMENT MANAGEMENT
 // ============================================================================
 
-/**
- * @brief Open a document and add it to the server
- */
 LSPDocument *lsp_document_open(LSPServer *server, const char *uri,
                                const char *content, int version);
-
-/**
- * @brief Update document content
- */
 bool lsp_document_update(LSPServer *server, const char *uri,
                          const char *content, int version);
-
-/**
- * @brief Close and remove a document
- */
 bool lsp_document_close(LSPServer *server, const char *uri);
-
-/**
- * @brief Find document by URI
- */
 LSPDocument *lsp_document_find(LSPServer *server, const char *uri);
-
-/**
- * @brief Analyze document (lex, parse, typecheck)
- */
 bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
                           BuildConfig *config);
 
 // ============================================================================
-// LSP Feature Implementations
+// MODULE & IMPORT RESOLUTION
 // ============================================================================
 
-/**
- * @brief Get hover information at position
- */
+void extract_imports(LSPDocument *doc, ArenaAllocator *arena);
+void resolve_imports(LSPServer *server, LSPDocument *doc,
+                     BuildConfig *config, GrowableArray *imported_modules);
+void build_module_registry(LSPServer *server, const char *workspace_uri);
+const char *lookup_module(LSPServer *server, const char *module_name);
+AstNode *parse_imported_module_ast(LSPServer *server,
+                                          const char *module_uri,
+                                          BuildConfig *config,
+                                          ArenaAllocator *arena);
+
+// ============================================================================
+// LSP FEATURES (Hover, Definition, Completion, etc.)
+// ============================================================================
+
 const char *lsp_hover(LSPDocument *doc, LSPPosition position,
                       ArenaAllocator *arena);
-
-/**
- * @brief Get definition location for symbol at position
- */
 LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
                             ArenaAllocator *arena);
-
-/**
- * @brief Get completions at position
- */
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena);
-
-/**
- * @brief Get document symbols (outline)
- */
-LSPDocumentSymbol **lsp_document_symbols(LSPDocument *doc, size_t *symbol_count,
+LSPDocumentSymbol **lsp_document_symbols(LSPDocument *doc, 
+                                         size_t *symbol_count,
                                          ArenaAllocator *arena);
-
-/**
- * @brief Get diagnostics (errors, warnings)
- */
 LSPDiagnostic *lsp_diagnostics(LSPDocument *doc, size_t *diagnostic_count,
                                ArenaAllocator *arena);
-
-/**
- * @brief Convert error system errors to LSP diagnostics
- */
 LSPDiagnostic *convert_errors_to_diagnostics(size_t *diagnostic_count,
                                              ArenaAllocator *arena);
 
 // ============================================================================
-// JSON-RPC Helpers
+// JSON-RPC PROTOCOL
 // ============================================================================
 
-/**
- * @brief Parse incoming JSON-RPC message
- */
 LSPMethod lsp_parse_method(const char *json);
-
-/**
- * @brief Send JSON-RPC response
- */
 void lsp_send_response(int id, const char *result);
-
-/**
- * @brief Send JSON-RPC notification
- */
 void lsp_send_notification(const char *method, const char *params);
-
-/**
- * @brief Send error response
- */
 void lsp_send_error(int id, int code, const char *message);
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
+// JSON extraction helpers
+char *extract_string(const char *json, const char *key, ArenaAllocator *arena);
+int extract_int(const char *json, const char *key);
+LSPPosition extract_position(const char *json);
 
-/**
- * @brief Convert file URI to path
- */
-const char *lsp_uri_to_path(const char *uri, ArenaAllocator *arena);
-
-/**
- * @brief Convert path to file URI
- */
-const char *lsp_path_to_uri(const char *path, ArenaAllocator *arena);
-
-/**
- * @brief Get token at position
- */
-Token *lsp_token_at_position(LSPDocument *doc, LSPPosition position);
-
-/**
- * @brief Get AST node at position
- */
-AstNode *lsp_node_at_position(LSPDocument *doc, LSPPosition position);
-
-/**
- * @brief Get symbol at position
- */
-Symbol *lsp_symbol_at_position(LSPDocument *doc, LSPPosition position);
-
+// JSON serialization helpers
+void serialize_diagnostics_to_json(const char *uri, LSPDiagnostic *diagnostics,
+                                   size_t diag_count, char *output,
+                                   size_t output_size);
 void serialize_completion_items(LSPCompletionItem *items, size_t count,
                                 char *output, size_t output_size);
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+// URI conversion
+const char *lsp_uri_to_path(const char *uri, ArenaAllocator *arena);
+const char *lsp_path_to_uri(const char *path, ArenaAllocator *arena);
+
+// Position-based queries
+Token *lsp_token_at_position(LSPDocument *doc, LSPPosition position);
+AstNode *lsp_node_at_position(LSPDocument *doc, LSPPosition position);
+Symbol *lsp_symbol_at_position(LSPDocument *doc, LSPPosition position);
