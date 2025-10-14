@@ -14,7 +14,7 @@ export function activate(context: ExtensionContext) {
     // Otherwise the run options are used
   const serverOptions: ServerOptions = {
     //? the name of the project is "luma" in the Makefile so this will be the name of exe for users
-    command: "/home/connor/Projects/Luma/luma",
+    command: "/home/thedevconnor/Projects/lux/luma",
     transport: TransportKind.stdio,
     args: ["-lsp"]
   };
@@ -22,7 +22,7 @@ export function activate(context: ExtensionContext) {
   // Options to control the language client
   const clientOptions: LanguageClientOptions = {
     // Register the server for all documents by default
-    documentSelector: [{ scheme: "file", language: "lux" }],
+    documentSelector: [{ scheme: "file", language: "luma" }],
     synchronize: {
       // Notify the server about file changes to '.clientrc files contained in the workspace
       fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
@@ -31,8 +31,8 @@ export function activate(context: ExtensionContext) {
 
   // Create the language client and start the client.
   client = new LanguageClient(
-    "lux-lsp",
-    "Lux LSP",
+    "luma-lsp",
+    "Luma LSP",
     serverOptions,
     clientOptions
   );

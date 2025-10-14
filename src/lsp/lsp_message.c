@@ -183,30 +183,78 @@ void lsp_handle_message(LSPServer *server, const char *message) {
   }
 
   case LSP_METHOD_TEXT_DOCUMENT_COMPLETION: {
-    fprintf(stderr, "[LSP] Handling completion\n");
+    fprintf(stderr, "[LSP] Handling completion - START\n");
+    fflush(stderr);
 
     const char *uri = extract_string(message, "uri", &temp_arena);
+    fprintf(stderr, "[LSP] Extracted URI: %s\n", uri ? uri : "NULL");
+    fflush(stderr);
+
     LSPPosition position = extract_position(message);
+    fprintf(stderr, "[LSP] Extracted position: line=%d, character=%d\n",
+            position.line, position.character);
+    fflush(stderr);
 
     if (uri) {
+      fprintf(stderr, "[LSP] Finding document...\n");
+      fflush(stderr);
+
       LSPDocument *doc = lsp_document_find(server, uri);
+      fprintf(stderr, "[LSP] Document found: %p\n", (void *)doc);
+      fflush(stderr);
 
       if (doc) {
+        fprintf(stderr, "[LSP] Calling lsp_completion...\n");
+        fflush(stderr);
+
         size_t count;
         LSPCompletionItem *items =
             lsp_completion(doc, position, &count, &temp_arena);
 
+        fprintf(stderr, "[LSP] lsp_completion returned: items=%p, count=%zu\n",
+                (void *)items, count);
+        fflush(stderr);
+
         if (items && count > 0) {
+          fprintf(stderr, "[LSP] Serializing %zu completion items...\n", count);
+          fflush(stderr);
+
           char result[16384];
           serialize_completion_items(items, count, result, sizeof(result));
+
+          fprintf(stderr, "[LSP] Serialized result (first 200 chars): %.200s\n",
+                  result);
+          fprintf(stderr, "[LSP] Sending response with request_id=%d\n",
+                  request_id);
+          fflush(stderr);
+
           lsp_send_response(request_id, result);
+
+          fprintf(stderr, "[LSP] Response sent successfully\n");
+          fflush(stderr);
         } else {
+          fprintf(stderr,
+                  "[LSP] No items or count=0, sending empty response\n");
+          fflush(stderr);
+
           lsp_send_response(request_id, "{\"items\":[]}");
+
+          fprintf(stderr, "[LSP] Empty response sent\n");
+          fflush(stderr);
         }
       } else {
+        fprintf(stderr, "[LSP] Document not found, sending empty response\n");
+        fflush(stderr);
         lsp_send_response(request_id, "{\"items\":[]}");
       }
+    } else {
+      fprintf(stderr, "[LSP] No URI extracted, sending empty response\n");
+      fflush(stderr);
+      lsp_send_response(request_id, "{\"items\":[]}");
     }
+
+    fprintf(stderr, "[LSP] Handling completion - END\n");
+    fflush(stderr);
     break;
   }
 

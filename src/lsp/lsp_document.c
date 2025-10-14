@@ -95,12 +95,14 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
   if (!doc || !doc->needs_reanalysis)
     return true;
 
-  // NEW: Save import scopes BEFORE destroying arena (they live in server arena after successful typecheck)
+  // NEW: Save import scopes BEFORE destroying arena (they live in server arena
+  // after successful typecheck)
   Scope **saved_scopes = NULL;
   size_t saved_import_count = doc->import_count;
   if (saved_import_count > 0 && doc->imports) {
     // Allocate in server arena (persistent)
-    saved_scopes = arena_alloc(server->arena, saved_import_count * sizeof(Scope *), alignof(Scope *));
+    saved_scopes = arena_alloc(
+        server->arena, saved_import_count * sizeof(Scope *), alignof(Scope *));
     for (size_t i = 0; i < saved_import_count; i++) {
       saved_scopes[i] = doc->imports[i].scope;
     }
@@ -124,7 +126,8 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
   if (saved_scopes && doc->import_count == saved_import_count) {
     for (size_t i = 0; i < doc->import_count; i++) {
       doc->imports[i].scope = saved_scopes[i];
-      fprintf(stderr, "[LSP] Restored scope for import '%s'\n", doc->imports[i].module_path);
+      fprintf(stderr, "[LSP] Restored scope for import '%s'\n",
+              doc->imports[i].module_path);
     }
   }
 
@@ -153,6 +156,10 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
   if (!doc->ast || error_get_count() > 0) {
     fprintf(stderr, "[LSP] Parse has %d errors, skipping typecheck\n",
             error_get_count());
+
+    // CRITICAL FIX: Clear scope when parse fails
+    doc->scope = NULL;
+
     doc->diagnostics =
         convert_errors_to_diagnostics(&doc->diagnostic_count, doc->arena);
     doc->needs_reanalysis = false;
@@ -207,15 +214,24 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
 
   if (!combined_program) {
     fprintf(stderr, "[LSP] Failed to create combined program\n");
+    doc->scope = NULL; // Clear scope on failure
     doc->needs_reanalysis = false;
     return false;
   }
 
   // Use SERVER arena for global scope so it persists across document analyses
-  Scope global_scope;
-  init_scope(&global_scope, NULL, "global", server->arena);
-  global_scope.config = config;
-  doc->scope = &global_scope;
+  Scope *global_scope =
+      arena_alloc(server->arena, sizeof(Scope), alignof(Scope));
+  if (!global_scope) {
+    fprintf(stderr, "[LSP] Failed to allocate global scope\n");
+    doc->scope = NULL;
+    doc->needs_reanalysis = false;
+    return false;
+  }
+
+  init_scope(global_scope, NULL, "global", server->arena);
+  global_scope->config = config;
+  doc->scope = global_scope;
 
   tc_error_init(doc->tokens, doc->token_count, file_path, doc->arena);
 
@@ -225,40 +241,49 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
   bool success = false;
 
   if (combined_program && all_modules.count > 0) {
-    success = typecheck(combined_program, &global_scope, server->arena, config);
+    success = typecheck(combined_program, global_scope, server->arena, config);
   }
 
   fprintf(stderr, "[LSP] Typecheck result: %s, errors: %d\n",
           success ? "success" : "failed", error_get_count());
 
-  // Link module scopes EVEN IF typecheck failed
-  // The imported modules may have been successfully typechecked even if main module has errors
-  for (size_t i = 0; i < doc->import_count; i++) {
-    ImportedModule *import = &doc->imports[i];
+  // If typecheck failed, clear the scope (it may be partially initialized)
+  if (!success) {
+    fprintf(stderr, "[LSP] Typecheck failed, clearing scope\n");
+    doc->scope = NULL;
+  }
 
-    // Find the corresponding module AST node from imported_modules
-    for (size_t j = 0; j < all_modules.count - 1; j++) { // -1 to skip main module
-      AstNode *module_ast = ((AstNode **)all_modules.data)[j];
+  // Link module scopes ONLY IF typecheck succeeded
+  if (success) {
+    for (size_t i = 0; i < doc->import_count; i++) {
+      ImportedModule *import = &doc->imports[i];
 
-      if (module_ast->type == AST_PREPROCESSOR_MODULE) {
-        const char *module_file_name = module_ast->preprocessor.module.name;
+      // Find the corresponding module AST node from imported_modules
+      for (size_t j = 0; j < all_modules.count - 1;
+           j++) { // -1 to skip main module
+        AstNode *module_ast = ((AstNode **)all_modules.data)[j];
 
-        if (strcmp(module_file_name, import->module_path) == 0) {
-          // Found the matching module - extract its scope
-          Scope *module_scope = (Scope *)module_ast->preprocessor.module.scope;
-          
-          // Only update if we got a valid scope
-          if (module_scope) {
-            import->scope = module_scope;
+        if (module_ast->type == AST_PREPROCESSOR_MODULE) {
+          const char *module_file_name = module_ast->preprocessor.module.name;
+
+          if (strcmp(module_file_name, import->module_path) == 0) {
+            // Found the matching module - extract its scope
+            Scope *module_scope =
+                (Scope *)module_ast->preprocessor.module.scope;
+
+            // Only update if we got a valid scope
+            if (module_scope) {
+              import->scope = module_scope;
+            }
+            // If module_scope is NULL, keep the saved scope
+
+            fprintf(stderr,
+                    "[LSP] Linked import '%s' (alias: %s) to scope with %zu "
+                    "symbols\n",
+                    import->module_path, import->alias ? import->alias : "none",
+                    import->scope ? import->scope->symbols.count : 0);
+            break;
           }
-          // If module_scope is NULL, keep the saved scope
-
-          fprintf(stderr,
-                  "[LSP] Linked import '%s' (alias: %s) to scope with %zu symbols\n",
-                  import->module_path, 
-                  import->alias ? import->alias : "none",
-                  import->scope ? import->scope->symbols.count : 0);
-          break;
         }
       }
     }

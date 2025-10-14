@@ -16,11 +16,7 @@
 // CORE LSP TYPES
 // ============================================================================
 
-typedef enum { 
-  LSP_REQUEST, 
-  LSP_RESPONSE, 
-  LSP_NOTIFICATION 
-} LSPMessageType;
+typedef enum { LSP_REQUEST, LSP_RESPONSE, LSP_NOTIFICATION } LSPMessageType;
 
 typedef enum {
   LSP_METHOD_INITIALIZE,
@@ -151,14 +147,14 @@ typedef struct {
 // ============================================================================
 
 typedef struct {
-  const char *module_path;  // e.g., "string", "std/memory"
-  const char *alias;        // Import alias (e.g., "str")
-  Scope *scope;             // Parsed scope from that module
+  const char *module_path; // e.g., "string", "std/memory"
+  const char *alias;       // Import alias (e.g., "str")
+  Scope *scope;            // Parsed scope from that module
 } ImportedModule;
 
 typedef struct {
-  const char *module_name;  // e.g., "math", "string"
-  const char *file_uri;     // Full file URI where module is defined
+  const char *module_name; // e.g., "math", "string"
+  const char *file_uri;    // Full file URI where module is defined
 } ModuleRegistryEntry;
 
 typedef struct {
@@ -242,14 +238,12 @@ bool lsp_document_analyze(LSPDocument *doc, LSPServer *server,
 // ============================================================================
 
 void extract_imports(LSPDocument *doc, ArenaAllocator *arena);
-void resolve_imports(LSPServer *server, LSPDocument *doc,
-                     BuildConfig *config, GrowableArray *imported_modules);
+void resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config,
+                     GrowableArray *imported_modules);
 void build_module_registry(LSPServer *server, const char *workspace_uri);
 const char *lookup_module(LSPServer *server, const char *module_name);
-AstNode *parse_imported_module_ast(LSPServer *server,
-                                          const char *module_uri,
-                                          BuildConfig *config,
-                                          ArenaAllocator *arena);
+AstNode *parse_imported_module_ast(LSPServer *server, const char *module_uri,
+                                   BuildConfig *config, ArenaAllocator *arena);
 
 // ============================================================================
 // LSP FEATURES (Hover, Definition, Completion, etc.)
@@ -262,8 +256,7 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena);
-LSPDocumentSymbol **lsp_document_symbols(LSPDocument *doc, 
-                                         size_t *symbol_count,
+LSPDocumentSymbol **lsp_document_symbols(LSPDocument *doc, size_t *symbol_count,
                                          ArenaAllocator *arena);
 LSPDiagnostic *lsp_diagnostics(LSPDocument *doc, size_t *diagnostic_count,
                                ArenaAllocator *arena);

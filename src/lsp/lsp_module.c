@@ -5,8 +5,7 @@
 #include "lsp.h"
 
 // Extract @module declaration from file content
-const char *extract_module_name(const char *content,
-                                       ArenaAllocator *arena) {
+const char *extract_module_name(const char *content, ArenaAllocator *arena) {
   if (!content)
     return NULL;
 
@@ -71,7 +70,7 @@ const char *extract_module_name(const char *content,
 
 // Scan a single file and register its module
 void scan_file_for_module(LSPServer *server, const char *file_uri,
-                                 ArenaAllocator *temp_arena) {
+                          ArenaAllocator *temp_arena) {
   const char *file_path = lsp_uri_to_path(file_uri, temp_arena);
   if (!file_path)
     return;
@@ -134,7 +133,7 @@ void scan_file_for_module(LSPServer *server, const char *file_uri,
 
 // Recursively scan directory for .lx files
 void scan_directory_recursive(LSPServer *server, const char *dir_path,
-                                     ArenaAllocator *temp_arena) {
+                              ArenaAllocator *temp_arena) {
 #ifdef _WIN32
   WIN32_FIND_DATA find_data;
   char search_path[512];
@@ -206,8 +205,7 @@ void scan_directory_recursive(LSPServer *server, const char *dir_path,
 }
 
 // Build module registry by scanning workspace
-void build_module_registry(LSPServer *server,
-                                  const char *workspace_uri) {
+void build_module_registry(LSPServer *server, const char *workspace_uri) {
   fprintf(stderr, "[LSP] Building module registry for workspace: %s\n",
           workspace_uri);
 
@@ -348,10 +346,8 @@ const char *resolve_module_path(const char *current_uri,
 }
 
 // Update parse_imported_module to return the parsed module AST, not just scope
-AstNode *parse_imported_module_ast(LSPServer *server,
-                                          const char *module_uri,
-                                          BuildConfig *config,
-                                          ArenaAllocator *arena) {
+AstNode *parse_imported_module_ast(LSPServer *server, const char *module_uri,
+                                   BuildConfig *config, ArenaAllocator *arena) {
   // Check if already opened
   LSPDocument *module_doc = lsp_document_find(server, module_uri);
   if (module_doc && module_doc->ast) {
@@ -410,8 +406,7 @@ AstNode *parse_imported_module_ast(LSPServer *server,
 }
 
 // Update resolve_imports to store module scopes from the typechecker
-void resolve_imports(LSPServer *server, LSPDocument *doc,
-                     BuildConfig *config,
+void resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config,
                      GrowableArray *imported_modules) {
   if (!doc || !doc->imports || doc->import_count == 0)
     return;

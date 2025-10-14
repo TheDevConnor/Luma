@@ -43,13 +43,23 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena) {
-  if (!doc || !completion_count)
+  fprintf(stderr,
+          "[LSP] lsp_completion called: doc=%p, position=(%d,%d), arena=%p\n",
+          (void *)doc, position.line, position.character, (void *)arena);
+
+  if (!doc || !completion_count) {
+    fprintf(stderr,
+            "[LSP] lsp_completion early return: doc=%p, completion_count=%p\n",
+            (void *)doc, (void *)completion_count);
     return NULL;
+  }
 
   Token *token = lsp_token_at_position(doc, position);
+  fprintf(stderr, "[LSP] Token at position: %p\n", (void *)token);
 
   GrowableArray completions;
   growable_array_init(&completions, arena, 32, sizeof(LSPCompletionItem));
+  fprintf(stderr, "[LSP] Initialized completions array\n");
 
   // Add keyword snippets based on Luma syntax
   const struct {
@@ -58,12 +68,19 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
     const char *detail;
   } keywords[] = {
       // Top-level declarations
-      {"const fn", "const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n};",
-       "Function declaration"},
+      {"const fn", "const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "Function declaration (Private by default)"},
+      {"pub const fn",
+       "pub const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "Public Function declaration"},
+      {"priv const fn",
+       "priv const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "Private Function declaration"},
+
       {"const struct",
-       "const ${1:Name} = struct {\n\t${2:field}: ${3:Type}$0\n};",
+       "const ${1:Name} = struct {\n\t${2:field}: ${3:Type}$0,\n};",
        "Struct definition"},
-      {"const enum", "const ${1:Name} = enum {\n\t${2:Variant}$0\n};",
+      {"const enum", "const ${1:Name} = enum {\n\t${2:Variant}$0,\n};",
        "Enum definition"},
       {"const var", "const ${1:name}: ${2:Type} = ${3:value};$0",
        "Top-level constant"},
@@ -148,101 +165,139 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
     }
   }
 
+  fprintf(stderr, "[LSP] Added %zu keyword completions\n", completions.count);
+
   // Add symbols from scope (variables, functions, etc.)
+  fprintf(stderr, "[LSP] Checking document scope: %p\n", (void *)doc->scope);
   if (doc->scope) {
     Scope *current_scope = doc->scope;
+    int scope_depth = 0;
     while (current_scope) {
-      for (size_t i = 0; i < current_scope->symbols.count; i++) {
-        Symbol *sym = (Symbol *)((char *)current_scope->symbols.data +
-                                 i * sizeof(Symbol));
+      fprintf(stderr, "[LSP] Scope depth %d: symbols.data=%p, count=%zu\n",
+              scope_depth, (void *)current_scope->symbols.data,
+              current_scope->symbols.count);
+
+      // SAFETY CHECK: Validate scope has valid data
+      if (current_scope->symbols.data && current_scope->symbols.count > 0) {
+        for (size_t i = 0; i < current_scope->symbols.count; i++) {
+          Symbol *sym = (Symbol *)((char *)current_scope->symbols.data +
+                                   i * sizeof(Symbol));
+
+          // SAFETY CHECK: Validate symbol has valid name and type
+          if (!sym || !sym->name || !sym->type) {
+            continue;
+          }
+
+          LSPCompletionItem *item =
+              (LSPCompletionItem *)growable_array_push(&completions);
+          if (item) {
+            item->label = arena_strdup(arena, sym->name);
+
+            // Determine kind based on symbol type
+            if (sym->type->type == AST_TYPE_FUNCTION) {
+              item->kind = LSP_COMPLETION_FUNCTION;
+              // Create function call snippet
+              char snippet[512];
+              snprintf(snippet, sizeof(snippet), "%s($0)", sym->name);
+              item->insert_text = arena_strdup(arena, snippet);
+              item->format = LSP_INSERT_FORMAT_SNIPPET;
+            } else if (sym->type->type == AST_TYPE_STRUCT) {
+              item->kind = LSP_COMPLETION_STRUCT;
+              item->insert_text = arena_strdup(arena, sym->name);
+              item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+            } else {
+              item->kind = LSP_COMPLETION_VARIABLE;
+              item->insert_text = arena_strdup(arena, sym->name);
+              item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+            }
+
+            item->detail = type_to_string(sym->type, arena);
+            item->documentation = NULL;
+            item->sort_text = NULL;
+            item->filter_text = NULL;
+          }
+        }
+      }
+      scope_depth++;
+      current_scope = current_scope->parent;
+    }
+    fprintf(stderr, "[LSP] Finished adding scope symbols, total depth: %d\n",
+            scope_depth);
+  }
+
+  fprintf(stderr, "[LSP] Checking %zu imports for completions\n",
+          doc->import_count);
+
+  // Add imported module symbols
+  if (doc->imports && doc->import_count > 0) {
+    for (size_t i = 0; i < doc->import_count; i++) {
+      ImportedModule *import = &doc->imports[i];
+
+      fprintf(stderr,
+              "[LSP] Import %zu: module_path='%s', alias='%s', scope=%p\n", i,
+              import->module_path ? import->module_path : "NULL",
+              import->alias ? import->alias : "NULL", (void *)import->scope);
+
+      // CRITICAL SAFETY CHECKS
+      if (!import->scope) {
+        fprintf(stderr, "[LSP] Skipping import - no scope\n");
+        continue;
+      }
+
+      // Validate scope structure
+      if (!import->scope->symbols.data) {
+        fprintf(stderr, "[LSP] Skipping import - scope has no symbol data\n");
+        continue;
+      }
+
+      fprintf(stderr, "[LSP] Import scope has %zu symbols\n",
+              import->scope->symbols.count);
+
+      // Add symbols with prefix (e.g., "string::strlen")
+      const char *prefix = import->alias ? import->alias : "module";
+
+      for (size_t j = 0; j < import->scope->symbols.count; j++) {
+        Symbol *sym = (Symbol *)((char *)import->scope->symbols.data +
+                                 j * sizeof(Symbol));
+
+        // SAFETY CHECK: Validate symbol
+        if (!sym || !sym->name || !sym->type) {
+          fprintf(stderr, "[LSP]   Symbol %zu: INVALID (skipping)\n", j);
+          continue;
+        }
+
+        fprintf(stderr, "[LSP]   Symbol %zu: '%s', is_public=%d\n", j,
+                sym->name, sym->is_public);
+
+        // Only include public symbols
+        if (!sym->is_public)
+          continue;
 
         LSPCompletionItem *item =
             (LSPCompletionItem *)growable_array_push(&completions);
         if (item) {
-          item->label = arena_strdup(arena, sym->name);
+          // Format: "alias::name"
+          size_t label_len = strlen(prefix) + strlen(sym->name) + 3;
+          char *label = arena_alloc(arena, label_len, 1);
+          snprintf(label, label_len, "%s::%s", prefix, sym->name);
 
-          // Determine kind based on symbol type
-          if (sym->type->type == AST_TYPE_FUNCTION) {
-            item->kind = LSP_COMPLETION_FUNCTION;
-            // Create function call snippet
-            char snippet[512];
-            snprintf(snippet, sizeof(snippet), "%s($0)", sym->name);
-            item->insert_text = arena_strdup(arena, snippet);
-            item->format = LSP_INSERT_FORMAT_SNIPPET;
-          } else if (sym->type->type == AST_TYPE_STRUCT) {
-            item->kind = LSP_COMPLETION_STRUCT;
-            item->insert_text = arena_strdup(arena, sym->name);
-            item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
-          } else {
-            item->kind = LSP_COMPLETION_VARIABLE;
-            item->insert_text = arena_strdup(arena, sym->name);
-            item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
-          }
-
+          item->label = label;
+          item->kind = (sym->type->type == AST_TYPE_FUNCTION)
+                           ? LSP_COMPLETION_FUNCTION
+                           : LSP_COMPLETION_VARIABLE;
+          item->insert_text = arena_strdup(arena, label);
+          item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
           item->detail = type_to_string(sym->type, arena);
           item->documentation = NULL;
           item->sort_text = NULL;
           item->filter_text = NULL;
         }
       }
-      current_scope = current_scope->parent;
-    }
-  }
-
-  fprintf(stderr, "[LSP] Checking %zu imports for completions\n",
-          doc->import_count);
-  for (size_t i = 0; i < doc->import_count; i++) {
-    ImportedModule *import = &doc->imports[i];
-
-    fprintf(stderr,
-            "[LSP] Import %zu: module_path='%s', alias='%s', scope=%p\n", i,
-            import->module_path ? import->module_path : "NULL",
-            import->alias ? import->alias : "NULL", (void *)import->scope);
-
-    if (!import->scope) {
-      fprintf(stderr, "[LSP] Skipping import - no scope\n");
-      continue;
-    }
-
-    fprintf(stderr, "[LSP] Import scope has %zu symbols\n",
-            import->scope->symbols.count);
-
-    // Add symbols with prefix (e.g., "string::strlen")
-    const char *prefix = import->alias ? import->alias : "module";
-
-    for (size_t j = 0; j < import->scope->symbols.count; j++) {
-      Symbol *sym =
-          (Symbol *)((char *)import->scope->symbols.data + j * sizeof(Symbol));
-
-      fprintf(stderr, "[LSP]   Symbol %zu: '%s', is_public=%d\n", j, sym->name,
-              sym->is_public);
-
-      // Only include public symbols
-      if (!sym->is_public)
-        continue;
-
-      LSPCompletionItem *item =
-          (LSPCompletionItem *)growable_array_push(&completions);
-      if (item) {
-        // Format: "alias::name"
-        size_t label_len = strlen(prefix) + strlen(sym->name) + 3;
-        char *label = arena_alloc(arena, label_len, 1);
-        snprintf(label, label_len, "%s::%s", prefix, sym->name);
-
-        item->label = label;
-        item->kind = (sym->type->type == AST_TYPE_FUNCTION)
-                         ? LSP_COMPLETION_FUNCTION
-                         : LSP_COMPLETION_VARIABLE;
-        item->insert_text = arena_strdup(arena, label);
-        item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
-        item->detail = type_to_string(sym->type, arena);
-        item->documentation = NULL;
-        item->sort_text = NULL;
-        item->filter_text = NULL;
-      }
     }
   }
 
   *completion_count = completions.count;
+  fprintf(stderr, "[LSP] Returning %zu completion items\n", *completion_count);
+  fflush(stderr); // CRITICAL: Ensure logs are written before return
   return (LSPCompletionItem *)completions.data;
 }
