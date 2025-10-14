@@ -23,5 +23,7 @@ docs/xml/
 *.s
 
 # ignore the lsp-client server node modules
-src/lsp/vscode-server/node_modules
-src/lsp/vscode-server/client/node_modules
+node_modules
+package-lock.json
+tsconfig.tsbuildinfo
+src/lsp/language-support/client/out
