@@ -1,57 +1,97 @@
 #include <ctype.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "lsp.h"
 
-// ============================================================================
-// JSON Parsing Utilities
-// ============================================================================
-
-char *extract_string(const char *json, const char *key,
-                            ArenaAllocator *arena) {
+char *extract_string(const char *json, const char *key, ArenaAllocator *arena) {
   char search[256];
   snprintf(search, sizeof(search), "\"%s\"", key);
 
   const char *found = strstr(json, search);
-  if (!found)
+  if (!found) {
+    fprintf(stderr, "[LSP] extract_string: key '%s' not found\n", key);
     return NULL;
+  }
 
-  const char *colon = strchr(found + strlen(search), ':');
-  if (!colon)
-    return NULL;
+  const char *colon = found + strlen(search);
 
-  const char *start = colon + 1;
+  // Skip whitespace and colon
+  while (*colon && (isspace(*colon) || *colon == ':')) {
+    colon++;
+  }
+
+  const char *start = colon;
+
+  // Skip whitespace before opening quote
   while (*start && isspace(*start))
     start++;
-  if (*start != '"')
-    return NULL;
-  start++;
 
-  // Allocate a buffer for the unescaped string (worst case: same size)
+  if (*start != '"') {
+    fprintf(stderr, "[LSP] extract_string: expected quote after key '%s'\n",
+            key);
+    return NULL;
+  }
+  start++; // Skip opening quote
+
+  // Allocate buffer for the unescaped string
   size_t max_len = strlen(start);
   char *result = arena_alloc(arena, max_len + 1, 1);
+  if (!result) {
+    fprintf(stderr, "[LSP] extract_string: allocation failed\n");
+    return NULL;
+  }
+
   char *dst = result;
+  const char *src = start;
 
   // Parse and unescape the JSON string
-  const char *src = start;
   while (*src && *src != '"') {
     if (*src == '\\') {
       src++; // Skip the backslash
-      if (*src == 'n') {
+      if (!*src)
+        break; // Guard against trailing backslash
+
+      switch (*src) {
+      case 'n':
         *dst++ = '\n';
-      } else if (*src == 't') {
+        break;
+      case 't':
         *dst++ = '\t';
-      } else if (*src == 'r') {
+        break;
+      case 'r':
         *dst++ = '\r';
-      } else if (*src == '"') {
+        break;
+      case '"':
         *dst++ = '"';
-      } else if (*src == '\\') {
+        break;
+      case '\\':
         *dst++ = '\\';
-      } else {
+        break;
+      case '/':
+        *dst++ = '/';
+        break;
+      case 'b':
+        *dst++ = '\b';
+        break;
+      case 'f':
+        *dst++ = '\f';
+        break;
+      case 'u': {
+        // Unicode escape \uXXXX - simplified handling
+        // For full support, you'd need proper UTF-8 encoding
+        src++;
+        if (strlen(src) >= 4) {
+          // Skip the 4 hex digits for now (proper impl needs conversion)
+          src += 3; // +3 because we increment at end of loop
+        }
+        break;
+      }
+      default:
         // Unknown escape, keep the character
         *dst++ = *src;
+        break;
       }
       src++;
     } else {
@@ -60,33 +100,43 @@ char *extract_string(const char *json, const char *key,
   }
 
   *dst = '\0';
+
+  fprintf(stderr, "[LSP] extract_string: key '%s' = '%s'\n", key, result);
   return result;
 }
 
 int extract_int(const char *json, const char *key) {
-  // Build search patterns for both "key": value and "key" : value (with spaces)
   char search[256];
   snprintf(search, sizeof(search), "\"%s\"", key);
 
   const char *found = strstr(json, search);
   if (!found) {
+    fprintf(stderr, "[LSP] extract_int: key '%s' not found\n", key);
     return -1;
   }
 
   // Find the colon after the key
   const char *colon = found + strlen(search);
 
-  // Skip whitespace and colon
+  // Skip ALL whitespace and the colon character
   while (*colon && (isspace(*colon) || *colon == ':')) {
     colon++;
   }
 
-  // Now we should be at the number
-  if (!*colon || !isdigit(*colon)) {
+  // Check if we have a valid number (could be negative)
+  if (!*colon) {
+    fprintf(stderr, "[LSP] extract_int: no value after key '%s'\n", key);
     return -1;
   }
 
-  return atoi(colon);
+  if (*colon == '-' || isdigit(*colon)) {
+    int value = atoi(colon);
+    fprintf(stderr, "[LSP] extract_int: key '%s' = %d\n", key, value);
+    return value;
+  }
+
+  fprintf(stderr, "[LSP] extract_int: invalid number for key '%s'\n", key);
+  return -1;
 }
 
 LSPPosition extract_position(const char *json) {
@@ -101,43 +151,88 @@ LSPPosition extract_position(const char *json) {
   return pos;
 }
 
-// ============================================================================
-// JSON-RPC Helpers
-// ============================================================================
+const char *find_json_value(const char *json, const char *key) {
+  char search[256];
+  snprintf(search, sizeof(search), "\"%s\"", key);
+
+  const char *found = strstr(json, search);
+  if (!found) {
+    return NULL;
+  }
+
+  // Skip to colon
+  const char *colon = found + strlen(search);
+  while (*colon && *colon != ':') {
+    colon++;
+  }
+
+  if (!*colon)
+    return NULL;
+  colon++; // Skip the colon
+
+  // Skip whitespace
+  while (*colon && isspace(*colon)) {
+    colon++;
+  }
+
+  return colon;
+}
 
 LSPMethod lsp_parse_method(const char *json) {
-  if (!json)
+  if (!json) {
+    fprintf(stderr, "[LSP] parse_method: NULL input\n");
     return LSP_METHOD_UNKNOWN;
+  }
 
-  // CHECK LONGER STRINGS FIRST!
-  if (strstr(json, "textDocument/documentSymbol"))
+  // Log the first part of the JSON for debugging
+  fprintf(stderr, "[LSP] parse_method: checking first 200 chars: %.200s\n",
+          json);
+
+  // Find the "method" value
+  const char *method_value = find_json_value(json, "method");
+  if (!method_value) {
+    fprintf(stderr, "[LSP] parse_method: no 'method' field found\n");
+    return LSP_METHOD_UNKNOWN;
+  }
+
+  // Extract method string (skip opening quote)
+  if (*method_value == '"') {
+    method_value++;
+  }
+
+  fprintf(stderr, "[LSP] parse_method: found method starting with: %.50s\n",
+          method_value);
+
+  // Check methods - LONGEST FIRST to avoid partial matches
+  if (strncmp(method_value, "textDocument/documentSymbol", 27) == 0)
     return LSP_METHOD_TEXT_DOCUMENT_DOCUMENT_SYMBOL;
-  if (strstr(json, "textDocument/semanticTokens"))
+  if (strncmp(method_value, "textDocument/semanticTokens", 27) == 0)
     return LSP_METHOD_TEXT_DOCUMENT_SEMANTIC_TOKENS;
-  if (strstr(json, "textDocument/didOpen"))
-    return LSP_METHOD_TEXT_DOCUMENT_DID_OPEN;
-  if (strstr(json, "textDocument/didChange"))
-    return LSP_METHOD_TEXT_DOCUMENT_DID_CHANGE;
-  if (strstr(json, "textDocument/didClose"))
-    return LSP_METHOD_TEXT_DOCUMENT_DID_CLOSE;
-  if (strstr(json, "textDocument/hover"))
-    return LSP_METHOD_TEXT_DOCUMENT_HOVER;
-  if (strstr(json, "textDocument/definition"))
-    return LSP_METHOD_TEXT_DOCUMENT_DEFINITION;
-  if (strstr(json, "textDocument/completion"))
+  if (strncmp(method_value, "textDocument/completion", 23) == 0)
     return LSP_METHOD_TEXT_DOCUMENT_COMPLETION;
+  if (strncmp(method_value, "textDocument/definition", 23) == 0)
+    return LSP_METHOD_TEXT_DOCUMENT_DEFINITION;
+  if (strncmp(method_value, "textDocument/didChange", 22) == 0)
+    return LSP_METHOD_TEXT_DOCUMENT_DID_CHANGE;
+  if (strncmp(method_value, "textDocument/didClose", 21) == 0)
+    return LSP_METHOD_TEXT_DOCUMENT_DID_CLOSE;
+  if (strncmp(method_value, "textDocument/didOpen", 20) == 0)
+    return LSP_METHOD_TEXT_DOCUMENT_DID_OPEN;
+  if (strncmp(method_value, "textDocument/hover", 18) == 0)
+    return LSP_METHOD_TEXT_DOCUMENT_HOVER;
 
-  // Check "initialized" BEFORE "initialize"!
-  if (strstr(json, "initialized"))
+  // Check "initialized" BEFORE "initialize" (11 vs 10 chars)
+  if (strncmp(method_value, "initialized", 11) == 0)
     return LSP_METHOD_INITIALIZED;
-  if (strstr(json, "initialize"))
+  if (strncmp(method_value, "initialize", 10) == 0)
     return LSP_METHOD_INITIALIZE;
 
-  if (strstr(json, "shutdown"))
+  if (strncmp(method_value, "shutdown", 8) == 0)
     return LSP_METHOD_SHUTDOWN;
-  if (strstr(json, "exit"))
+  if (strncmp(method_value, "exit", 4) == 0)
     return LSP_METHOD_EXIT;
 
+  fprintf(stderr, "[LSP] parse_method: unknown method\n");
   return LSP_METHOD_UNKNOWN;
 }
 
@@ -172,10 +267,9 @@ void lsp_send_error(int id, int code, const char *message) {
   fflush(stdout);
 }
 
-void serialize_diagnostics_to_json(const char *uri,
-                                          LSPDiagnostic *diagnostics,
-                                          size_t diag_count, char *output,
-                                          size_t output_size) {
+void serialize_diagnostics_to_json(const char *uri, LSPDiagnostic *diagnostics,
+                                   size_t diag_count, char *output,
+                                   size_t output_size) {
   size_t offset = 0;
   offset += snprintf(output + offset, output_size - offset,
                      "{\"uri\":\"%s\",\"diagnostics\":[", uri);

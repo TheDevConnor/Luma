@@ -14,7 +14,7 @@ export function activate(context: ExtensionContext) {
     // Otherwise the run options are used
   const serverOptions: ServerOptions = {
     //? the name of the project is "luma" in the Makefile so this will be the name of exe for users
-    command: "luma",
+    command: "/home/connor/Projects/Luma/luma",
     transport: TransportKind.stdio,
     args: ["-lsp"]
   };
