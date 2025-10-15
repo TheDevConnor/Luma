@@ -1,15 +1,19 @@
 @module "main"
 
+const swap = fn (a: *int, b: *int) void {
+  let tmp: int = *a;
+  *a = *b;
+  *b = tmp;
+}
+
 const bubble_sort = fn (n: int, arr: *int) void {
-  loop [i: int = 0](i < n-1) : (++i) {
+  loop [i: int = 0, j: int = 0](i < n-1) : (++i) {
     let swapped: int = 0;
+    j = 0;
 
-    loop [j: int = 0](j < n-1) : (++j) {
+    loop (j < n - i - 1) : (++j) {
       if (arr[j] > arr[j + 1]) {
-        let temp: int = arr[j];
-        arr[j] = arr[j + 1];
-        arr[j + 1] = temp;
-
+        swap(&arr[j], &arr[j+1]); 
         swapped = 1;
       }
     }
@@ -25,8 +29,7 @@ const print_arr = fn (n: int, arr: *int) void {
   output("\n");
 }
 
-#takes_ownership 
-const free_arr = fn (arr: *int) void { free(arr); }
+#takes_ownership const free_arr = fn (arr: *int) void { free(arr); }
 
 pub const main = fn () int {
   let arr: *int = cast<*int>(alloc(7 * sizeof<int>));

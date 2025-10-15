@@ -1484,6 +1484,77 @@ LLVMValueRef codegen_expr_addr(CodeGenContext *ctx, AstNode *node) {
   } else if (target->type == AST_EXPR_DEREF) {
     // &(*ptr) == ptr
     return codegen_expr(ctx, target->expr.deref.object);
+  } else if (target->type == AST_EXPR_INDEX) {
+    // ADD THIS CASE: Handle &arr[i] for pointer indexing
+    LLVMValueRef object = codegen_expr(ctx, target->expr.index.object);
+    if (!object) {
+      return NULL;
+    }
+
+    LLVMValueRef index = codegen_expr(ctx, target->expr.index.index);
+    if (!index) {
+      return NULL;
+    }
+
+    LLVMTypeRef object_type = LLVMTypeOf(object);
+    LLVMTypeKind object_kind = LLVMGetTypeKind(object_type);
+
+    if (object_kind == LLVMPointerTypeKind) {
+      // For pointer indexing, determine element type
+      LLVMTypeRef element_type = NULL;
+
+      if (target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
+        const char *var_name = target->expr.index.object->expr.identifier.name;
+        LLVM_Symbol *sym = find_symbol(ctx, var_name);
+        if (sym && sym->element_type) {
+          element_type = sym->element_type;
+        }
+      }
+
+      // Fallback: infer from variable name (temporary)
+      if (!element_type &&
+          target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
+        const char *var_name = target->expr.index.object->expr.identifier.name;
+        if (strstr(var_name, "int") && !strstr(var_name, "char")) {
+          element_type = LLVMInt64TypeInContext(ctx->context);
+        }
+      }
+
+      if (!element_type) {
+        fprintf(
+            stderr,
+            "Error: Could not determine element type for pointer indexing\n");
+        return NULL;
+      }
+
+      // Return the address directly using GEP (don't load)
+      return LLVMBuildGEP2(ctx->builder, element_type, object, &index, 1,
+                           "element_addr");
+    } else if (object_kind == LLVMArrayTypeKind) {
+      // For array indexing
+      LLVMValueRef array_ptr;
+
+      if (target->expr.index.object->type == AST_EXPR_IDENTIFIER) {
+        LLVM_Symbol *sym =
+            find_symbol(ctx, target->expr.index.object->expr.identifier.name);
+        if (sym && !sym->is_function) {
+          array_ptr = sym->value;
+        } else {
+          return NULL;
+        }
+      } else {
+        array_ptr =
+            LLVMBuildAlloca(ctx->builder, object_type, "temp_array_ptr");
+        LLVMBuildStore(ctx->builder, object, array_ptr);
+      }
+
+      LLVMValueRef indices[2];
+      indices[0] = LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);
+      indices[1] = index;
+
+      return LLVMBuildGEP2(ctx->builder, object_type, array_ptr, indices, 2,
+                           "array_element_addr");
+    }
   } else if (target->type == AST_EXPR_MEMBER) {
     // Handle address of struct member: &obj.field
     const char *field_name = target->expr.member.member;

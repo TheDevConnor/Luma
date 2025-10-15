@@ -115,6 +115,48 @@ pub const memswap = fn (a: *void, b: *void, n: int) void {
     }
 }
 
+pub const memswapn = fn (a: *void, b: *void, count: int, size: int) void {
+    let temp: *void = alloc(size);
+
+    loop [i: int = 0](i < count) : (++i) {
+        let p1: *void = cast<*void>(cast<int>(a) + i * size);
+        let p2: *void = cast<*void>(cast<int>(b) + i * size);
+        
+        memcpy(temp, p1, size);
+        memcpy(p1, p2, size);
+        memcpy(p2, temp, size);
+    }
+
+    free(temp);
+}
+
+pub const memfill = fn (dest: *void, value: int, size: int, count: int) *void {
+    if (size == 1) {
+        // Fill char/byte
+        let d: *char = cast<*char>(dest);
+        let byte_val: char = cast<char>(value);
+        loop [i: int = 0](i < count) : (++i) {
+            d[i] = byte_val;
+        }
+    } elif (size == 8) {
+        // Fill int (8 bytes)
+        let d: *int = cast<*int>(dest);
+        loop [i: int = 0](i < count) : (++i) {
+            d[i] = value;
+        }
+    } else {
+        // For other sizes, just treat as bytes and fill with low byte of value
+        let d: *char = cast<*char>(dest);
+        let byte_val: char = cast<char>(value);
+        let total: int = count * size;
+        loop [i: int = 0](i < total) : (++i) {
+            d[i] = byte_val;
+        }
+    }
+    
+    return dest;
+}
+
 // Reverse bytes in memory region
 pub const memrev = fn (ptr: *void, n: int) *void {
     let p: *char = cast<*char>(ptr);
@@ -144,6 +186,46 @@ pub const memcount = fn (ptr: *void, value: int, n: int) int {
     }
     
     return count;
+}
+
+// Duplicate memory region
+#returns_ownership
+pub const memdup = fn (src: *void, n: int) *void {
+    let dest: *void = alloc(n);
+    if (dest != cast<*void>(0)) {
+        memcpy(dest, src, n);
+    }
+    return dest;
+}
+
+// Check if memory regions are equal
+pub const memeq = fn (a: *void, b: *void, n: int) bool {
+    return memcmp(a, b, n) == 0;
+}
+
+// Find substring in memory
+pub const memmem = fn (haystack: *void, haystack_len: int, needle: *void, needle_len: int) *void {
+    if (needle_len == 0) { return haystack; }
+    if (needle_len > haystack_len) { return cast<*void>(0); }
+    
+    let h: *char = cast<*char>(haystack);
+    let n: *char = cast<*char>(needle);
+    let limit: int = haystack_len - needle_len;
+    
+    loop [i: int = 0](i <= limit) : (++i) {
+        let found: int = 1;
+        loop [j: int = 0](j < needle_len) : (++j) {
+            if (h[i + j] != n[j]) {
+                found = 0;
+                break;
+            }
+        }
+        if (found == 1) {
+            return cast<*void>(cast<int>(h) + i);
+        }
+    }
+    
+    return cast<*void>(0);
 }
 
 pub const align = fn (member_alignments: *int, count: int) int {

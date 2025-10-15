@@ -1,7 +1,7 @@
 @module "main"
 
 // Compile this with the following command
-// ./luma tests/str_test.lx -name string_test -l std/string.lx std/memory.lx && ./string_test
+// ./luma tests/str_test.lx -name string_test -l std/string.lx std/memory.lx && valgrind --leak-check=full ./string_test
 
 @use "string" as string
 @use "memory" as mem
@@ -16,7 +16,7 @@ const test_strlen = fn () void {
     }
 
     // Test normal string "Hello"
-    let hello: *char = cast<*char>(mem::calloc(1, sizeof<char>));
+    let hello: *char = cast<*char>(mem::calloc(6, sizeof<char>));
     defer { free(hello); }
     
     hello[0] = 'H'; // 'H'

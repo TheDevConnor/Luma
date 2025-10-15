@@ -227,6 +227,68 @@ const test_memswap = fn () void {
     output("memswap passed!\n");
 }
 
+const test_memswapn = fn () void {
+    // Allocate arrays for swapping
+    let a: *int = cast<*int>(alloc(5 * sizeof<int>));
+    let b: *int = cast<*int>(alloc(5 * sizeof<int>));
+    defer { free(a); free(b); }
+
+    // Initialize arrays
+    loop [i: int = 0](i < 5) : (++i) {
+        a[i] = i + 1;       // 1, 2, 3, 4, 5
+        b[i] = (i + 1) * 10; // 10, 20, 30, 40, 50
+    }
+
+    // Swap them by elements
+    mem::memswapn(cast<*void>(a), cast<*void>(b), 5, sizeof<int>);
+
+    // Verify swap
+    loop [i: int = 0](i < 5) : (++i) {
+        if (a[i] != (i + 1) * 10) {
+            output("memswapn failed: a[", i, "] = ", a[i], " expected ", (i + 1) * 10, "\n");
+            return;
+        }
+        if (b[i] != i + 1) {
+            output("memswapn failed: b[", i, "] = ", b[i], " expected ", i + 1, "\n");
+            return;
+        }
+    }
+
+    output("memswapn passed!\n");
+}
+
+const test_memfill = fn () void {
+    // === Test 1: Fill with int pattern ===
+    let arr: *int = cast<*int>(alloc(5 * sizeof<int>));
+    let pattern: int = 42;
+    mem::memfill(cast<*void>(arr), pattern, sizeof<int>, 5);
+
+    let failed: int = 0;
+    loop [i: int = 0](i < 5) : (++i) {
+        if (arr[i] != 42) {
+            output("memfill (int) failed at index ", i, ": got ", arr[i], ", expected 42\n");
+            failed = 1;
+        }
+    }
+    
+    free(arr);
+    if (failed == 1) { return; }
+
+    // === Test 2: Fill with char pattern ===
+    let buf: *char = cast<*char>(alloc(6));
+    defer { free(buf); }
+    mem::memfill(cast<*void>(buf), 65, sizeof<char>, 6);
+
+    loop [i: int = 0](i < 6) : (++i) {
+        if (buf[i] != 'A') {
+            output("memfill (char) failed at index ", i, ": got ", buf[i], ", expected 'A'\n");
+            return;
+        }
+    }
+
+    output("memfill passed!\n");
+}
+
 const test_memrev = fn () void {
     let buf: *void = alloc(5 * sizeof<char>);
     defer { free(buf); }
@@ -326,6 +388,8 @@ const run_all_tests = fn () void {
     test_calloc();
     test_realloc();
     test_memswap();
+    test_memswapn();
+    test_memfill();
     test_memrev();
     test_memcount();
     test_align();
