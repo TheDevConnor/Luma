@@ -81,6 +81,7 @@ static const KeywordEntry keywords[] = {
     {"in", TOK_IN},
     {"switch", TOK_SWITCH},
     {"input", TOK_INPUT},
+    {"system", TOK_SYSTEM},
 };
 
 static const KeywordEntry preprocessor_directives[] = {

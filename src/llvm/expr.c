@@ -1098,8 +1098,6 @@ LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node) {
   return LLVMBuildBitCast(ctx->builder, value, target_type, "bitcast");
 }
 
-// Add this function to expr.c (LLVM codegen)
-
 LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node) {
   if (!node || node->type != AST_EXPR_INPUT) {
     fprintf(stderr, "Error: Expected input expression node\n");
@@ -1269,6 +1267,55 @@ LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node) {
   }
 
   return result;
+}
+
+LLVMValueRef codegen_expr_system(CodeGenContext *ctx, AstNode *node) {
+  if (!node || node->type != AST_EXPR_SYSTEM) {
+    fprintf(stderr, "Error: Expected system expression node\n");
+    return NULL;
+  }
+
+  // Get the command expression
+  LLVMValueRef command = codegen_expr(ctx, node->expr._system.command);
+  if (!command) {
+    fprintf(stderr, "Error: Failed to generate system command\n");
+    return NULL;
+  }
+
+  // Get current LLVM module
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+
+  // Declare system function if not already declared
+  LLVMValueRef system_func =
+      LLVMGetNamedFunction(current_llvm_module, "system");
+  LLVMTypeRef system_type = NULL;
+
+  if (!system_func) {
+    // Declare system: int system(const char *command)
+    LLVMTypeRef param_types[] = {
+        LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0)};
+    system_type = LLVMFunctionType(LLVMInt32TypeInContext(ctx->context),
+                                   param_types, 1, false);
+    system_func = LLVMAddFunction(current_llvm_module, "system", system_type);
+    LLVMSetLinkage(system_func, LLVMExternalLinkage);
+  } else {
+    system_type = LLVMGlobalGetValueType(system_func);
+  }
+
+  // Ensure command is a string pointer (char*)
+  LLVMTypeRef command_type = LLVMTypeOf(command);
+  LLVMTypeKind command_kind = LLVMGetTypeKind(command_type);
+
+  if (command_kind != LLVMPointerTypeKind) {
+    fprintf(stderr, "Error: System command must be a string (char*)\n");
+    return NULL;
+  }
+
+  // Call system with the command
+  LLVMValueRef args[] = {command};
+  return LLVMBuildCall2(ctx->builder, system_type, system_func, args, 1,
+                        "system_call");
 }
 
 // sizeof<type || expr>

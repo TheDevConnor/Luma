@@ -367,6 +367,20 @@ Expr *input_expr(Parser *parser) {
   return create_input_expr(parser->arena, type, msg, line, col);
 }
 
+Expr *system_expr(Parser *parser) {
+  p_advance(parser);
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+
+  p_consume(parser, TOK_LPAREN,
+            "Expected a '(' before you give your system command.");
+  Expr *command = parse_expr(parser, BP_NONE);
+  p_consume(parser, TOK_RPAREN,
+            "Expected a ')' after you give your system command.");
+
+  return create_system_expr(parser->arena, command, line, col);
+}
+
 // size_t sizeof(TYPE);
 // sizeof<int>         Compile-time constant
 // sizeof<[10]int>     Compile-time constant

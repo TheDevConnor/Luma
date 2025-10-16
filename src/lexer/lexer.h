@@ -66,6 +66,7 @@ typedef enum {
   TOK_DEFER,    /**< defer keyword */
   TOK_IN,       /**< in keyword */
   TOK_SWITCH,   /**< switch keyword */
+  TOK_SYSTEM,   /**< system keyword */
 
   // prepocessor directives
   TOK_MODULE, /**< @module */

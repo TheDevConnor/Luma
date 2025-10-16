@@ -867,6 +867,44 @@ AstNode *typecheck_input_expr(AstNode *expr, Scope *scope,
   return input_type;
 }
 
+AstNode *typecheck_system_expr(AstNode *expr, Scope *scope,
+                               ArenaAllocator *arena) {
+  if (expr->type != AST_EXPR_SYSTEM) {
+    tc_error(expr, "Internal Error", "Expected system expression node");
+    return NULL;
+  }
+
+  AstNode *command = expr->expr._system.command;
+
+  // Validate that a command expression is provided
+  if (!command) {
+    tc_error(expr, "System Error", "System expression must have a command");
+    return NULL;
+  }
+
+  // Typecheck the command expression
+  AstNode *command_type = typecheck_expression(command, scope, arena);
+  if (!command_type) {
+    tc_error(expr, "System Error",
+             "Failed to determine type of system command");
+    return NULL;
+  }
+
+  // Verify the command is a string type
+  AstNode *expected_string = create_basic_type(arena, "string", 0, 0);
+  TypeMatchResult match = types_match(expected_string, command_type);
+
+  if (match == TYPE_MATCH_NONE) {
+    tc_error_help(
+        expr, "System Command Type Error", "System command must be a string",
+        "Expected 'string', got '%s'", type_to_string(command_type, arena));
+    return NULL;
+  }
+
+  // system() returns an int (the exit status of the command)
+  return create_basic_type(arena, "int", expr->line, expr->column);
+}
+
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   // sizeof always returns size_t (or int in simplified systems)

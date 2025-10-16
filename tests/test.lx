@@ -1,56 +1,33 @@
 @module "main"
 
-const swap = fn (a: *int, b: *int) void {
-  let tmp: int = *a;
-  *a = *b;
-  *b = tmp;
+@use "string" as string
+
+pub const getch = fn () char {
+    // Disable canonical mode and echo
+    system("stty -icanon -echo");
+    
+    // Read single character
+    let c: char = input<char>("");
+    
+    // Restore terminal settings
+    system("stty icanon echo");
+    
+    return c;
 }
-
-const bubble_sort = fn (n: int, arr: *int) void {
-  loop [i: int = 0, j: int = 0](i < n-1) : (++i) {
-    let swapped: int = 0;
-    j = 0;
-
-    loop (j < n - i - 1) : (++j) {
-      if (arr[j] > arr[j + 1]) {
-        swap(&arr[j], &arr[j+1]); 
-        swapped = 1;
-      }
-    }
-
-    if (swapped == 0) { break; }
-  }
-}
-
-const print_arr = fn (n: int, arr: *int) void {
-  loop [i: int = 0](i < n) : (++i) {
-    output(arr[i], " ");
-  }
-  output("\n");
-}
-
-#takes_ownership const free_arr = fn (arr: *int) void { free(arr); }
 
 pub const main = fn () int {
-  let arr: *int = cast<*int>(alloc(7 * sizeof<int>));
-  let n: int = 7;
+  output("Press any key (Press 'q' to quit): \n");
+  
+  loop {
+    let c: char = getch();
 
-  arr[0] = 64;
-  arr[1] = 34;
-  arr[2] = 25;
-  arr[3] = 12;
-  arr[4] = 22;
-  arr[5] = 11;
-  arr[6] = 90;
+    if (c == 'q') {
+      output("\nQuiting...\n");
+      break;
+    }
 
-  output("Unsorted Array: ");
-  print_arr(n, arr);
+    output("\nYou pressed: ", string::from_char(c), "\n");
+  }
 
-  bubble_sort(n, arr);
-
-  output("Sorted Array: ");
-  print_arr(n, arr);
-
-  free_arr(arr);
   return 0;
 }
