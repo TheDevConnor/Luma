@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <time.h>
@@ -182,7 +181,10 @@ void draw_screen(int currentPiece, int currentRotation, int currentX,
         printf("%s██\x1b[0m", piece_colors[currentPiece]);
       } else if (cell == 9) {
         printf("\x1b[90m▓▓\x1b[0m"); // wall
-      } else if (cell > 0 && cell < 9) {
+      } else if (cell == 8) {
+        // Line being cleared - show it in white/bright
+        printf("\x1b[97m██\x1b[0m");
+      } else if (cell > 0 && cell < 8) {
         printf("%s██\x1b[0m", piece_colors[cell - 1]);
       } else {
         printf("  ");
@@ -293,13 +295,31 @@ int main() {
         gameOver = 1;
         break;
       }
-      if (c == 'a' || c == 'A' || c == 68)
+      // Handle escape sequences for arrow keys
+      if (c == 27) { // ESC
+        if (kbhit()) {
+          int c2 = readch();
+          if (c2 == '[' && kbhit()) {
+            int c3 = readch();
+            if (c3 == 'A')
+              key = 'U'; // Up arrow
+            if (c3 == 'B')
+              key = 'D'; // Down arrow
+            if (c3 == 'C')
+              key = 'R'; // Right arrow
+            if (c3 == 'D')
+              key = 'L'; // Left arrow
+          }
+        }
+      }
+      // Regular keys
+      if (c == 'a' || c == 'A')
         key = 'L';
-      if (c == 'd' || c == 'D' || c == 67)
+      if (c == 'd' || c == 'D')
         key = 'R';
-      if (c == 's' || c == 'S' || c == 66)
+      if (c == 's' || c == 'S')
         key = 'D';
-      if (c == 'w' || c == 'W' || c == 65)
+      if (c == 'w' || c == 'W')
         key = 'U';
       if (c == ' ')
         key = ' ';
