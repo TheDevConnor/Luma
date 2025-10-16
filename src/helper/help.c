@@ -90,6 +90,12 @@ int print_help() {
   printf("  -debug                  Enable debug mode\n");
   printf("  --no-sanitize           Disable memory sanitization\n");
   printf("  -l, -link <files...>    Link additional files\n");
+  printf("\nOptimization:\n");
+  printf("  -O0                     No optimization (fastest compilation)\n");
+  printf("  -O1                     Basic optimization\n");
+  printf("  -O2                     Moderate optimization (default)\n");
+  printf(
+      "  -O3                     Aggressive optimization (best performance)\n");
   printf("\nFormatting:\n");
   printf("  fmt, format             Format source code\n");
   printf("  -fc, --format-check     Check formatting without modifying\n");
@@ -216,68 +222,72 @@ bool run_formatter(BuildConfig config, ArenaAllocator *allocator) {
  */
 bool parse_args(int argc, char *argv[], BuildConfig *config,
                 ArenaAllocator *arena) {
+  // Initialize files array
   if (!growable_array_init(&config->files, arena, 4, sizeof(char *))) {
     fprintf(stderr, "Failed to initialize files array\n");
     return false;
   }
 
-  // set check_mem to true by default
+  // Default configuration
   config->check_mem = true;
   config->filepath = false;
   config->format = false;
   config->format_check = false;
   config->format_in_place = false;
-  config->lsp_mode = false; // Add this field to BuildConfig
+  config->lsp_mode = false;
+  config->opt_level = 2; // Default opt_level is 2 unless told
 
   for (int i = 1; i < argc; i++) {
-    if (!PathExist(argv[i]) || argv[i][0] == '-') {
-      if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0)
-        return print_version(), false;
-      else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
-        return print_help(), false;
-      else if (strcmp(argv[i], "-lc") == 0 || strcmp(argv[i], "--license") == 0)
-        return print_license(), false;
-      else if (strcmp(argv[i], "-lsp") == 0 || strcmp(argv[i], "--lsp") == 0) {
+    const char *arg = argv[i];
+
+    // Handle options and non-existent paths
+    if (!PathExist(arg) || arg[0] == '-') {
+      if (strcmp(arg, "-v") == 0 || strcmp(arg, "--version") == 0) {
+        print_version();
+        return false;
+      } else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+        print_help();
+        return false;
+      } else if (strcmp(arg, "-lc") == 0 || strcmp(arg, "--license") == 0) {
+        print_license();
+        return false;
+      } else if (strcmp(arg, "-lsp") == 0 || strcmp(arg, "--lsp") == 0) {
         config->lsp_mode = true;
         fprintf(stderr, "Starting Language Server Protocol mode...\n");
 
-        // Initialize LSP server
         LSPServer server;
         if (!lsp_server_init(&server, arena)) {
           fprintf(stderr, "Failed to initialize LSP server\n");
           arena_destroy(arena);
-          return 1;
+          return false;
         }
 
-        // Run LSP server (blocks until shutdown)
+        // Run and clean up LSP server
         lsp_server_run(&server);
-
-        // Cleanup
         lsp_server_shutdown(&server);
         arena_destroy(arena);
         return true;
-      } else if (strcmp(argv[i], "-name") == 0 && i + 1 < argc)
+      } else if (strcmp(arg, "-name") == 0 && i + 1 < argc) {
         config->name = argv[++i];
-      else if (strcmp(argv[i], "-save") == 0)
+      } else if (strcmp(arg, "-save") == 0) {
         config->save = true;
-      else if (strcmp(argv[i], "-clean") == 0)
+      } else if (strcmp(arg, "-clean") == 0) {
         config->clean = true;
-      else if (strcmp(argv[i], "--no-sanitize") == 0 ||
-               strcmp(argv[i], "-no-sanitize") == 0) {
+      } else if (strcmp(arg, "--no-sanitize") == 0 ||
+                 strcmp(arg, "-no-sanitize") == 0) {
         config->check_mem = false;
-      } else if (strcmp(argv[i], "-debug") == 0) {
+      } else if (strcmp(arg, "-debug") == 0) {
         // Placeholder for debug flag
-      } else if (strcmp(argv[i], "fmt") == 0 ||
-                 strcmp(argv[i], "format") == 0) {
+      } else if (strcmp(arg, "fmt") == 0 || strcmp(arg, "format") == 0) {
         config->format = true;
-      } else if (strcmp(argv[i], "-fc") == 0 ||
-                 strcmp(argv[i], "--format-check") == 0) {
+      } else if (strcmp(arg, "-fc") == 0 ||
+                 strcmp(arg, "--format-check") == 0) {
         config->format_check = true;
-      } else if (strcmp(argv[i], "-fi") == 0 ||
-                 strcmp(argv[i], "--format-in-place") == 0) {
+      } else if (strcmp(arg, "-fi") == 0 ||
+                 strcmp(arg, "--format-in-place") == 0) {
         config->format_in_place = true;
-      } else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "-link") == 0) {
-        // Collect files until next flag or end of args
+      } else if (strcmp(arg, "-l") == 0 || strcmp(arg, "-link") == 0) {
+        // Collect linked files
         int start = i + 1;
         while (start < argc && argv[start][0] != '-') {
           char **slot = (char **)growable_array_push(&config->files);
@@ -290,24 +300,33 @@ bool parse_args(int argc, char *argv[], BuildConfig *config,
           start++;
         }
         i = start - 1;
-      } else {
-        if (argv[i][0] == '-') {
-          fprintf(stderr, "Unknown build option: %s\n", argv[i]);
-          return false;
+      } else if (strcmp(arg, "-O0") == 0)
+        config->opt_level = 0;
+      else if (strcmp(arg, "-O1") == 0)
+        config->opt_level = 1;
+      else if (strcmp(arg, "-O2") == 0)
+        config->opt_level = 2;
+      else if (strcmp(arg, "-O3") == 0)
+        config->opt_level = 3;
+      else {
+        if (arg[0] == '-') {
+          fprintf(stderr, "Unknown build option: %s\n", arg);
         } else {
-          fprintf(stderr, "%s: No such file or directory\n", argv[i]);
-          return false;
+          fprintf(stderr, "%s: No such file or directory\n", arg);
         }
+        return false;
       }
-    } else if (PathIsDir(argv[i])) {
-      fprintf(stderr, "%s: Is a directory\n", argv[i]);
+    } else if (PathIsDir(arg)) {
+      fprintf(stderr, "%s: Is a directory\n", arg);
       return false;
     } else {
-      config->filepath = argv[i];
+      config->filepath = arg;
     }
   }
+
   return true;
 }
+
 /**
  * @brief Prints a token's text and its token type with color formatting.
  *

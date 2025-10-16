@@ -112,7 +112,7 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   char exe_file[256];
   snprintf(exe_file, sizeof(exe_file), "%s", base_name);
 
-  if (!link_object_files(output_dir, exe_file)) {
+  if (!link_object_files(output_dir, exe_file, config.opt_level)) {
     cleanup_codegen_context(ctx);
     return false;
   }
@@ -124,14 +124,12 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
 }
 
 // Helper function to link all object files in a directory
-bool link_object_files(const char *output_dir, const char *executable_name) {
+bool link_object_files(const char *output_dir, const char *executable_name, int opt_level) {
   char command[2048];
 
   // Build the linking command with PIE-compatible flags
-  snprintf(command, sizeof(command), "cc -pie %s/*.o -o %s", output_dir,
-           executable_name);
-
-  // printf("Linking command: %s\n", command);
+  snprintf(command, sizeof(command), "cc -O%d -pie %s/*.o -o %s", 
+         opt_level, output_dir, executable_name);
 
   int result = system(command);
   if (result != 0) {
@@ -139,7 +137,7 @@ bool link_object_files(const char *output_dir, const char *executable_name) {
 
     // Try alternative linking approach
     printf("Trying alternative linking approach...\n");
-    snprintf(command, sizeof(command), "gcc -no-pie %s/*.o -o %s", output_dir,
+    snprintf(command, sizeof(command), "gcc -O%d -no-pie %s/*.o -o %s", opt_level, output_dir,
              executable_name);
 
     printf("Alternative linking command: %s\n", command);
@@ -153,45 +151,6 @@ bool link_object_files(const char *output_dir, const char *executable_name) {
   }
 
   return true;
-}
-
-// Alternative approach: Enhanced linking with better error handling
-bool link_object_files_enhanced(const char *output_dir,
-                                const char *executable_name) {
-  char command[2048];
-
-  // Try different linking strategies in order of preference
-  const char *link_strategies[] = {
-      "gcc -pie %s/*.o -o %s",     // PIE (position independent executable)
-      "gcc -no-pie %s/*.o -o %s",  // No PIE
-      "gcc -static %s/*.o -o %s",  // Static linking
-      "clang -pie %s/*.o -o %s",   // Try clang instead of gcc
-      "clang -no-pie %s/*.o -o %s" // Clang without PIE
-  };
-
-  const char *strategy_names[] = {"PIE linking", "No-PIE linking",
-                                  "Static linking", "Clang PIE linking",
-                                  "Clang no-PIE linking"};
-
-  size_t num_strategies = sizeof(link_strategies) / sizeof(link_strategies[0]);
-
-  for (size_t i = 0; i < num_strategies; i++) {
-    // printf("Attempting %s...\n", strategy_names[i]);
-    snprintf(command, sizeof(command), link_strategies[i], output_dir,
-             executable_name);
-    // printf("Command: %s\n", command);
-
-    int result = system(command);
-    if (result == 0) {
-      // printf("Successfully linked using %s\n", strategy_names[i]);
-      return true;
-    } else {
-      printf("Failed with exit code %d\n", result);
-    }
-  }
-
-  fprintf(stderr, "All linking strategies failed\n");
-  return false;
 }
 
 Stmt *parse_file_to_module(const char *path, size_t position,

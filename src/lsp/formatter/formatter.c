@@ -325,17 +325,13 @@ bool format_luma_code(const char *input_path, const char *output_path,
   return true;
 }
 
-// Platform-specific temporary file creation
 static int create_temp_file(char *template_path) {
 #ifdef _WIN32
-  // Windows implementation
   if (_mktemp_s(template_path, strlen(template_path) + 1) != 0) {
     return -1;
   }
-  return _open(template_path, _O_CREAT | _O_EXCL | _O_RDWR,
-               _S_IREAD | _S_IWRITE);
+  return _open(template_path, _O_CREAT | _O_EXCL | _O_RDWR, 0600);
 #else
-  // Unix/Linux implementation
   return mkstemp(template_path);
 #endif
 }

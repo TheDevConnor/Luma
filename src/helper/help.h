@@ -55,6 +55,7 @@ typedef struct {
   bool lsp_mode;        // Run as Language Server
   GrowableArray files;  // Change from char** to GrowableArray
   size_t file_count;    // Keep for convenience, or remove and use files.count
+  int opt_level;  // 0, 1, 2, or 
 
   GrowableArray tokens;
   size_t token_count;
@@ -99,6 +100,6 @@ bool link_with_ld(const char *obj_filename, const char *exe_filename);
 bool get_gcc_file_path(const char *filename, char *buffer, size_t buffer_size);
 bool get_lib_paths(char *buffer, size_t buffer_size);
 bool link_with_ld_simple(const char *obj_filename, const char *exe_filename);
-bool link_object_files(const char *output_dir, const char *executable_name);
+bool link_object_files(const char *output_dir, const char *executable_name, int opt_level);
 bool validate_module_system(CodeGenContext *ctx);
 void save_module_output_files(CodeGenContext *ctx, const char *output_dir);
