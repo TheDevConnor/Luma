@@ -1188,7 +1188,7 @@ LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node) {
 
     } else if (bits == 8) {
       // char
-      format_str = " %c"; // Space before %c to skip whitespace
+      format_str = "%c"; // Space before %c to skip whitespace
       LLVMValueRef format_str_val =
           LLVMBuildGlobalStringPtr(ctx->builder, format_str, "input_fmt");
       LLVMValueRef scanf_args[] = {format_str_val, input_alloca};

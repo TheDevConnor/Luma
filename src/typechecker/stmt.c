@@ -674,6 +674,7 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Scope *then_branch = create_child_scope(scope, "then_branch", arena);
   Scope *else_branch = create_child_scope(scope, "else_branch", arena);
 
+  // Typecheck main if condition
   Type *expected =
       create_basic_type(arena, "bool", node->stmt.if_stmt.condition->line,
                         node->stmt.if_stmt.condition->column);
@@ -688,18 +689,64 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     return false;
   }
 
+  // Typecheck then branch
   if (node->stmt.if_stmt.then_stmt != NULL) {
-    typecheck_statement(node->stmt.if_stmt.then_stmt, then_branch, arena);
-  }
-
-  for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
-    if (node->stmt.if_stmt.elif_stmts[i] != NULL) {
-      typecheck_statement(node->stmt.if_stmt.elif_stmts[i], then_branch, arena);
+    if (!typecheck_statement(node->stmt.if_stmt.then_stmt, then_branch,
+                             arena)) {
+      return false;
     }
   }
 
+  // Typecheck elif branches
+  for (int i = 0; i < node->stmt.if_stmt.elif_count; i++) {
+    if (node->stmt.if_stmt.elif_stmts[i] != NULL) {
+      Scope *elif_scope = create_child_scope(scope, "elif_branch", arena);
+
+      // CRITICAL FIX: Extract the condition and body from the elif node
+      // The elif_stmts[i] is actually an AST_STMT_IF node with its own
+      // condition/then_stmt
+      AstNode *elif_node = node->stmt.if_stmt.elif_stmts[i];
+
+      if (elif_node->type != AST_STMT_IF) {
+        tc_error(elif_node, "Internal Error",
+                 "Expected if statement node for elif");
+        return false;
+      }
+
+      // Typecheck elif condition
+      Type *elif_expected = create_basic_type(
+          arena, "bool", elif_node->stmt.if_stmt.condition->line,
+          elif_node->stmt.if_stmt.condition->column);
+      Type *elif_user =
+          typecheck_expression(elif_node->stmt.if_stmt.condition, scope, arena);
+      TypeMatchResult elif_condition = types_match(elif_expected, elif_user);
+
+      if (elif_condition == TYPE_MATCH_NONE) {
+        tc_error_help(
+            elif_node, "Elif Condition Error",
+            "The condition of an elif statement must be of type 'bool'",
+            "Elif condition expected to be of type 'bool', but got '%s' "
+            "instead",
+            type_to_string(elif_user, arena));
+        return false;
+      }
+
+      // Typecheck elif body
+      if (elif_node->stmt.if_stmt.then_stmt != NULL) {
+        if (!typecheck_statement(elif_node->stmt.if_stmt.then_stmt, elif_scope,
+                                 arena)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  // Typecheck else branch
   if (node->stmt.if_stmt.else_stmt != NULL) {
-    typecheck_statement(node->stmt.if_stmt.else_stmt, else_branch, arena);
+    if (!typecheck_statement(node->stmt.if_stmt.else_stmt, else_branch,
+                             arena)) {
+      return false;
+    }
   }
 
   return true;

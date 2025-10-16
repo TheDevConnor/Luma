@@ -1,25 +1,13 @@
 @module "main"
 
 @use "string" as string
-
-pub const getch = fn () char {
-    // Disable canonical mode and echo
-    system("stty -icanon -echo");
-    
-    // Read single character
-    let c: char = input<char>("");
-    
-    // Restore terminal settings
-    system("stty icanon echo");
-    
-    return c;
-}
+@use "terminal" as term
 
 pub const main = fn () int {
   output("Press any key (Press 'q' to quit): \n");
   
   loop {
-    let c: char = getch();
+    let c: char = term::getch();
 
     if (c == 'q') {
       output("\nQuiting...\n");

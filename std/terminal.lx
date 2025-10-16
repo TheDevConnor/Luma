@@ -1,0 +1,112 @@
+@module "terminal"
+
+@use "string" as string
+
+// Get a single character without waiting for Enter
+pub const getch = fn () char {
+    // Disable canonical mode and echo
+    system("stty -icanon -echo");
+    
+    // Read single character
+    let c: char = input<char>("");
+    
+    // Restore terminal settings
+    system("stty icanon echo");
+    
+    return c;
+}
+
+// Get a single character without waiting for Enter (no echo)
+pub const getch_silent = fn () char {
+    // Already has -echo, so it won't display
+    system("stty -icanon -echo");
+    let c: char = input<char>("");
+    system("stty icanon echo");
+    return c;
+}
+
+#returns_ownership
+pub const getche = fn () char {
+    // Disable canonical mode but keep echo
+    system("stty -icanon echo");
+    let c: char = input<char>("");
+    system("stty icanon echo");
+    return c;
+}
+
+// Check if a key is pressed (non-blocking)
+pub const kbhit = fn () int {
+    system("stty -icanon -echo min 0 time 0");
+    let c: char = input<char>("");
+    system("stty icanon echo");
+    
+    if (c == cast<char>(0)) {
+        return 0;
+    }
+    return 1;
+}
+
+// Wait for any key press
+pub const wait_for_key = fn () void {
+    output("Press any key to continue...");
+    getch();
+    output("\n");
+}
+
+// Clear input buffer
+pub const clear_input_buffer = fn () void {
+    system("stty -icanon -echo");
+    
+    // Read until no more input
+    loop {
+        system("stty min 0 time 0");
+        let c: char = input<char>("");
+        system("stty min 1 time 0");
+        
+        if (c == cast<char>(0)) {
+            break;
+        }
+    }
+    
+    system("stty icanon echo");
+}
+
+// Get password input (hidden)
+#returns_ownership
+pub const getpass = fn (prompt: *char) *char {
+    output(prompt);
+    
+    // Allocate buffer for password
+    let password: *char = cast<*char>(alloc(256));
+    let i: int = 0;
+    
+    system("stty -icanon -echo");
+    
+    loop {
+        let c: char = input<char>("");
+        
+        // Check for Enter key
+        if (c == cast<char>(10) || c == cast<char>(13)) {
+            break;
+        }
+        
+        // Check for backspace
+        if (c == cast<char>(127) || c == cast<char>(8)) {
+            if (i > 0) {
+                i = i - 1;
+                output("\b \b"); // Erase character visually
+            }
+            continue;
+        }
+        
+        password[i] = c;
+        i = i + 1;
+        output("*"); // Show asterisk for each character
+    }
+    
+    password[i] = cast<char>(0); // Null terminate
+    system("stty icanon echo");
+    output("\n");
+    
+    return password;
+}

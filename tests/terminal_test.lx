@@ -1,0 +1,149 @@
+@module "main"
+
+@use "string" as string
+@use "terminal" as term
+@use "termfx" as fx
+
+const menu_demo = fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_CYAN, "=== Interactive Menu ===\n", fx::RESET);
+  output("1. Option One\n");
+  output("2. Option Two\n");
+  output("3. Option Three\n");
+  output("4. Exit\n\n");
+  output("Select an option: ");
+  
+  let choice: char = term::getch();
+  output(string::from_char(choice), "\n\n"); // Echo the choice
+  
+  if (choice == '1') {
+    output(fx::GREEN, "✓ You selected Option One\n", fx::RESET);
+  } elif (choice == '2') {
+    output(fx::GREEN, "✓ You selected Option Two\n", fx::RESET);
+  } elif (choice == '3') {
+    output(fx::GREEN, "✓ You selected Option Three\n", fx::RESET);
+  } elif (choice == '4') {
+    output(fx::YELLOW, "Exiting...\n", fx::RESET);
+  } else {
+    output(fx::RED, "✗ Invalid option\n", fx::RESET);
+  }
+}
+ 
+const password_demo = fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_MAGENTA, "=== Password Input Demo ===\n", fx::RESET);
+  
+  let password: *char = term::getpass("Enter password: ");
+  defer { free(password); }
+  
+  output(fx::GREEN, "Password received! (hidden)\n", fx::RESET);
+  output("Password length: ", string::strlen(password), "\n");
+}
+
+const keystroke_demo = fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_YELLOW, "=== Keystroke Demo ===\n", fx::RESET);
+  output("Press keys (ESC to exit)\n\n");
+  
+  loop {
+    let c: char = term::getch();
+    
+    // ESC key
+    if (c == cast<char>(27)) {
+        output("\n", fx::CYAN, "ESC pressed - exiting\n", fx::RESET);
+        break;
+    }
+    
+    // Show character code
+    output("Key: '", string::from_char(c), "' (ASCII: ", cast<int>(c), ")\n");
+    
+    // Special key detection
+    if (c == cast<char>(13) || c == cast<char>(10)) {
+        output(fx::BRIGHT_GREEN, "  → ENTER key\n", fx::RESET);
+    } elif (c == cast<char>(32)) {
+        output(fx::BRIGHT_BLUE, "  → SPACE key\n", fx::RESET);
+    } elif (c == cast<char>(127) || c == cast<char>(8)) {
+        output(fx::BRIGHT_RED, "  → BACKSPACE key\n", fx::RESET);
+    }
+  }
+}
+
+const reaction_game = fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_RED, "=== Reaction Time Game ===\n", fx::RESET);
+  output("Press SPACE as fast as you can when you see GO!\n\n");
+  
+  output("Ready...\n");
+  term::wait_for_key();
+  
+  output(fx::BRIGHT_GREEN, fx::BOLD, "\nGO!\n", fx::RESET);
+  let c: char = term::getch();
+  
+  if (c == ' ') {
+    output(fx::GREEN, "✓ Good reflexes!\n", fx::RESET);
+  } else {
+    output(fx::RED, "✗ You pressed '", c, "' instead of SPACE\n", fx::RESET);
+  }
+}
+
+const yes_no_prompt = fn (question: *char) int {
+  output(question, " (y/n): ");
+  
+  loop {
+    let c: char = term::getch();
+    output(string::from_char(c), "\n");
+    
+    if (c == 'y' || c == 'Y') {
+      return 1;
+    } elif (c == 'n' || c == 'N') {
+      return 0;
+    } else {
+      output(fx::YELLOW, "Please press 'y' or 'n': ", fx::RESET);
+    }
+  }
+  
+  return 0;
+}
+
+pub const main = fn () int {
+  loop {
+   output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+   output(fx::BOLD, fx::BRIGHT_CYAN, "╔════════════════════════════╗\n", fx::RESET);
+   output(fx::BOLD, fx::BRIGHT_CYAN, "║  Interactive Input Demos   ║\n", fx::RESET);
+   output(fx::BOLD, fx::BRIGHT_CYAN, "╚════════════════════════════╝\n\n", fx::RESET);
+   
+   output("1. Menu Demo\n");
+   output("2. Password Input Demo\n");
+   output("3. Keystroke Demo\n");
+   output("4. Reaction Game\n");
+   output("5. Exit\n\n");
+   output("Choose: ");
+   
+   let choice: char = term::getch();
+   output(string::from_char(choice), "\n\n");
+    
+   if (choice == '1') {
+     menu_demo();
+     term::wait_for_key();
+   } elif (choice == '2') {
+     password_demo();
+     term::wait_for_key();
+   } elif (choice == '3') {
+     keystroke_demo();
+     term::wait_for_key();
+   } elif (choice == '4') {
+     reaction_game();
+     term::wait_for_key();
+   } elif (choice == '5') {
+    if (yes_no_prompt("Are you sure you want to exit?") == 1) {
+      output(fx::BRIGHT_YELLOW, "Goodbye!\n", fx::RESET);
+      break;
+    }
+   } else {
+    output(fx::RED, "Invalid choice!\n", fx::RESET);
+    term::wait_for_key();
+   }
+  }
+  
+  return 0;
+}
