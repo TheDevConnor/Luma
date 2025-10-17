@@ -100,7 +100,7 @@ pub const pop = fn(stack: *Stack) int {
   return value;
 }
 
-const peek = fn(stack: *Stack) int {
+pub const peek = fn(stack: *Stack) int {
   if (isEmpty(stack) == 1) {
       output("Stack is empty\n");
       return 0;
