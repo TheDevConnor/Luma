@@ -74,6 +74,7 @@ These AST node types are fully implemented in code generation:
 - [ ] Return value allocation tracking
 - [ ] Support for ownership transfer through function calls
 
+
 #### Advanced Pointer Operations
 - [ ] **Complex pointer arithmetic**
 - [ ] Handle `ptr + offset` operations
