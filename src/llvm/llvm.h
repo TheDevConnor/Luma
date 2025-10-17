@@ -60,6 +60,7 @@ typedef struct StructInfo {
   LLVMTypeRef llvm_type;
   char **field_names;
   LLVMTypeRef *field_types;
+  LLVMTypeRef *field_element_types;
   bool *field_is_public;
   size_t field_count;
   bool is_public;

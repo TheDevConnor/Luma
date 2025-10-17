@@ -56,12 +56,12 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     bool type1_is_builtin =
         (strcmp(name1, "int") == 0 || strcmp(name1, "float") == 0 ||
          strcmp(name1, "double") == 0 || strcmp(name1, "bool") == 0 ||
-         strcmp(name1, "string") == 0 || strcmp(name1, "char") == 0 ||
+         strcmp(name1, "str") == 0 || strcmp(name1, "char") == 0 ||
          strcmp(name1, "void") == 0);
     bool type2_is_builtin =
         (strcmp(name2, "int") == 0 || strcmp(name2, "float") == 0 ||
          strcmp(name2, "double") == 0 || strcmp(name2, "bool") == 0 ||
-         strcmp(name2, "string") == 0 || strcmp(name2, "char") == 0 ||
+         strcmp(name2, "str") == 0 || strcmp(name2, "char") == 0 ||
          strcmp(name2, "void") == 0);
 
     // Allow enum to int conversion (one is enum, other is int)
@@ -85,7 +85,7 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     AstNode *pointee = type2->type_data.pointer.pointee_type;
 
     // string is compatible with char*
-    if (strcmp(basic_name, "string") == 0 && pointee &&
+    if (strcmp(basic_name, "str") == 0 && pointee &&
         pointee->category == Node_Category_TYPE &&
         pointee->type == AST_TYPE_BASIC &&
         strcmp(pointee->type_data.basic.name, "char") == 0) {
@@ -101,7 +101,7 @@ TypeMatchResult types_match(AstNode *type1, AstNode *type2) {
     if (pointee && pointee->category == Node_Category_TYPE &&
         pointee->type == AST_TYPE_BASIC &&
         strcmp(pointee->type_data.basic.name, "char") == 0 &&
-        strcmp(basic_name, "string") == 0) {
+        strcmp(basic_name, "str") == 0) {
       return TYPE_MATCH_COMPATIBLE;
     }
   }

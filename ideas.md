@@ -205,3 +205,6 @@ Works within the existing build system architecture without requiring fundamenta
 4. **Standard Library Package**: Pre-generate bindings for common C standard library headers
 
 This approach provides a foundation for C interoperability that feels natural to Luma developers while maintaining the language's design principles.
+
+## Look into adding in Multithreading 
+## Add in multiple return types. ``const createStack = fn (stackCeiling: int) <*Stack, *void>``

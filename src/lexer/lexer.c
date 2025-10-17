@@ -451,6 +451,8 @@ Token next_token(Lexer *lx) {
 
   if (c == '\'') {
     const char *char_start = lx->current; // Start after opening quote
+    char actual_char = 0; // The actual character value we'll store
+    int char_count = 0;   // How many characters we consumed
 
     if (is_at_end(lx)) {
       // Unclosed character literal
@@ -466,6 +468,8 @@ Token next_token(Lexer *lx) {
     // Handle escape sequences
     if (ch == '\\') {
       advance(lx); // consume backslash
+      char_count++;
+
       if (is_at_end(lx)) {
         report_lexer_error(lx, "LexerError", "unknown_file",
                            "Incomplete escape sequence in character literal",
@@ -475,10 +479,31 @@ Token next_token(Lexer *lx) {
       }
 
       char escaped = peek(lx, 0);
-      // Validate common escape sequences
-      if (escaped != 'n' && escaped != 't' && escaped != 'r' &&
-          escaped != '\\' && escaped != '\'' && escaped != '\"' &&
-          escaped != '0') {
+
+      // Convert escape sequence to actual character value
+      switch (escaped) {
+      case 'n':
+        actual_char = '\n';
+        break;
+      case 't':
+        actual_char = '\t';
+        break;
+      case 'r':
+        actual_char = '\r';
+        break;
+      case '\\':
+        actual_char = '\\';
+        break;
+      case '\'':
+        actual_char = '\'';
+        break;
+      case '\"':
+        actual_char = '\"';
+        break;
+      case '0':
+        actual_char = '\0';
+        break;
+      default: {
         static char error_msg[64];
         snprintf(error_msg, sizeof(error_msg),
                  "Invalid escape sequence '\\%c' in character literal",
@@ -488,7 +513,11 @@ Token next_token(Lexer *lx) {
                            lx->line, lx->col - 2, 3);
         return MAKE_TOKEN(TOK_ERROR, start, lx, 3, wh_count);
       }
+      }
+
       advance(lx); // consume escaped character
+      char_count++;
+
     } else if (ch == '\'') {
       // Empty character literal
       report_lexer_error(lx, "LexerError", "unknown_file",
@@ -497,6 +526,7 @@ Token next_token(Lexer *lx) {
                          lx->col - 1, 2);
       advance(lx); // consume closing quote
       return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
+
     } else if (ch == '\n' || ch == '\r') {
       // Newline in character literal
       report_lexer_error(lx, "LexerError", "unknown_file",
@@ -504,9 +534,12 @@ Token next_token(Lexer *lx) {
                          get_line_text_from_source(lx->src, lx->line), lx->line,
                          lx->col - 1, 1);
       return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+
     } else {
       // Regular character
+      actual_char = ch;
       advance(lx); // consume the character
+      char_count = 1;
     }
 
     // Check for closing quote
@@ -521,10 +554,16 @@ Token next_token(Lexer *lx) {
 
     advance(lx); // consume closing quote
     int total_len = (int)(lx->current - start);
-    int content_len =
-        (int)(lx->current - char_start - 1); // Length of content between quotes
-    return make_token(TOK_CHAR_LITERAL, char_start, lx->line,
-                      lx->col - total_len, content_len, wh_count);
+
+    // CRITICAL: Store the actual character value, not the escape sequence
+    // We'll create a single-character string with the resolved value
+    char *char_storage = (char *)arena_alloc(lx->arena, 2, 1);
+    char_storage[0] = actual_char;
+    char_storage[1] = '\0';
+
+    return make_token(TOK_CHAR_LITERAL, char_storage, lx->line,
+                      lx->col - total_len, 1,
+                      wh_count); // length = 1 (single char)
   }
 
   // Strings
