@@ -106,3 +106,32 @@ pub const cat = fn (dest: *char, s1: *char, s2: *char) *char {
   return dest;
 }
 
+pub const putchar = fn(c: char) int {
+  // allocate buffer for command + escaped char (32 bytes is enough)
+  let cmd: *char = cast<*char>(alloc(32 * sizeof<char>));
+  defer { free(cmd); }
+
+  // build command inline
+  // Use integer values instead of character literals with escapes
+  let char_val: int = cast<int>(c);
+  
+  switch(char_val) {
+      10  => { system("echo"); }                                        // '\n'
+      9   => { system("printf '\\t'"); }                                // '\t'
+      37  => cat(cmd, cast<*char>("printf '\\%'"),  cast<*char>(""));   // '%'
+      92  => cat(cmd, cast<*char>("printf '\\\\'"), cast<*char>(""));   // '\\'
+      39  => cat(cmd, cast<*char>("printf '\\\''"), cast<*char>(""));   // '\''
+      34  => cat(cmd, cast<*char>("printf '\\'"), cast<*char>(""));     // '"'
+      36  => cat(cmd, cast<*char>("printf '\\$'"),  cast<*char>(""));   // '$'
+      96  => cat(cmd, cast<*char>("printf '\\`'"),  cast<*char>(""));   // '`'
+      _   => {
+          let s: *char = from_char(c);
+          defer { free(s); }
+          cat(cmd, cast<*char>("printf '%s' "), s);
+      }
+  }
+
+  if (char_val != 10 && char_val != 9) { system(cmd); }
+  
+  return cast<int>(c);
+}

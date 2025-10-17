@@ -1471,15 +1471,10 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
     LLVM_Symbol *sym = find_symbol(ctx, var_name);
 
     if (sym && !sym->is_function) {
-      LLVMTypeRef sym_type = sym->type;
-
-      // If the symbol is a pointer type, we need to determine what it points to
-      if (LLVMGetTypeKind(sym_type) == LLVMPointerTypeKind) {
-        // For opaque pointers (newer LLVM), we need to infer the pointee type
-        // This is a simplified approach - in a real compiler you'd track this
-        // through your type system
-
-        // Try to infer based on variable name patterns
+      if (sym->element_type) {
+        element_type = sym->element_type;
+      } else {
+        // Fallback: infer from variable name patterns
         if (strstr(var_name, "ptr") || strstr(var_name, "aligned_ptr")) {
           // Check if this looks like a void** -> void* case
           if (strstr(var_name, "aligned")) {
@@ -1494,9 +1489,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
           } else if (strstr(var_name, "double")) {
             element_type = LLVMDoubleTypeInContext(ctx->context);
           } else {
-            // Default for void** -> void*
-            element_type =
-                LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
+            // Default for unknown pointer types
+            element_type = LLVMInt64TypeInContext(ctx->context);
           }
         } else {
           // Generic pointer dereference - assume int64 for safety
@@ -1508,8 +1502,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
 
   // Final fallback if we couldn't determine the type
   if (!element_type) {
-    // Default to void* for unknown pointer dereferences
-    element_type = LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0);
+    fprintf(stderr, "Warning: Could not determine pointer element type for dereference, defaulting to i64\n");
+    element_type = LLVMInt64TypeInContext(ctx->context);
   }
 
   return LLVMBuildLoad2(ctx->builder, element_type, ptr, "deref");

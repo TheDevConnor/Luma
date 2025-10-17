@@ -1,33 +1,11 @@
-// @module "main"
-
-// @use "string" as string
-// @use "terminal" as term
-
-// pub const main = fn () int {
-//   output("Press any key (Press 'q' to quit): \n");
-  
-//   loop {
-//     let c: char = term::getch();
-
-//     if (c == 'q') {
-//       output("\nQuiting...\n");
-//       break;
-//     }
-
-//     output("\nYou pressed: ", string::from_char(c), "\n");
-//   }
-
-//   return 0;
-// }
-
 @module "main"
 
+@use "string" as string
+
 pub const main = fn () int {
-  let person: [str; 7] = ["Software Dev", "Compiler Dev", 
-                        "Low-Level Dev", "C Dev", 
-                        "Rust Dev", "Zig Dev", "Zura Dev"];
-  loop [i: int = 0](i < 7) : (++i) {
-    output("Hello there, ", person[i], "!\n");
-  }
+  string::putchar('H');
+  string::putchar('i');
+  string::putchar('!');
+  string::putchar('\n');
   return 0;
 }

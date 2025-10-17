@@ -891,7 +891,7 @@ AstNode *typecheck_system_expr(AstNode *expr, Scope *scope,
   }
 
   // Verify the command is a string type
-  AstNode *expected_string = create_basic_type(arena, "string", 0, 0);
+  AstNode *expected_string = create_basic_type(arena, "str", 0, 0);
   TypeMatchResult match = types_match(expected_string, command_type);
 
   if (match == TYPE_MATCH_NONE) {
