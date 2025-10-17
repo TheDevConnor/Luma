@@ -1,6 +1,6 @@
 @module "memory"
 
-pub const memcpy = fn (dest: *void, src: *void, n: int) *void {
+pub const memcpy -> fn (dest: *void, src: *void, n: int) *void {
     let d: *char = cast<*char>(dest);
     let s: *char = cast<*char>(src);
 
@@ -11,7 +11,7 @@ pub const memcpy = fn (dest: *void, src: *void, n: int) *void {
     return dest;
 }
 
-pub const memcmp = fn (a: *void, b: *void, n: int) int {
+pub const memcmp -> fn (a: *void, b: *void, n: int) int {
     let x: *char = cast<*char>(a);
     let y: *char = cast<*char>(b);
     loop [i: int = 0](i < n) : (++i) {
@@ -22,7 +22,7 @@ pub const memcmp = fn (a: *void, b: *void, n: int) int {
     return 0;
 }
 
-pub const memset = fn (dest: *void, value: int, n: int) *void {
+pub const memset -> fn (dest: *void, value: int, n: int) *void {
     let d: *char = cast<*char>(dest);
     let c:  char = cast<char>(value);
     let i:   int = 0;
@@ -40,7 +40,7 @@ pub const memset = fn (dest: *void, value: int, n: int) *void {
 }
 
 // Move memory regions (handles overlapping regions correctly)
-pub const memmove = fn (dest: *void, src: *void, n: int) *void {
+pub const memmove -> fn (dest: *void, src: *void, n: int) *void {
     let d: *char = cast<*char>(dest);
     let s: *char = cast<*char>(src);
     
@@ -60,7 +60,7 @@ pub const memmove = fn (dest: *void, src: *void, n: int) *void {
 }
 
 // Find first occurrence of byte in memory
-pub const memchr = fn (ptr: *void, value: int, n: int) *void {
+pub const memchr -> fn (ptr: *void, value: int, n: int) *void {
     let p: *char = cast<*char>(ptr);
     let target: char = cast<char>(value);
     
@@ -74,11 +74,11 @@ pub const memchr = fn (ptr: *void, value: int, n: int) *void {
 }
 
 // Zero out memory (common operation)
-pub const memzero = fn (dest: *void, n: int) *void { return memset(dest, 0, n); }
+pub const memzero -> fn (dest: *void, n: int) *void { return memset(dest, 0, n); }
 
 // Allocate and zero memory (calloc equivalent)
 #returns_ownership
-pub const calloc = fn (count: int, size: int) *void {
+pub const calloc -> fn (count: int, size: int) *void {
     let total_size: int = count * size;
     let ptr: *void = alloc(total_size);
  
@@ -91,7 +91,7 @@ pub const calloc = fn (count: int, size: int) *void {
 
 // Reallocate memory (simplified version - allocates new and copies)
 #returns_ownership 
-pub const realloc = fn (ptr: *void, new_size: int) *void {
+pub const realloc -> fn (ptr: *void, new_size: int) *void {
     if (ptr == cast<*void>(0)) {
         return alloc(new_size);
     }
@@ -104,7 +104,7 @@ pub const realloc = fn (ptr: *void, new_size: int) *void {
 }
 
 // Memory swap (swap contents of two memory regions)
-pub const memswap = fn (a: *void, b: *void, n: int) void {
+pub const memswap -> fn (a: *void, b: *void, n: int) void {
     let p1: *char = cast<*char>(a);
     let p2: *char = cast<*char>(b);
     
@@ -115,7 +115,7 @@ pub const memswap = fn (a: *void, b: *void, n: int) void {
     }
 }
 
-pub const memswapn = fn (a: *void, b: *void, count: int, size: int) void {
+pub const memswapn -> fn (a: *void, b: *void, count: int, size: int) void {
     let temp: *void = alloc(size);
 
     loop [i: int = 0](i < count) : (++i) {
@@ -130,7 +130,7 @@ pub const memswapn = fn (a: *void, b: *void, count: int, size: int) void {
     free(temp);
 }
 
-pub const memfill = fn (dest: *void, value: int, size: int, count: int) *void {
+pub const memfill -> fn (dest: *void, value: int, size: int, count: int) *void {
     if (size == 1) {
         // Fill char/byte
         let d: *char = cast<*char>(dest);
@@ -158,7 +158,7 @@ pub const memfill = fn (dest: *void, value: int, size: int, count: int) *void {
 }
 
 // Reverse bytes in memory region
-pub const memrev = fn (ptr: *void, n: int) *void {
+pub const memrev -> fn (ptr: *void, n: int) *void {
     let p: *char = cast<*char>(ptr);
     let start: int = 0;
     let end: int = n - 1;
@@ -174,7 +174,7 @@ pub const memrev = fn (ptr: *void, n: int) *void {
 }
 
 // Count occurrences of a byte in memory
-pub const memcount = fn (ptr: *void, value: int, n: int) int {
+pub const memcount -> fn (ptr: *void, value: int, n: int) int {
     let p: *char = cast<*char>(ptr);
     let target: char = cast<char>(value);
     let count: int = 0;
@@ -190,7 +190,7 @@ pub const memcount = fn (ptr: *void, value: int, n: int) int {
 
 // Duplicate memory region
 #returns_ownership
-pub const memdup = fn (src: *void, n: int) *void {
+pub const memdup -> fn (src: *void, n: int) *void {
     let dest: *void = alloc(n);
     if (dest != cast<*void>(0)) {
         memcpy(dest, src, n);
@@ -199,12 +199,12 @@ pub const memdup = fn (src: *void, n: int) *void {
 }
 
 // Check if memory regions are equal
-pub const memeq = fn (a: *void, b: *void, n: int) bool {
+pub const memeq -> fn (a: *void, b: *void, n: int) bool {
     return memcmp(a, b, n) == 0;
 }
 
 // Find substring in memory
-pub const memmem = fn (haystack: *void, haystack_len: int, needle: *void, needle_len: int) *void {
+pub const memmem -> fn (haystack: *void, haystack_len: int, needle: *void, needle_len: int) *void {
     if (needle_len == 0) { return haystack; }
     if (needle_len > haystack_len) { return cast<*void>(0); }
     
@@ -228,7 +228,7 @@ pub const memmem = fn (haystack: *void, haystack_len: int, needle: *void, needle
     return cast<*void>(0);
 }
 
-pub const align = fn (member_alignments: *int, count: int) int {
+pub const align -> fn (member_alignments: *int, count: int) int {
     let max: int = 1;
     loop [i: int = 0](i < count) : (++i) {
         if (max < cast<*int>(member_alignments)[i]) {

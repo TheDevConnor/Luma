@@ -28,15 +28,15 @@ pub const SIN_TABLE: [double; 129] = [
     1.000000
 ];
 
-pub const rand = fn (seed: *int) int {
+pub const rand -> fn (seed: *int) int {
     *seed = (*seed * 1103515245 + 12345) % 2147483648;
     return *seed;
 }
 
-pub const add      = fn (x: int, y: int) int { return x + y; }
-pub const subtract = fn (x: int, y: int) int { return x - y; }
-pub const multiply = fn (x: int, y: int) int { return x * y; }
-pub const divide = fn (x: int, y: int) int { 
+pub const add      -> fn (x: int, y: int) int { return x + y; }
+pub const subtract -> fn (x: int, y: int) int { return x - y; }
+pub const multiply -> fn (x: int, y: int) int { return x * y; }
+pub const divide -> fn (x: int, y: int) int { 
     if (y == 0) {
         output("(Division by zero error) ");
         return 0;
@@ -44,7 +44,7 @@ pub const divide = fn (x: int, y: int) int {
     return x / y;
 }
 
-pub const mod = fn (x: int, y: int) int {
+pub const mod -> fn (x: int, y: int) int {
     if (y == 0) {
         output("(Division by zero error) ");
         return 0;
@@ -52,13 +52,13 @@ pub const mod = fn (x: int, y: int) int {
     return x % y;
 }
 
-pub const fib = fn (n: int, a: int, b: int) int {
+pub const fib -> fn (n: int, a: int, b: int) int {
     if (n == 0) { return a; }
     if (n == 1) { return b; }
     return fib(n - 1, b, a + b);
 }
 
-pub const power = fn (base: double, exponent: int) double {
+pub const power -> fn (base: double, exponent: int) double {
     if (exponent == 0) { return 1.0; } 
 
     let result: double = 1.0;
@@ -76,17 +76,17 @@ pub const power = fn (base: double, exponent: int) double {
     return result;
 } 
 
-pub const max_size = fn (a: int, b: int) int {
+pub const max_size -> fn (a: int, b: int) int {
     if (a > b) { return a; }
     return b; 
 }
 
-pub const min_size = fn (a: int, b: int) int {
+pub const min_size -> fn (a: int, b: int) int {
     if (a < b) { return a; }
     return b; 
 }
 
-pub const sin = fn (a: double) double {
+pub const sin -> fn (a: double) double {
   // Normalize into [0, TWO_PI)
   let k: int = cast<int>(a / TWO_PI);
   a = a - k * TWO_PI;
@@ -122,15 +122,15 @@ pub const sin = fn (a: double) double {
   }
 }
 
-pub const cos = fn (x: double) double { return sin(x + HALF_PI); }
+pub const cos -> fn (x: double) double { return sin(x + HALF_PI); }
 
-pub const tan = fn (x: double) double { return sin(x)/(cos(x)+0.000000001); }
+pub const tan -> fn (x: double) double { return sin(x)/(cos(x)+0.000000001); }
 
-pub const sec = fn (x: double) double { return 1/(cos(x)+0.000000001); }
+pub const sec -> fn (x: double) double { return 1/(cos(x)+0.000000001); }
 
-pub const csc = fn (x: double) double { return 1/(sin(x)+0.000000001); }
+pub const csc -> fn (x: double) double { return 1/(sin(x)+0.000000001); }
 
-pub const cot = fn (x: double) double { return cos(x)/(sin(x)+0.000000001); }
+pub const cot -> fn (x: double) double { return cos(x)/(sin(x)+0.000000001); }
 
 // const f = fn (x: double) double {
 //     return math::sin(x); 

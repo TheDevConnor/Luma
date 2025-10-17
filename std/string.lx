@@ -1,7 +1,7 @@
 @module "string"
 
 #returns_ownership 
-pub const from_char = fn (c: char) *char {
+pub const from_char -> fn (c: char) *char {
   let s: *char = cast<*char>(alloc(2 * sizeof<char>));
   s[0] = c;
   s[1] = cast<char>(0);
@@ -9,7 +9,7 @@ pub const from_char = fn (c: char) *char {
 }
 
 #returns_ownership
-pub const from_int = fn (n: int) *char {
+pub const from_int -> fn (n: int) *char {
   if (n == 0) {
     return from_char(cast<char>('0'));
   }
@@ -45,13 +45,13 @@ pub const from_int = fn (n: int) *char {
   return s;
 }
 
-pub const strlen = fn (s: *char) int {
+pub const strlen -> fn (s: *char) int {
   let length: int = 0;
   loop (s[length] != cast<char>(0)) : (++length) {}
   return length;
 }
 
-pub const strcmp = fn (s1: *char, s2: *char) int {
+pub const strcmp -> fn (s1: *char, s2: *char) int {
   let ls1: int = strlen(s1);
   let ls2: int = strlen(s2);
 
@@ -64,7 +64,7 @@ pub const strcmp = fn (s1: *char, s2: *char) int {
   return 0;
 }
 
-pub const s_char = fn (s: *char, c: int) char{
+pub const s_char -> fn (s: *char, c: int) char{
   loop [i: int = 0](s[i] != cast<char>(0)) : (++i) {
     if (s[i] == cast<char>(c)) {
       return s[i];
@@ -74,13 +74,13 @@ pub const s_char = fn (s: *char, c: int) char{
   return cast<char>(0);
 }
 
-pub const copy = fn (dest: *char, src: *char) *char {
+pub const copy -> fn (dest: *char, src: *char) *char {
   let i: int = 0;
   loop((dest[i] = src[i]) != cast<char>(0)) : (++i) {}
   return dest;
 }
 
-pub const n_copy = fn (dest: *char, src: *char, n: int) *char {
+pub const n_copy -> fn (dest: *char, src: *char, n: int) *char {
   let i: int = 0;
   loop(i < n && src[i] != cast<char>(0)) : (++i) {
     dest[i] = src[i]; 
@@ -88,7 +88,7 @@ pub const n_copy = fn (dest: *char, src: *char, n: int) *char {
   return dest;
 }
 
-pub const cat = fn (dest: *char, s1: *char, s2: *char) *char {
+pub const cat -> fn (dest: *char, s1: *char, s2: *char) *char {
   let ls1: int = strlen(s1);
   let lt: int = ls1 + strlen(s2) + 1;
 
@@ -106,7 +106,7 @@ pub const cat = fn (dest: *char, s1: *char, s2: *char) *char {
   return dest;
 }
 
-pub const putchar = fn(c: char) int {
+pub const putchar -> fn(c: char) int {
   // allocate buffer for command + escaped char (32 bytes is enough)
   let cmd: *char = cast<*char>(alloc(32 * sizeof<char>));
   defer { free(cmd); }
@@ -116,15 +116,15 @@ pub const putchar = fn(c: char) int {
   let char_val: int = cast<int>(c);
   
   switch(char_val) {
-      10  => { system("echo"); }                                        // '\n'
-      9   => { system("printf '\\t'"); }                                // '\t'
-      37  => cat(cmd, cast<*char>("printf '\\%'"),  cast<*char>(""));   // '%'
-      92  => cat(cmd, cast<*char>("printf '\\\\'"), cast<*char>(""));   // '\\'
-      39  => cat(cmd, cast<*char>("printf '\\\''"), cast<*char>(""));   // '\''
-      34  => cat(cmd, cast<*char>("printf '\\'"), cast<*char>(""));     // '"'
-      36  => cat(cmd, cast<*char>("printf '\\$'"),  cast<*char>(""));   // '$'
-      96  => cat(cmd, cast<*char>("printf '\\`'"),  cast<*char>(""));   // '`'
-      _   => {
+      10 -> { system("echo"); }                                        // '\n'
+      9  -> { system("printf '\\t'"); }                                // '\t'
+      37 -> cat(cmd, cast<*char>("printf '\\%'"),  cast<*char>(""));   // '%'
+      92 -> cat(cmd, cast<*char>("printf '\\\\'"), cast<*char>(""));   // '\\'
+      39 -> cat(cmd, cast<*char>("printf '\\\''"), cast<*char>(""));   // '\''
+      34 -> cat(cmd, cast<*char>("printf '\\'"), cast<*char>(""));     // '"'
+      36 -> cat(cmd, cast<*char>("printf '\\$'"),  cast<*char>(""));   // '$'
+      96 -> cat(cmd, cast<*char>("printf '\\`'"),  cast<*char>(""));   // '`'
+      _  -> {
           let s: *char = from_char(c);
           defer { free(s); }
           cat(cmd, cast<*char>("printf '%s' "), s);

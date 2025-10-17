@@ -1,9 +1,9 @@
 @module "terminal"
 
-@use "string" as string
+// @use "string" as string
 
 // Get a single character without waiting for Enter
-pub const getch = fn () char {
+pub const getch -> fn () char {
     // Disable canonical mode and echo
     system("stty -icanon -echo");
     
@@ -17,7 +17,7 @@ pub const getch = fn () char {
 }
 
 // Get a single character without waiting for Enter (no echo)
-pub const getch_silent = fn () char {
+pub const getch_silent -> fn () char {
     // Already has -echo, so it won't display
     system("stty -icanon -echo");
     let c: char = input<char>("");
@@ -26,7 +26,7 @@ pub const getch_silent = fn () char {
 }
 
 #returns_ownership
-pub const getche = fn () char {
+pub const getche -> fn () char {
     // Disable canonical mode but keep echo
     system("stty -icanon echo");
     let c: char = input<char>("");
@@ -35,7 +35,7 @@ pub const getche = fn () char {
 }
 
 // Check if a key is pressed (non-blocking)
-pub const kbhit = fn () int {
+pub const kbhit -> fn () int {
     system("stty -icanon -echo min 0 time 0");
     let c: char = input<char>("");
     system("stty icanon echo");
@@ -47,14 +47,14 @@ pub const kbhit = fn () int {
 }
 
 // Wait for any key press
-pub const wait_for_key = fn () void {
+pub const wait_for_key -> fn () void {
     output("Press any key to continue...");
     getch();
     output("\n");
 }
 
 // Clear input buffer
-pub const clear_input_buffer = fn () void {
+pub const clear_input_buffer -> fn () void {
     system("stty -icanon -echo");
     
     // Read until no more input
@@ -73,7 +73,7 @@ pub const clear_input_buffer = fn () void {
 
 // Get password input (hidden)
 #returns_ownership
-pub const getpass = fn (prompt: *char) *char {
+pub const getpass -> fn (prompt: *char) *char {
     output(prompt);
     
     // Allocate buffer for password
