@@ -70,6 +70,8 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
       ctx->arena, sizeof(char *) * total_members, alignof(char *));
   struct_info->field_types = (LLVMTypeRef *)arena_alloc(
       ctx->arena, sizeof(LLVMTypeRef) * total_members, alignof(LLVMTypeRef));
+  struct_info->field_element_types = (LLVMTypeRef *)arena_alloc(  // NEW
+      ctx->arena, sizeof(LLVMTypeRef) * total_members, alignof(LLVMTypeRef));
   struct_info->field_is_public = (bool *)arena_alloc(
       ctx->arena, sizeof(bool) * total_members, alignof(bool));
 
@@ -94,10 +96,9 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
-    struct_info->field_names[field_index] =
-        arena_strdup(ctx->arena, field_name);
-    struct_info->field_types[field_index] =
-        codegen_type(ctx, field->stmt.field_decl.type);
+    struct_info->field_names[field_index] = arena_strdup(ctx->arena, field_name);
+    struct_info->field_types[field_index] = codegen_type(ctx, field->stmt.field_decl.type);
+    struct_info->field_element_types[field_index] = extract_element_type_from_ast(ctx, field->stmt.field_decl.type);
     struct_info->field_is_public[field_index] = true;
 
     if (!struct_info->field_types[field_index]) {
@@ -129,12 +130,10 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
-    struct_info->field_names[field_index] =
-        arena_strdup(ctx->arena, field_name);
-    struct_info->field_types[field_index] =
-        codegen_type(ctx, field->stmt.field_decl.type);
-    struct_info->field_is_public[field_index] =
-        field->stmt.field_decl.is_public;
+    struct_info->field_names[field_index] = arena_strdup(ctx->arena, field_name);
+    struct_info->field_types[field_index] = codegen_type(ctx, field->stmt.field_decl.type);
+    struct_info->field_element_types[field_index] = extract_element_type_from_ast(ctx, field->stmt.field_decl.type);
+    struct_info->field_is_public[field_index] = field->stmt.field_decl.is_public;
 
     if (!struct_info->field_types[field_index]) {
       fprintf(stderr,

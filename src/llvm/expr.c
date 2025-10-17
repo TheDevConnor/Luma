@@ -985,6 +985,21 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
             cast_node->expr.cast.type->type_data.pointer.pointee_type;
         pointee_type = codegen_type(ctx, pointee_node);
       }
+    } else if (node->expr.index.object->type == AST_EXPR_MEMBER) {
+      AstNode *member_expr = node->expr.index.object;
+      const char *field_name = member_expr->expr.member.member;
+      
+      // Get the struct info
+      StructInfo *struct_info = NULL;
+      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+        int field_idx = get_field_index(info, field_name);
+        if (field_idx >= 0) {
+          struct_info = info;
+          // Use the element type stored for this field
+          pointee_type = struct_info->field_element_types[field_idx];
+          break;
+        }
+      }
     }
 
     // CRITICAL: Don't fall back to i8! This causes the bug.
