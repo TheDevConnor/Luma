@@ -84,7 +84,7 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     case LITERAL_FLOAT:
       return create_basic_type(arena, "double", expr->line, expr->column);
     case LITERAL_STRING:
-      return create_basic_type(arena, "string", expr->line, expr->column);
+      return create_basic_type(arena, "str", expr->line, expr->column);
     case LITERAL_BOOL:
       return create_basic_type(arena, "bool", expr->line, expr->column);
     case LITERAL_CHAR:
