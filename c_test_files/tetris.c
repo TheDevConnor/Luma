@@ -51,40 +51,13 @@ int readch() {
 
 // Tetromino definitions (7 pieces, each as 4x4 block string)
 const char *tetromino[7] = {
-    "...."
-    "XXXX"
-    "...."
-    "....", // I
-
-    ".X.."
-    ".X.."
-    ".XX."
-    "....", // J
-
-    "..X."
-    "..X."
-    ".XX."
-    "....", // L
-
-    ".XX."
-    ".XX."
-    "...."
-    "....", // O
-
-    ".XX."
-    "XX.."
-    "...."
-    "....", // S
-
-    ".X.."
-    ".XXX"
-    "...."
-    "....", // T
-
-    "XX.."
-    ".XX."
-    "...."
-    "...." // Z
+    "....XXXX........", // I
+    ".X...X...XX.....", // J
+    "..X...X..XX.....", // L
+    ".XX..XX.........", // O
+    ".XX.XX..........", // S
+    ".X...XXX........", // T
+    "XX...XX........." // Z
 };
 
 // ANSI color codes for each piece
@@ -153,8 +126,7 @@ void draw_screen(int currentPiece, int currentRotation, int currentX,
   // Draw header with box drawing characters
   printf("\x1b[0m");
   printf("╔════════════════════════════╗  ╔═══════════════╗\n");
-  printf("║      \x1b[1;97mT E T R I S\x1b[0m         ║  ║  \x1b[1mNEXT "
-         "PIECE\x1b[0m  ║\n");
+  printf("║      \x1b[1;97mT E T R I S\x1b[0m         ║  ║  \x1b[1mNEXT PIECE\x1b[0m  ║\n");
   printf("╠════════════════════════════╣  ║               ║\n");
 
   // Draw visible area with next piece preview

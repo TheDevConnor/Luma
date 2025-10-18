@@ -1,6 +1,64 @@
 @module "terminal"
 
-// @use "string" as string
+@use "string" as string
+@use "termfx" as fx
+
+// Global flag to track raw mode state
+let raw_mode_enabled: int = 0;
+
+// Enable raw mode - BLOCKING (waits for input)
+pub const enable_raw_mode -> fn () void {
+    if (raw_mode_enabled == 1) {
+        return; // Already enabled
+    }
+    
+    // Save terminal state and set up restoration on exit
+    system("stty -g > /tmp/luma_termios_backup");
+    
+    // Configure raw mode:
+    // -icanon: disable line buffering (read char by char)
+    // -echo: don't echo input
+    // -isig: disable interrupt signals (Ctrl+C, Ctrl+Z)
+    // -ixon: disable software flow control (Ctrl+S, Ctrl+Q)
+    // -icrnl: don't translate CR to NL
+    // min 1 time 0: blocking read (wait for at least 1 character)
+    system("stty -icanon -echo -isig -ixon -icrnl min 1 time 0");
+    
+    // Hide cursor
+    output(fx::CURSOR_HIDE);
+    
+    raw_mode_enabled = 1;
+}
+
+// Disable raw mode - restore terminal to normal
+pub const disable_raw_mode -> fn () void {
+    if (raw_mode_enabled == 0) {
+        return; // Already disabled
+    }
+    
+    // Restore original terminal settings
+    system("stty $(cat /tmp/luma_termios_backup)");
+    system("rm /tmp/luma_termios_backup");
+    
+    // Show cursor
+    output(fx::CURSOR_SHOW);
+    
+    // Reset colors
+    output(fx::RESET);
+    
+    raw_mode_enabled = 0;
+}
+
+// Blocking input in raw mode - waits for a key but no Enter needed
+// Use with enable_raw_mode() (not enable_raw_mode_nonblock)
+pub const getch_raw -> fn () char {
+    if (raw_mode_enabled == 0) {
+        enable_raw_mode();
+    }
+    
+    let c: char = input<char>("");
+    return c;
+}
 
 // Get a single character without waiting for Enter
 pub const getch -> fn () char {
@@ -35,10 +93,18 @@ pub const getche -> fn () char {
 }
 
 // Check if a key is pressed (non-blocking)
+// WARNING: This consumes the character! Don't use in raw mode.
 pub const kbhit -> fn () int {
+    // Save current state
+    system("stty -g > /tmp/luma_kbhit_backup");
+    
+    // Set non-blocking
     system("stty -icanon -echo min 0 time 0");
     let c: char = input<char>("");
-    system("stty icanon echo");
+    
+    // Restore previous state
+    system("stty $(cat /tmp/luma_kbhit_backup)");
+    system("rm /tmp/luma_kbhit_backup");
     
     if (c == cast<char>(0)) {
         return 0;
@@ -109,4 +175,21 @@ pub const getpass -> fn (prompt: *char) *char {
     output("\n");
     
     return password;
+}
+
+// Sleep for milliseconds (more precise than system("sleep"))
+pub const sleep_ms -> fn (ms: int) void {
+    // Convert to seconds string
+    let seconds: *char = string::from_int(ms);
+    defer free(seconds);
+    
+    // TODO: Better implementation with usleep or nanosleep
+    system("sleep 0.001");  // Placeholder
+}
+
+// Get terminal size
+pub const get_terminal_size -> fn () void {
+    system("tput cols > /tmp/luma_cols");
+    system("tput lines > /tmp/luma_lines");
+    // Read back from files...
 }
