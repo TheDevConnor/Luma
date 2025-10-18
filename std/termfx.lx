@@ -12,14 +12,14 @@ pub const MAGENTA: *char = "\x1b[35m";
 pub const CYAN: *char    = "\x1b[36m";
 pub const WHITE: *char   = "\x1b[37m";
 
-pub const BRIGHT_BLACK: *char   = "\x1b[90m";
-pub const BRIGHT_RED: *char     = "\x1b[91m";
-pub const BRIGHT_GREEN: *char   = "\x1b[92m";
-pub const BRIGHT_YELLOW: *char  = "\x1b[93m";
-pub const BRIGHT_BLUE: *char    = "\x1b[94m";
-pub const BRIGHT_MAGENTA: *char = "\x1b[95m";
-pub const BRIGHT_CYAN: *char    = "\x1b[96m";
-pub const BRIGHT_WHITE: *char   = "\x1b[97m";
+pub const BRIGHT_BLACK: *char   = "\x1b[1;90m";
+pub const BRIGHT_RED: *char     = "\x1b[1;91m";
+pub const BRIGHT_GREEN: *char   = "\x1b[1;92m";
+pub const BRIGHT_YELLOW: *char  = "\x1b[1;93m";
+pub const BRIGHT_BLUE: *char    = "\x1b[1;94m";
+pub const BRIGHT_MAGENTA: *char = "\x1b[1;95m";
+pub const BRIGHT_CYAN: *char    = "\x1b[1;96m";
+pub const BRIGHT_WHITE: *char   = "\x1b[1;97m";
 
 pub const BG_BLACK: *char   = "\x1b[40m";
 pub const BG_RED: *char     = "\x1b[41m";

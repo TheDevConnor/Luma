@@ -267,23 +267,7 @@ int main() {
         gameOver = 1;
         break;
       }
-      // Handle escape sequences for arrow keys
-      if (c == 27) { // ESC
-        if (kbhit()) {
-          int c2 = readch();
-          if (c2 == '[' && kbhit()) {
-            int c3 = readch();
-            if (c3 == 'A')
-              key = 'U'; // Up arrow
-            if (c3 == 'B')
-              key = 'D'; // Down arrow
-            if (c3 == 'C')
-              key = 'R'; // Right arrow
-            if (c3 == 'D')
-              key = 'L'; // Left arrow
-          }
-        }
-      }
+
       // Regular keys
       if (c == 'a' || c == 'A')
         key = 'L';
