@@ -51,40 +51,13 @@ int readch() {
 
 // Tetromino definitions (7 pieces, each as 4x4 block string)
 const char *tetromino[7] = {
-    "...."
-    "XXXX"
-    "...."
-    "....", // I
-
-    ".X.."
-    ".X.."
-    ".XX."
-    "....", // J
-
-    "..X."
-    "..X."
-    ".XX."
-    "....", // L
-
-    ".XX."
-    ".XX."
-    "...."
-    "....", // O
-
-    ".XX."
-    "XX.."
-    "...."
-    "....", // S
-
-    ".X.."
-    ".XXX"
-    "...."
-    "....", // T
-
-    "XX.."
-    ".XX."
-    "...."
-    "...." // Z
+    "....XXXX........", // I
+    ".X...X...XX.....", // J
+    "..X...X..XX.....", // L
+    ".XX..XX.........", // O
+    ".XX.XX..........", // S
+    ".X...XXX........", // T
+    "XX...XX........." // Z
 };
 
 // ANSI color codes for each piece
@@ -153,8 +126,7 @@ void draw_screen(int currentPiece, int currentRotation, int currentX,
   // Draw header with box drawing characters
   printf("\x1b[0m");
   printf("╔════════════════════════════╗  ╔═══════════════╗\n");
-  printf("║      \x1b[1;97mT E T R I S\x1b[0m         ║  ║  \x1b[1mNEXT "
-         "PIECE\x1b[0m  ║\n");
+  printf("║      \x1b[1;97mT E T R I S\x1b[0m         ║  ║  \x1b[1mNEXT PIECE\x1b[0m  ║\n");
   printf("╠════════════════════════════╣  ║               ║\n");
 
   // Draw visible area with next piece preview
@@ -295,23 +267,7 @@ int main() {
         gameOver = 1;
         break;
       }
-      // Handle escape sequences for arrow keys
-      if (c == 27) { // ESC
-        if (kbhit()) {
-          int c2 = readch();
-          if (c2 == '[' && kbhit()) {
-            int c3 = readch();
-            if (c3 == 'A')
-              key = 'U'; // Up arrow
-            if (c3 == 'B')
-              key = 'D'; // Down arrow
-            if (c3 == 'C')
-              key = 'R'; // Right arrow
-            if (c3 == 'D')
-              key = 'L'; // Left arrow
-          }
-        }
-      }
+
       // Regular keys
       if (c == 'a' || c == 'A')
         key = 'L';

@@ -1,0 +1,345 @@
+@module "main"
+
+@use "terminal" as term
+@use "termfx" as tx
+
+const FIELD_W: int = 14;
+const FIELD_H: int = 24;
+const VISIB_H: int = 23;
+
+const teromino: [[*char; 4]; 7] = [
+  ["....", "XXXX", "....", "...."], // I
+  [".X..", ".X..", ".XX.", "...."], // J
+  ["..X.", "..X.", ".XX.", "...."], // L
+  [".XX.", ".XX.", "....", "...."], // O
+  [".XX.", "XX..", "....", "...."], // S
+  [".X..", ".XXX", "....", "...."], // T
+  ["XX..", ".XX.", "....", "...."]  // Z
+];
+
+const piece_color: [*char; 7] = [
+  "\x1b[96m",       // Cyan - I piece
+  "\x1b[94m",       // Blue - J piece
+  "\x1b[38;5;208m", // Orange - L piece
+  "\x1b[93m",       // Yellow - O piece
+  "\x1b[92m",       // Green - S piece
+  "\x1b[95m",       // Magenta - T piece
+  "\x1b[91m"        // Red - Z piece
+];
+
+const offset: [[int; 16]; 4]  = [
+  [0,  1,  2,  3, 4,  5,  6,  7,
+    8,  9, 10, 11, 12, 13, 14, 15],
+  [12,  8,  4,  0, 13,  9,  5,  1,
+    14, 10,  6,  2, 15, 11,  7,  3],
+  [15, 14, 13, 12, 11, 10,  9,  8,
+    7,  6,  5,  4, 3,  2,  1,  0],
+  [3,  7, 11, 15, 2,  6, 10, 14,
+    1,  5,  9, 13, 0,  4,  8, 12]
+];
+
+let field: *int;
+
+const init_field -> fn () void {
+  loop [x: int = 0, y: int = 0](x < FIELD_W) : (++x) {
+    y = 0;
+    loop (y < FIELD_H) : (++y) {
+      if (x == 0 || x == (FIELD_W - 1) || y == (FIELD_H-1)) {
+        field[y * FIELD_W + x] = 9; // wall
+      } else {
+        field[y * FIELD_W + x] = 0; // empty
+      }
+    }
+  }
+}
+
+const rotate -> fn (px: int, py: int, r: int) int {
+    return offset[r % 4][py * 4 + px];
+}
+
+const draw_screen -> fn (c_piece: int, c_rotation: int, c_x: int, c_y: int,
+                         score: int, lines: int, next_piece: int) void {
+  output(tx::move_cursor(3, 1), tx::RESET, "╔════════════════════════════╗  ╔═══════════════╗\n",
+            "║        " tx::BRIGHT_WHITE,"T E T R I S", tx::RESET, "         ║  ║   ", 
+                        tx::BRIGHT_WHITE,"NEXT PIECE", tx::RESET, "  ║\n",
+                    "╠════════════════════════════╣  ║               ║\n");
+  
+  loop [y: int = 0](y < VISIB_H) : (++y) {
+    output("║");
+    loop [x: int = 0](x < FIELD_W) : (++x) {
+      let cell: int = field[y * FIELD_W + x];
+      
+      // Check if current piece occupies this position
+      let is_piece: int = 0;
+      loop [py: int = 0](py < 4) : (++py) {
+        loop [px: int = 0](px < 4) : (++px) {
+          let pi: int = rotate(px, py, c_rotation);
+          let row: int = pi / 4;
+          let col: int = pi % 4;
+          let str_ptr: *char = teromino[c_piece][row];
+          if (str_ptr[col] == 'X') {
+            if ((c_x + px) == x && (c_y + py) == y) {
+              is_piece = 1;
+            }
+          }
+        }
+      }
+      
+      if (is_piece == 1) {
+        output(piece_color[c_piece], "██");
+      } elif (cell == 9) {
+        output("\x1b[90m", "██");  // Wall (dark gray)
+      } elif (cell > 0) {
+        output(piece_color[cell - 1], "██");  // Locked piece
+      } else {
+        output("  ");  // Empty space
+      }
+    }
+    output(tx::RESET, "║");
+
+    switch(y) {
+      1, 2, 3, 4 -> {
+        let py: int = y - 1;
+        output("  ║ ");
+        loop [px: int = 0](px < 4) : (++px) {
+          let pi: int = rotate(px, py, 0);
+          let row: int = pi / 4;
+          let col: int = pi % 4;
+          let str_ptr: *char = teromino[next_piece][row];
+          if (str_ptr[col] == 'X') {
+            output(piece_color[next_piece], "██", tx::RESET);
+          } else {
+            output("  ");
+          }
+        }
+        output("   ║");
+      }
+      5 -> output("  ╠═══════════════╣");
+      6 -> output("  ║ \x1b[1mScore:\x1b[0m        ║");
+      7 -> output("  ║ \x1b[93m", score, "\x1b[0m          ║");
+      8 -> output("  ║               ║");
+      9 -> output("  ║ \x1b[1mLines:\x1b[0m        ║");
+      10 -> output("  ║ \x1b[92m", lines,  "\x1b[0m          ║");
+      11 -> output("  ╠═══════════════╣");
+      12 -> output("  ║ \x1b[1mControls:\x1b[0m     ║");
+      13 -> output("  ║ \x1b[96mW/↑\x1b[0m - Rotate  ║");
+      14 -> output("  ║ \x1b[96mA/←\x1b[0m - Left    ║");
+      15 -> output("  ║ \x1b[96mD/→\x1b[0m - Right   ║");
+      16 -> output("  ║ \x1b[96mS/↓\x1b[0m - Down    ║");
+      17 -> output("  ║ \x1b[96mSPACE\x1b[0m - Drop  ║");
+      18 -> output("  ║ \x1b[96mQ\x1b[0m - Quit      ║");
+      22 -> output("  ╚═══════════════╝");
+      _ -> output("  ║               ║");
+    }
+
+    output("\n");
+  }
+
+  output("╚════════════════════════════╝\n");
+}
+
+const does_piece_fit -> fn (piece: int, rotation: int, pos_x: int, pos_y: int) int {
+  loop [py: int = 0](py < 4) : (++py) {
+    loop [px: int = 0](px < 4) : (++px) {
+    let pi: int = rotate(px, py, rotation);
+    let row: int = pi / 4;
+    let col: int = pi % 4;
+    let str_ptr: *char = teromino[piece][row];
+    if (str_ptr[col] == 'X') {
+        let field_x: int = pos_x + px;
+        let field_y: int = pos_y + py;
+        
+        // Check boundaries
+        if (field_x < 0 || field_x >= FIELD_W || field_y >= FIELD_H) {
+          return 0;
+        }
+        
+        // Check collision with locked pieces
+        if (field_y >= 0 && field[field_y * FIELD_W + field_x] != 0) {
+          return 0;
+        }
+      }
+    }
+  }
+  return 1;
+}
+
+const lock_piece -> fn (piece: int, rotation: int, pos_x: int, pos_y: int) void {
+  loop [py: int = 0](py < 4) : (++py) {
+    loop [px: int = 0](px < 4) : (++px) {
+    let pi: int = rotate(px, py, rotation);
+    let row: int = pi / 4;
+    let col: int = pi % 4;
+    let str_ptr: *char = teromino[piece][row];
+    if (str_ptr[col] == 'X') {
+        let field_x: int = pos_x + px;
+        let field_y: int = pos_y + py;
+        
+        if (field_y >= 0 && field_y < FIELD_H && field_x >= 0 && field_x < FIELD_W) {
+          field[field_y * FIELD_W + field_x] = piece + 1;
+        }
+      }
+    }
+  }
+}
+
+const check_lines -> fn () int {
+  let lines_cleared: int = 0;
+  
+  loop [y: int = FIELD_H - 2](y > 0) : (--y) {
+    let is_full: int = 1;
+    
+    loop [x: int = 1](x < FIELD_W - 1) : (++x) {
+      if (field[y * FIELD_W + x] == 0) {
+        is_full = 0;
+      }
+    }
+    
+    if (is_full == 1) {
+      lines_cleared = lines_cleared + 1;
+      
+      // Move lines down
+      loop [yy: int = y](yy > 1) : (--yy) {
+        loop [x: int = 1](x < FIELD_W - 1) : (++x) {
+          field[yy * FIELD_W + x] = field[(yy - 1) * FIELD_W + x];
+        }
+      }
+      
+      // Clear top line
+      loop [x: int = 1](x < FIELD_W - 1) : (++x) {
+        field[FIELD_W + x] = 0;
+      }
+      
+      ++y;  // Check this line again
+    }
+  }
+  
+  return lines_cleared;
+}
+
+pub const main -> fn () int {
+  let total: int = FIELD_W * FIELD_H;
+  field = cast<*int>(alloc(sizeof<int> * total));
+  defer { free(field); }
+
+  term::enable_raw_mode();
+  output(tx::CLEAR_SCREEN, "\n\n");
+  init_field();
+
+  let current_piece: int = 1;
+  let current_rotation: int = 0;
+  let current_x: int = FIELD_W / 2 - 2;
+  let current_y: int = 0;
+  let next_piece: int = 3;
+
+  let game_over: int = 0;
+  let score: int = 0;
+  let lines_cleared_total: int = 0;
+  let speed: int = 20;
+  let speed_count: int = 0;
+  let force_down: int = 0;
+  
+  loop (game_over == 0) {
+    ++speed_count;
+    force_down = -cast<int>((speed_count == speed) && (1 == 1));
+    if (force_down == 1) { speed_count = 0; }
+    
+    // Input
+    if (term::kbhit() == 1) {
+      let c: char = term::getch();
+      switch(c) {
+        'q', 'Q' -> { game_over = 1; }
+        'a', 'A' -> {
+          if (does_piece_fit(current_piece, current_rotation, current_x - 1, current_y) == 1) {
+            --current_x;
+          }
+        }
+        'd', 'D' -> {
+          if (does_piece_fit(current_piece, current_rotation, current_x + 1, current_y) == 1) {
+            ++current_x;
+          }
+        }
+        's', 'S' -> {
+          if (does_piece_fit(current_piece, current_rotation, current_x, current_y + 1) == 1) {
+            ++current_y;
+          }
+        }
+        'w', 'W' -> {
+          let new_rotation: int = (current_rotation + 1) % 4;
+          if (does_piece_fit(current_piece, new_rotation, current_x, current_y) == 1) {
+            current_rotation = new_rotation;
+          }
+        }
+        ' ' -> {
+          // Hard drop
+          loop (does_piece_fit(current_piece, current_rotation, current_x, current_y + 1) == 1) {
+            ++current_y;
+            score = score + 2;
+          }
+          force_down = 1;
+        }
+      }
+    }
+    
+    // Gravity
+    if (force_down == 1) {
+      if (does_piece_fit(current_piece, current_rotation, current_x, current_y + 1) == 1) {
+        ++current_y;
+        ++score;
+      } else {
+        // Lock piece
+        lock_piece(current_piece, current_rotation, current_x, current_y);
+        
+        // Check for lines
+        let lines: int = check_lines();
+        if (lines > 0) {
+          lines_cleared_total = lines_cleared_total + lines;
+          score = score + (lines * lines * 100);
+        }
+        
+        // Spawn new piece
+        current_piece = next_piece;
+        next_piece = (next_piece + 1) % 7;
+        current_rotation = 0;
+        current_x = FIELD_W / 2 - 2;
+        current_y = 0;
+        
+        // Check game over
+        if (does_piece_fit(current_piece, current_rotation, current_x, current_y) == 0) {
+          output(tx::CLEAR_SCREEN, tx::move_cursor(1, 1), "\n\n\n");
+          output("╔══════════════════════════════╗\n");
+          output("║          ", tx::BRIGHT_RED, "GAME OVER!", tx::RESET, "          ║\n");
+          output("╠══════════════════════════════╣\n");
+          output("║                              ║\n");
+          output("║  Final Score: ", tx::BRIGHT_YELLOW, score, tx::RESET, "           ║\n");
+          output("║  Lines:       ", tx::BRIGHT_GREEN, lines_cleared_total, tx::RESET, "           ║\n");
+          output("║                              ║\n");
+          output("╠══════════════════════════════╣\n");
+          output("║  Press Q to quit             ║\n");
+          output("╚══════════════════════════════╝\n");
+          
+          loop {
+            if (term::kbhit() == 1) {
+              let c: char = term::getch();
+              if (c == 'q' || c == 'Q') {
+                game_over = 1;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      force_down = 0;
+    }
+
+    draw_screen(current_piece, current_rotation, current_x, current_y, 
+                score, lines_cleared_total, next_piece);
+
+    loop [i: int = 0](i < 20000000) :(++i) {}
+  }
+  
+  term::disable_raw_mode();
+  output(tx::BRIGHT_CYAN, "\n\nGame Over! Final Score: ", score, "\n", tx::RESET);
+  return 0;
+}

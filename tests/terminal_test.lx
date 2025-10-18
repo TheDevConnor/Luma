@@ -86,6 +86,159 @@ const reaction_game -> fn () void {
   }
 }
 
+const raw_mode_demo -> fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_MAGENTA, "=== Raw Mode Demo ===\n", fx::RESET);
+  output("Press keys immediately without Enter.\n");
+  output("Press Q to exit.\n\n");
+  
+  term::enable_raw_mode();
+  defer { term::disable_raw_mode(); }
+  
+  let running: int = 1;
+  
+  loop (running == 1) {
+    let key: char = term::getch_raw();
+    
+    output("Key: '", string::from_char(key), 
+           "' (ASCII: ", cast<int>(key), ")\n");
+    
+    if (key == 'q' || key == 'Q') {
+      running = 0;
+    }
+  }
+  
+  output(fx::BRIGHT_CYAN, "\nExiting...\n", fx::RESET);
+}
+
+const moving_character_demo -> fn () void {
+  // Enable raw mode
+  term::enable_raw_mode();
+  defer { term::disable_raw_mode(); }
+  
+  // Character position
+  let x: int = 20;
+  let y: int = 10;
+  let running: int = 1;
+  
+  // Initial draw
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  
+  loop (running == 1) {
+    // Draw screen at home position (overwrites previous)
+    output(fx::CURSOR_HOME);
+    output(fx::BOLD, fx::BRIGHT_YELLOW, "=== Moving Character Demo ===\n", fx::RESET);
+    output("Position: (", x, ", ", y, ")  \n");
+    output("Use WASD to move, Q to quit.\n\n");
+    
+    // Draw border
+    output(fx::BRIGHT_WHITE, "┌");
+    loop [i: int = 0](i < 40) : (++i) { output("─"); }
+    output("┐\n", fx::RESET);
+    
+    // Draw play area (rows 0-19, so y from 0 to 19)
+    loop [row: int = 0](row < 20) : (++row) {
+      output(fx::BRIGHT_WHITE, "│", fx::RESET);
+      
+      loop [col: int = 0](col < 40) : (++col) {
+        if (row == y && col == x) {
+          output(fx::BRIGHT_GREEN, "◉", fx::RESET);
+        } else {
+          output(" ");
+        }
+      }
+      
+      output(fx::BRIGHT_WHITE, "│\n", fx::RESET);
+    }
+    
+    // Bottom border
+    output(fx::BRIGHT_WHITE, "└");
+    loop [i: int = 0](i < 40) : (++i) { output("─"); }
+    output("┘\n", fx::RESET);
+    
+    // Wait for input (blocking)
+    let key: char = term::getch_raw();
+    
+    // Handle movement with boundary checks
+    switch (key) {
+      'w', 'W' -> if (y > 0)  { y = y - 1; }
+      's', 'S' -> if (y < 19) { y = y + 1; }
+      'a', 'A' -> if (x > 0)  { x = x - 1; }
+      'd', 'D' -> if (x < 39) { x = x + 1; }
+      'q', 'Q' -> running = 0;
+    }
+  }
+  
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BRIGHT_CYAN, "Thanks for playing!\n", fx::RESET);
+}
+
+const typing_speed_demo -> fn () void {
+  output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
+  output(fx::BOLD, fx::BRIGHT_BLUE, "=== Typing Speed Test ===\n", fx::RESET);
+  
+  let target: *char = "The quick brown fox jumps over the lazy dog";
+  output("Type this: ", fx::BRIGHT_YELLOW, target, fx::RESET, "\n\n", fx::CURSOR_SHOW);
+  output("Your input: ");
+  
+  // Enable raw mode for immediate feedback
+  term::enable_raw_mode();
+  defer { term::disable_raw_mode(); }
+  
+  let typed: *char = cast<*char>(alloc(100));
+  defer { free(typed); }
+  
+  let index: int = 0;
+  let target_len: int = string::strlen(target);
+  let correct: int = 0;
+  let wrong: int = 0;
+  
+  loop (index < target_len) {
+    let key: char = term::getch_raw(); // Blocking in raw mode
+    
+    // Handle backspace
+    if (key == cast<char>(127) || key == cast<char>(8)) {
+      if (index > 0) {
+        // Check if we need to undo a correct or wrong count
+        if (typed[index - 1] == target[index - 1]) {
+          correct = correct - 1;
+        } else {
+          wrong = wrong - 1;
+        }
+        
+        index = index - 1;
+        output("\b\b"); // Erase character visually
+      }
+      continue;
+    }
+    
+    // Store typed character
+    typed[index] = key;
+    
+    // Check if correct
+    if (key == target[index]) {
+      output(fx::GREEN, string::from_char(key), fx::RESET);
+      correct = correct + 1;
+    } else {
+      output(fx::RED, string::from_char(key), fx::RESET);
+      wrong = wrong + 1;
+    }
+    
+    index = index + 1;
+  }
+  
+  typed[index] = cast<char>(0); // Null terminate
+  
+  // Show results
+  output("\n\n");
+  output(fx::CURSOR_HIDE, fx::BOLD, "Results:\n", fx::RESET);
+  output(fx::GREEN, "✓ Correct: ", correct, "\n", fx::RESET);
+  output(fx::RED, "✗ Wrong: ", wrong, "\n", fx::RESET);
+  
+  let accuracy: int = (correct * 100) / target_len;
+  output(fx::BRIGHT_CYAN, "Accuracy: ", accuracy, "%\n", fx::RESET);
+}
+
 const yes_no_prompt -> fn (question: *char) int {
   output(question, " (y/n): ");
   
@@ -93,12 +246,12 @@ const yes_no_prompt -> fn (question: *char) int {
     let c: char = term::getch();
     output(string::from_char(c), "\n");
     
-    if (c == 'y' || c == 'Y') {
-      return 1;
-    } elif (c == 'n' || c == 'N') {
-      return 0;
-    } else {
+    switch (c) {
+     'y', 'Y' -> return 1;
+     'n', 'N' -> return 0;
+      _ -> {
       output(fx::YELLOW, "Please press 'y' or 'n': ", fx::RESET);
+      }
     }
   }
   
@@ -112,37 +265,40 @@ pub const main -> fn () int {
    output(fx::BOLD, fx::BRIGHT_CYAN, "║  Interactive Input Demos   ║\n", fx::RESET);
    output(fx::BOLD, fx::BRIGHT_CYAN, "╚════════════════════════════╝\n\n", fx::RESET);
    
-   output("1. Menu Demo\n");
-   output("2. Password Input Demo\n");
-   output("3. Keystroke Demo\n");
-   output("4. Reaction Game\n");
-   output("5. Exit\n\n");
+   output("Basic Demos:\n");
+   output("  1. Menu Demo\n");
+   output("  2. Password Input Demo\n");
+   output("  3. Keystroke Demo\n");
+   output("  4. Reaction Game\n\n");
+   output(fx::BRIGHT_MAGENTA, "Raw Mode Demos (NEW!):\n", fx::RESET);
+   output("  5. Raw Mode Demo\n");
+   output("  6. Moving Character Game\n");
+   output("  7. Typing Speed Test\n\n");
+   output("  8. Exit\n\n");
    output("Choose: ");
    
    let choice: char = term::getch();
    output(string::from_char(choice), "\n\n");
-    
-   if (choice == '1') {
-     menu_demo();
-     term::wait_for_key();
-   } elif (choice == '2') {
-     password_demo();
-     term::wait_for_key();
-   } elif (choice == '3') {
-     keystroke_demo();
-     term::wait_for_key();
-   } elif (choice == '4') {
-     reaction_game();
-     term::wait_for_key();
-   } elif (choice == '5') {
-    if (yes_no_prompt("Are you sure you want to exit?") == 1) {
-      output(fx::BRIGHT_YELLOW, "Goodbye!\n", fx::RESET);
-      break;
+
+    switch(choice) {
+     '1' -> { menu_demo(); term::wait_for_key(); }
+     '2' -> { password_demo(); term::wait_for_key(); }
+     '3' -> { keystroke_demo(); term::wait_for_key(); }
+     '4' -> { reaction_game(); term::wait_for_key(); }
+     '5' -> { raw_mode_demo(); term::wait_for_key(); }
+     '6' -> { moving_character_demo(); term::wait_for_key(); }
+     '7' -> { typing_speed_demo(); term::wait_for_key(); }
+     '8' -> {
+        if (yes_no_prompt("Are you sure you want to exit?") == 1) {
+          output(fx::BRIGHT_YELLOW, "Goodbye!\n", fx::RESET);
+          break;
+        } 
+      }
+      _  -> {
+      output(fx::RED, "Invalid choice!\n", fx::RESET);
+      term::wait_for_key();
+      }
     }
-   } else {
-    output(fx::RED, "Invalid choice!\n", fx::RESET);
-    term::wait_for_key();
-   }
   }
   
   return 0;
