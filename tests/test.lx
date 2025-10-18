@@ -1,20 +1,12 @@
 @module "main"
 
-@use "stack" as st
+impl [func1: int, func2: char] -> [theStruct] {
+
+}
 
 pub const main -> fn () int {
-  let stack: *Stack = st::createStack(20);
 
-  st::push(stack, 20);
-  st::push(stack, 30);
-  st::push(stack, 50);
-  st::push(stack, 12);
-  st::push(stack, 311);
-  output("Peeked: ", st::peek(stack), "\n");
-  st::pop(stack);
-  st::pop(stack);
 
-  st::freeStack(stack);
 
-  return 0;
+return 0;
 }
