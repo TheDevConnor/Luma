@@ -6,7 +6,7 @@
 @use "string" as string
 @use "memory" as mem
 
-const test_strlen = fn () void {
+const test_strlen -> fn () void {
     let empty_str: *char = cast<*char>(mem::calloc(1, sizeof<char>));
     defer { free(empty_str); }
     
@@ -34,7 +34,7 @@ const test_strlen = fn () void {
     output("strlen passed!\n");
 }
 
-const test_strcmp = fn () void {
+const test_strcmp -> fn () void {
     // Create test strings
     let str1: *char = cast<*char>(mem::calloc(6, sizeof<char>));
     let str2: *char = cast<*char>(mem::calloc(6, sizeof<char>));
@@ -84,7 +84,7 @@ const test_strcmp = fn () void {
     output("strcmp passed!\n");
 }
 
-const test_s_char = fn () void {
+const test_s_char -> fn () void {
     // Create test string "Hello World"
     let test_str: *char = cast<*char>(mem::calloc(12, sizeof<char>));
     defer { free(test_str); }
@@ -119,7 +119,7 @@ const test_s_char = fn () void {
     output("s_char passed!\n");
 }
 
-const test_copy = fn () void {
+const test_copy -> fn () void {
     // Create source string "Test"
     let src: *char = cast<*char>(mem::calloc(5, sizeof<char>));
     let dest: *char = cast<*char>(mem::calloc(10, sizeof<char>));
@@ -145,7 +145,7 @@ const test_copy = fn () void {
     output("copy passed!\n");
 }
 
-const test_n_copy = fn () void {
+const test_n_copy -> fn () void {
     // Create source string "Testing"
     let src: *char = cast<*char>(mem::calloc(8, sizeof<char>));
     let dest: *char = cast<*char>(mem::calloc(10, sizeof<char>));
@@ -183,7 +183,7 @@ const test_n_copy = fn () void {
     output("n_copy passed!\n");
 }
 
-const test_cat = fn () void {
+const test_cat -> fn () void {
     // Create strings "Hello" and " World"
     let s1: *char = cast<*char>(mem::calloc(6, sizeof<char>));
     let s2: *char = cast<*char>(mem::calloc(7, sizeof<char>));
@@ -239,7 +239,7 @@ const test_cat = fn () void {
     output("cat passed!\n");
 }
 
-const test_edge_cases = fn () void {
+const test_edge_cases -> fn () void {
     // Test strlen with single character
     let single_char: *char = cast<*char>(mem::calloc(2, sizeof<char>));
     defer { free(single_char); }
@@ -267,7 +267,7 @@ const test_edge_cases = fn () void {
     output("edge cases passed!\n");
 }
 
-const run_all_string_tests = fn () void {
+const run_all_string_tests -> fn () void {
     output("=== String Function Tests ===\n");
     
     test_strlen();
@@ -281,7 +281,7 @@ const run_all_string_tests = fn () void {
     output("=== All String Tests Complete ===\n");
 }
 
-pub const main = fn () int {
+pub const main -> fn () int {
     run_all_string_tests();
     return 0;
 }

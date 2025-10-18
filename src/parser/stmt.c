@@ -123,7 +123,7 @@ Stmt *const_stmt(Parser *parser, bool is_public, bool returns_ownership,
                                 is_public, line, col);
   }
 
-  p_consume(parser, TOK_EQUAL, "Expected '=' after const name");
+  p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after const name");
 
   // Handle complex constant types (functions, structs, enums)
   switch (p_current(parser).type_) {

@@ -61,7 +61,7 @@ pub const CLEAR_TO_EOL: *char = "\x1b[K";
 pub const CLEAR_TO_EOS: *char = "\x1b[J";
 
 #returns_ownership
-pub const fg_rgb = fn (r: int, g: int, b: int) *char {
+pub const fg_rgb -> fn (r: int, g: int, b: int) *char {
     let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
     
     string::cat(msg, msg, "\x1b[38;2;");
@@ -76,7 +76,7 @@ pub const fg_rgb = fn (r: int, g: int, b: int) *char {
 }
 
 #returns_ownership
-pub const bg_rgb = fn (r: int, g: int, b: int) *char {
+pub const bg_rgb -> fn (r: int, g: int, b: int) *char {
     let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
 
     string::cat(msg, msg, "\x1b[48;2;");
@@ -91,7 +91,7 @@ pub const bg_rgb = fn (r: int, g: int, b: int) *char {
 }
 
 #returns_ownership
-pub const move_cursor = fn (row: int, col: int) *char {
+pub const move_cursor -> fn (row: int, col: int) *char {
     let msg: *char = cast<*char>(alloc(20 * sizeof<char>));
 
     string::cat(msg, msg, "\x1b[");

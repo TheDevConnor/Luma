@@ -4,7 +4,7 @@
 @use "terminal" as term
 @use "termfx" as fx
 
-const menu_demo = fn () void {
+const menu_demo -> fn () void {
   output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
   output(fx::BOLD, fx::BRIGHT_CYAN, "=== Interactive Menu ===\n", fx::RESET);
   output("1. Option One\n");
@@ -29,7 +29,7 @@ const menu_demo = fn () void {
   }
 }
  
-const password_demo = fn () void {
+const password_demo -> fn () void {
   output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
   output(fx::BOLD, fx::BRIGHT_MAGENTA, "=== Password Input Demo ===\n", fx::RESET);
   
@@ -40,7 +40,7 @@ const password_demo = fn () void {
   output("Password length: ", string::strlen(password), "\n");
 }
 
-const keystroke_demo = fn () void {
+const keystroke_demo -> fn () void {
   output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
   output(fx::BOLD, fx::BRIGHT_YELLOW, "=== Keystroke Demo ===\n", fx::RESET);
   output("Press keys (ESC to exit)\n\n");
@@ -68,7 +68,7 @@ const keystroke_demo = fn () void {
   }
 }
 
-const reaction_game = fn () void {
+const reaction_game -> fn () void {
   output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
   output(fx::BOLD, fx::BRIGHT_RED, "=== Reaction Time Game ===\n", fx::RESET);
   output("Press SPACE as fast as you can when you see GO!\n\n");
@@ -86,7 +86,7 @@ const reaction_game = fn () void {
   }
 }
 
-const yes_no_prompt = fn (question: *char) int {
+const yes_no_prompt -> fn (question: *char) int {
   output(question, " (y/n): ");
   
   loop {
@@ -105,7 +105,7 @@ const yes_no_prompt = fn (question: *char) int {
   return 0;
 }
 
-pub const main = fn () int {
+pub const main -> fn () int {
   loop {
    output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
    output(fx::BOLD, fx::BRIGHT_CYAN, "╔════════════════════════════╗\n", fx::RESET);

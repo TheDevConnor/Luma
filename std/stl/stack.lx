@@ -1,8 +1,9 @@
 @module "stack"
+
 @use "memory" as mem
 
 // auto incrementing stack
-const Stack = struct {
+const Stack -> struct {
   top: int, // top value in the stack
   capacity: int, // total `length` of the stack
   currentAmount: int, // spaces from 0 - capacity that are full
@@ -11,7 +12,7 @@ const Stack = struct {
 };
 
 #returns_ownership
-pub const createStack = fn (stackCeiling: int) *Stack {
+pub const createStack -> fn (stackCeiling: int) *Stack {
   let stack: *Stack = cast<*Stack>(alloc(sizeof<Stack>));
 
   // check if allocation failed and return a void*
@@ -35,7 +36,7 @@ pub const createStack = fn (stackCeiling: int) *Stack {
   return stack;
 }
 
-const extendStack = fn (stack: *Stack, capacity: int) int {
+const extendStack -> fn (stack: *Stack, capacity: int) int {
   // Cannot extend stack past ceiling
   if (capacity > stack.stackCeiling) {
       return 0;
@@ -49,44 +50,44 @@ const extendStack = fn (stack: *Stack, capacity: int) int {
 }
 
 #takes_ownership
-pub const freeStack = fn (stack: *Stack) void {
+pub const freeStack -> fn (stack: *Stack) void {
   free(stack.array);
   free(stack);
 }
 
-const isEmpty = fn(stack: *Stack) int {
+const isEmpty -> fn(stack: *Stack) int {
   // goes to -1 instead of 1 so add -
   return -cast<int>(stack.top == -1);
 }
 
-const isFull = fn(stack: *Stack) int {
+const isFull -> fn(stack: *Stack) int {
   // goes to -1 instead of 1 so add -
   return -cast<int>(stack.top == (stack.capacity - 1));
 }
 
-pub const push = fn(stack: *Stack, value: int) void {
-     if (isFull(stack) == 1) {
-        if (stack.capacity >= stack.stackCeiling) {
-           output("Stack ceiling reached\nCan not push ", value, "\n");
-           return;
-        }
-        stack.currentAmount = stack.currentAmount + 1;
-        let newCapacity: int = stack.capacity * 2;
-
-        if (newCapacity > stack.stackCeiling) {
-           newCapacity = stack.stackCeiling;
-        }
-        if (extendStack(stack, newCapacity) == 0) {
-           output("Failed to extend stack, can not push ", value "\n");
-        }
-        output("Stack extended to capacity: ", stack.capacity, "\n");
+pub const push -> fn(stack: *Stack, value: int) void {
+  if (isFull(stack) == 1) {
+    if (stack.capacity >= stack.stackCeiling) {
+       output("Stack ceiling reached\nCan not push ", value, "\n");
+       return;
     }
-    stack.top = stack.top + 1;
-    stack.array[stack.top] = value;
-    output("Pushed ", value, " to the stack\n");
+    stack.currentAmount = stack.currentAmount + 1;
+    let newCapacity: int = stack.capacity * 2;
+
+    if (newCapacity > stack.stackCeiling) {
+       newCapacity = stack.stackCeiling;
+    }
+    if (extendStack(stack, newCapacity) == 0) {
+       output("Failed to extend stack, can not push ", value "\n");
+    }
+    output("Stack extended to capacity: ", stack.capacity, "\n");
+  }
+  stack.top = stack.top + 1;
+  stack.array[stack.top] = value;
+  output("Pushed ", value, " to the stack\n");
 }
 
-pub const pop = fn(stack: *Stack) int {
+pub const pop -> fn(stack: *Stack) int {
   if (isEmpty(stack) == 1) {
       output("Stack underflow (empty stack)\n");
       return 0;
@@ -100,7 +101,7 @@ pub const pop = fn(stack: *Stack) int {
   return value;
 }
 
-pub const peek = fn(stack: *Stack) int {
+pub const peek -> fn(stack: *Stack) int {
   if (isEmpty(stack) == 1) {
       output("Stack is empty\n");
       return 0;

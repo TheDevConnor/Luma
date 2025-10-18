@@ -825,7 +825,7 @@ AstNode *typecheck_input_expr(AstNode *expr, Scope *scope,
     }
 
     // Check that message is a string type
-    AstNode *expected_string = create_basic_type(arena, "string", 0, 0);
+    AstNode *expected_string = create_basic_type(arena, "str", 0, 0);
     TypeMatchResult match = types_match(expected_string, msg_type);
 
     if (match == TYPE_MATCH_NONE) {

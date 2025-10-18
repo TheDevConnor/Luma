@@ -25,7 +25,7 @@ const k1: double = 40.0;
 
 let cube_gradient_size: int = 12;
 
-const calculateX = fn (i: int, j: int, k: int) double {
+const calculateX -> fn (i: int, j: int, k: int) double {
   let sA: double = math::sin(A);
   let cA: double = math::cos(A);
   let sB: double = math::sin(B);
@@ -37,7 +37,7 @@ const calculateX = fn (i: int, j: int, k: int) double {
          j * cA * sC + k * sA * sC + i * cB * cC;
 }
 
-const calculateY = fn (i: int, j: int, k: int) double {
+const calculateY -> fn (i: int, j: int, k: int) double {
   let sA: double = math::sin(A);
   let cA: double = math::cos(A);
   let sB: double = math::sin(B);
@@ -50,7 +50,7 @@ const calculateY = fn (i: int, j: int, k: int) double {
          i * cB * sC;
 }
 
-const calculateZ = fn (i: int, j: int, k: int) double {
+const calculateZ -> fn (i: int, j: int, k: int) double {
   let sA: double = math::sin(A);
   let cA: double = math::cos(A);
   let sB: double = math::sin(B);
@@ -59,7 +59,7 @@ const calculateZ = fn (i: int, j: int, k: int) double {
   return k * cA * cB - j * sA * cB + i * sB;
 }
 
-const calculateForSurface = fn (cX: double, cY: double, cZ: double, 
+const calculateForSurface -> fn (cX: double, cY: double, cZ: double, 
                                 ch: char, color: *char) void {
   let x: double = calculateX(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
   let y: double = calculateY(cast<int>(cX), cast<int>(cY), cast<int>(cZ));
@@ -84,7 +84,7 @@ const calculateForSurface = fn (cX: double, cY: double, cZ: double,
   }
 }
 
-const print_cube = fn () void {
+const print_cube -> fn () void {
   loop [cubeX: double = -cube_width](cubeX < cube_width) : (cubeX = cubeX + increment_speed) {
     loop [cubeY: double = -cube_width](cubeY < cube_width) : (cubeY = cubeY + increment_speed) {
       calculateForSurface(cubeX,       cubeY,       -cube_width, '@', fx::BRIGHT_RED);
@@ -97,7 +97,7 @@ const print_cube = fn () void {
   } 
 }
 
-pub const main = fn () int {
+pub const main -> fn () int {
   zBuffer = cast<*double>(alloc(160 * 44 * sizeof<double>));
   _colorBuffer = cast<**char>(alloc(160 * 44 * 8));
   _buffer = cast<*char>(alloc(160 * 44));

@@ -5,7 +5,7 @@
 
 @use "memory" as mem
 
-const test_memset = fn () void {
+const test_memset -> fn () void {
    let buf: *void = alloc(10);
    defer { free(buf); }
 
@@ -21,7 +21,7 @@ const test_memset = fn () void {
    output("memset passed!\n");
 }
 
-const test_memcmp = fn () void {
+const test_memcmp -> fn () void {
     let a: *void = alloc(5 * sizeof<char>);
     let b: *void = alloc(5 * sizeof<char>);
     defer { free(a); free(b); }
@@ -46,7 +46,7 @@ const test_memcmp = fn () void {
     output("memcmp passed!\n");
 }
  
-const test_memcpy = fn () void {
+const test_memcpy -> fn () void {
     let src: *void = alloc(10 * sizeof<char>);
     let dest: *void = alloc(10 * sizeof<char>);
     defer { free(src); free(dest); }
@@ -70,7 +70,7 @@ const test_memcpy = fn () void {
     output("memcpy passed!\n");
 }
 
-const test_memmove = fn () void {
+const test_memmove -> fn () void {
     let buf: *void = alloc(20 * sizeof<char>);
     defer { free(buf); }
 
@@ -93,7 +93,7 @@ const test_memmove = fn () void {
     output("memmove passed!\n");
 }
 
-const test_memchr = fn () void {
+const test_memchr -> fn () void {
     let buf: *void = alloc(10 * sizeof<char>);
     defer { free(buf); }
   
@@ -130,7 +130,7 @@ const test_memchr = fn () void {
     output("memchr passed!\n");
 }
  
-const test_memzero = fn () void {
+const test_memzero -> fn () void {
     let buf: *void = alloc(10 * sizeof<char>);
     defer { free(buf); }
 
@@ -151,7 +151,7 @@ const test_memzero = fn () void {
     output("memzero passed!\n");
 }
 
-const test_calloc = fn () void {
+const test_calloc -> fn () void {
     let buf: *void = mem::calloc(10, sizeof<char>);
     defer { free(buf); }
 
@@ -171,7 +171,7 @@ const test_calloc = fn () void {
     output("calloc passed!\n");
 }
 
-const test_realloc = fn () void {
+const test_realloc -> fn () void {
     let buf: *void = alloc(5 * sizeof<char>);
  
     // Fill original buffer
@@ -200,7 +200,7 @@ const test_realloc = fn () void {
     output("realloc passed!\n");
 }
 
-const test_memswap = fn () void {
+const test_memswap -> fn () void {
     let a: *void = alloc(5 * sizeof<char>);
     let b: *void = alloc(5 * sizeof<char>);
     defer { free(a); free(b); }
@@ -227,7 +227,7 @@ const test_memswap = fn () void {
     output("memswap passed!\n");
 }
 
-const test_memswapn = fn () void {
+const test_memswapn -> fn () void {
     // Allocate arrays for swapping
     let a: *int = cast<*int>(alloc(5 * sizeof<int>));
     let b: *int = cast<*int>(alloc(5 * sizeof<int>));
@@ -257,7 +257,7 @@ const test_memswapn = fn () void {
     output("memswapn passed!\n");
 }
 
-const test_memfill = fn () void {
+const test_memfill -> fn () void {
     // === Test 1: Fill with int pattern ===
     let arr: *int = cast<*int>(alloc(5 * sizeof<int>));
     let pattern: int = 42;
@@ -289,7 +289,7 @@ const test_memfill = fn () void {
     output("memfill passed!\n");
 }
 
-const test_memrev = fn () void {
+const test_memrev -> fn () void {
     let buf: *void = alloc(5 * sizeof<char>);
     defer { free(buf); }
 
@@ -313,7 +313,7 @@ const test_memrev = fn () void {
     output("memrev passed!\n");
 }
 
-const test_memcount = fn () void {
+const test_memcount -> fn () void {
     let buf: *void = alloc(10 * sizeof<char>);
     defer { free(buf); }
 
@@ -335,7 +335,7 @@ const test_memcount = fn () void {
     output("memcount passed!\n");
 }
 
-const test_align = fn () void {
+const test_align -> fn () void {
     let arr: *int;
     {
         arr = cast<*int>(alloc(3 * sizeof<int>));
@@ -376,7 +376,7 @@ const test_align = fn () void {
 
 
 // Helper function to run all tests
-const run_all_tests = fn () void {
+const run_all_tests -> fn () void {
     output("=== Memory Function Tests ===\n");
     
     test_memset();
@@ -397,7 +397,7 @@ const run_all_tests = fn () void {
     output("=== All Tests Complete ===\n");
 }
 
-pub const main = fn () int {
+pub const main -> fn () int {
     run_all_tests();
     return 0;
 }

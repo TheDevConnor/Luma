@@ -1,127 +1,20 @@
 @module "main"
 
-@use "memory" as mem
+@use "stack" as st
 
-// auto incrementing stack
-const Stack = struct {
-  top: int, // top value in the stack
-  capacity: int, // total `length` of the stack
-  currentAmount: int, // spaces from 0 - capacity that are full
-  stackCeiling: int, // hard cap on the limit
-  array: *int // stack representation
-};
+pub const main -> fn () int {
+  let stack: *Stack = st::createStack(20);
 
-#returns_ownership
-const createStack = fn (stackCeiling: int) *Stack {
-  let stack: *Stack = cast<*Stack>(alloc(sizeof<Stack>));
+  st::push(stack, 20);
+  st::push(stack, 30);
+  st::push(stack, 50);
+  st::push(stack, 12);
+  st::push(stack, 311);
+  output("Peeked: ", st::peek(stack), "\n");
+  st::pop(stack);
+  st::pop(stack);
 
-  // check if allocation failed and return a void*
-  if (stack == cast<*Stack>(0)) {
-    return cast<*Stack>(0);
-  }
-
-  stack.top = -1;
-  stack.capacity = 1;
-  stack.currentAmount = 0;
-  stack.stackCeiling = stackCeiling;
-
-  // assume stack.array is empty
-  stack.array = cast<*int>(alloc(sizeof<int>));
-
-  if (stack.array == cast<*int>(0)) {
-      free(stack);
-      return cast<*Stack>(0);
-  }
-
-  return stack;
-}
-
-const extendStack = fn (stack: *Stack, capacity: int) int {
-  // Cannot extend stack past ceiling
-  if (capacity > stack.stackCeiling) {
-      return 0;
-  }
-
-  // frees itself on fail
-  stack.array = cast<*int>(mem::realloc(cast<*void>(stack.array), capacity * sizeof<int>));
-
-  stack.capacity = capacity;
-  return 1;
-}
-
-#takes_ownership
-const freeStack = fn (stack: *Stack) void {
-  free(stack.array);
-  free(stack);
-}
-
-const isEmpty = fn(stack: *Stack) int {
-  // goes to -1 instead of 1 so add -
-  return -cast<int>(stack.top == -1);
-}
-
-const isFull = fn(stack: *Stack) int {
-  // goes to -1 instead of 1 so add -
-  return -cast<int>(stack.top == stack.capacity - 1);
-}
-
-const push = fn(stack: *Stack, value: int) void {
-     if ((isFull(stack) == 1)) {
-        if (stack.capacity >= stack.stackCeiling) {
-           output("Stack ceiling reached\nCan not push ", value, "\n");
-           return;
-        }
-        stack.currentAmount = stack.currentAmount + 1;
-        let newCapacity: int = stack.capacity * 2;
-
-        if (newCapacity > stack.stackCeiling) {
-           newCapacity = stack.stackCeiling;
-        }
-        if (extendStack(stack, newCapacity) == 0) {
-           output("Failed to extend stack, can not push ", value "\n");
-        }
-        output("Stack extended to capacity: ", stack.capacity, "\n");
-    }
-    stack.top = stack.top + 1;
-    stack.array[stack.top] = value;
-    output("Pushed ", value, " to the stack\n");
-}
-
-const pop = fn(stack: *Stack) int {
-  if (isEmpty(stack) == 0) {
-      output("Stack underflow (empty stack)\n");
-      return 0;
-  }
-
-  let value: int = stack.array[stack.top];
-  output("Popping ", value, " from the stack\n");
-
-  stack.currentAmount = stack.currentAmount - 1;
-  stack.top = stack.top - 1;
-  return value;
-}
-
-const peek = fn(stack: *Stack) int {
-  if (isEmpty(stack) == 1) {
-      output("Stack is empty\n");
-      return 0;
-  }
-  return stack.array[stack.top];
-}
-
-pub const main = fn () int {
-  let stack: *Stack = createStack(20);
-
-  push(stack, 20);
-  push(stack, 30);
-  push(stack, 50);
-  push(stack, 12);
-  push(stack, 311);
-  peek(stack);
-  pop(stack);
-  pop(stack);
-
-  free(stack);
+  st::freeStack(stack);
 
   return 0;
 }
