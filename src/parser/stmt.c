@@ -350,10 +350,22 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     // TODO: Add in a check to see if we have any function modifiers like
     //  returns_ownership or takes_ownership
 
-    // Method: field_name = fn(...)
-    if (p_current(parser).type_ == TOK_EQUAL) {
-      p_consume(parser, TOK_EQUAL, "Expected '=' after field name");
-      field_function = fn_stmt(parser, field_name, public_member, false, false);
+    bool takes_ownership, returns_ownership = false;
+    while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
+           p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+        if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+            returns_ownership = true;
+            p_advance(parser);
+        } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+            takes_ownership = true;
+            p_advance(parser);
+        }
+    }
+
+    // Method: field_name -> fn(...)
+    if (p_current(parser).type_ == TOK_RIGHT_ARROW) {
+      p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after field name");
+      field_function = fn_stmt(parser, field_name, public_member, returns_ownership, takes_ownership);
     } else {
       // Data field: field_name: Type
       p_consume(parser, TOK_COLON, "Expected ':' after field name");

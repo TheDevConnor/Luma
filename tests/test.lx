@@ -1,95 +1,24 @@
 @module "main"
 
-// Define a struct
-const Point -> struct {
-pub:
-    x: int,
-    y: int
+const Person -> struct {
+  name: *char,
+  age: int,
+
+  init -> fn (age: int, name: *char) void {
+    self.name = name;
+    self.age = age;
+  },
+
+  greet -> fn () void {
+    output("I am ", self.name, " and I am ", self.age, " years old.\n");
+  }
 };
-
-// Define another struct
-const Rectangle -> struct {
-pub:
-    top_left: Point,
-    bottom_right: Point
-};
-
-// Implement methods for Point
-impl [distance: float, add: Point, scale: Point] -> [Point] {
-  const distance -> fn (p1: Point, p2: Point) float {
-    let dx: int = p2.x - p1.x;
-    let dy: int = p2.y - p1.y;
-    return cast<float>(dx * dx + dy * dy);
-  }
-  
-  const add -> fn (p1: Point, p2: Point) Point {
-    let result: Point;
-    result.x = p1.x + p2.x;
-    result.y = p1.y + p2.y;
-    return result;
-  }
-  
-  const scale -> fn (p: Point, factor: int) Point {
-    let result: Point;
-    result.x = p.x * factor;
-    result.y = p.y * factor;
-    return result;
-  }
-}
-
-// Implement methods for Rectangle
-impl [area: int, contains: bool] -> [Rectangle] {
-  const area -> fn (rect: Rectangle) int {
-    let width: int = rect.bottom_right.x - rect.top_left.x;
-    let height: int = rect.bottom_right.y - rect.top_left.y;
-    return width * height;
-  }
-  
-  const contains -> fn (rect: Rectangle, p: Point) bool {
-    return p.x >= rect.top_left.x && 
-           p.x <= rect.bottom_right.x &&
-           p.y >= rect.top_left.y && 
-           p.y <= rect.bottom_right.y;
-  }
-}
-
-// Implement shared methods for both structs
-impl [print: void] -> [Point, Rectangle] {
-  const print -> fn (p: Point) void {
-    output("Point(", p.x, ", ", p.y, ")\n");
-  }
-  
-  const print -> fn (rect: Rectangle) void {
-    output("Rectangle(", rect.top_left.x, ", ", rect.top_left.y, 
-            " to ", rect.bottom_right.x, ", ", rect.bottom_right.y, ")\n");
-  }
-}
 
 pub const main -> fn () int {
-  let p1: Point;
-  p1.x = 10;
-  p1.y = 20;
-  
-  let p2: Point;
-  p2.x = 30;
-  p2.y = 40;
-  
-  let p3: Point = add(p1, p2);
-  let dist: float = distance(p1, p2);
-  
-  print(p1);
-  print(p2);
-  print(p3);
-  
-  println("Distance: ", dist);
-  
-  let rect: Rectangle;
-  rect.top_left = p1;
-  rect.bottom_right = p2;
-  
-  print(rect);
-  println("Area: ", area(rect));
-  println("Contains p3: ", contains(rect, p3));
-  
+  let p: Person;
+
+  p.init(20, "Connor");
+  p.greet();
+
   return 0;
 }
