@@ -1,8 +1,21 @@
 @module "main"
 
-pub const main -> fn () int {
+const Person -> struct {
+  name: *char,
+  age: int,
 
-    output("Hello world\n");
+  init -> fn (age: int, name: *char) void {
+    self.name = name;
+    self.age = age;
+  },
 
-    return 0;
+  greet -> fn () void {
+    output("I am ", self.name, " and I am ", self.age, " years old.\n");
+  }
+};
+
+  p.init(20, "Connor");
+  p.greet();
+
+  return 0;
 }
