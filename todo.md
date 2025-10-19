@@ -34,12 +34,15 @@ These AST node types are fully implemented in code generation:
 - [x] `AST_STMT_PRINT`
 - [x] `AST_STMT_DEFER`
 - [x] `AST_STMT_LOOP` (this is for, while, and while-true)
+- [x] `AST_STMT_IMPL`
 
 ### Types
 - [x] `AST_TYPE_BASIC`
 - [x] `AST_TYPE_POINTER`
 - [x] `AST_TYPE_ARRAY`
 - [x] `AST_TYPE_FUNCTION`
+- [ ] `AST_TYPE_SET`
+- [ ] `AST_TYPE_SOME`
 
 ---
 
@@ -60,6 +63,7 @@ These AST node types are fully implemented in code generation:
 - [ ] Track when `ptr2 = ptr1` creates aliases
 - [ ] Warn when analyzer can't track aliased pointers
 - [ ] Consider ownership transfer semantics
+- [ ] Allowing structs to point to itself -- name struct {some: *name};
 
 #### Control Flow Analysis  
 - [ ] **Conditional path tracking**

@@ -108,7 +108,99 @@ pub const main = fn () int {
 }
 ```
 
-## Build System Integration
+## impl and its unique features
+# simple example
+impl [func list...] -> [struct list...] {
+    if (1 > 0) {
+       define a function one way
+    } else {
+      define the same function another way
+    }
+}
+# The goals of the impl is to implement functions for structs.
+# It should have the ability to conditionally make functions.
+# The functions are `injected` into the struct and can reference
+# `self` which is a pointer to the struct AstNode that should already be there.
+# There should be two types of functions for this instance. Runtime ready, and compile time optional.
+# with a tag of #runtime, the function will be compiled and optionally ran during runtime.
+# two instances of the same function can only run one at a time, and must be derived from an expression.
+# a #compile tag from a function within a conditional will be optionally compiled, and so only one available at runtime.
+# Why the two? One use case for @run_time is to allow dynamic function assignment. Lets say you must work with an api.
+# This api does not respond with the same data, same type of data and so on. This means you can write multiple capture() functions.
+# Yes this is function overloading, but conditionally, and can be programmed for the potential context the appliction will be in.
+# For @compile_time, it optionally compiles one of the implementations of the function. Say you need portability, you can use the same
+# source code and target specific architectures. This can be thought of #IF_WINDOWS bullshit from C, you can conditionaly compile
+# one function or another, but in a nice and effecient way.
+
+## the ? and None type
+someType: ?; # is a None, or a real type.
+# Thats what it does. Gives a way to init without a type. Can also be used to identify things. if (someType? == None) {return "Nothing found";}
+# It is our solution to NULL, but it provides a more meaning. Because it can also be a value if (someType?) {return "value found";}
+# This is very straigh forward in its concept. someType? returns the value inside, or it returns the None type.
+
+## the set type
+# A set is a fixed sized array of types
+# a, b, c : (int, float, char);
+# const func1 = fn () (int, float, int) {}
+# The same thing.
+# a, b, c : () = func1;
+# changes the the position for the returning set.
+# a, b, c : (float, int, int) = func1;
+# The () is here to be explicit that we are expecting a set from func1.
+
+## Luma Post-Processing and Build System (LPBS).
+# LPBS is made in Luma and uses a subset (vars, funcs, if (expr)).
+
+// -V2 : verbose level 2 for strictness?
+// -OB : object files
+cc_o = luma-1 -OB -V2;
+
+// -x86_64 could be used to verify the executable and compatability for translate()
+cc = luma-1 -O3 -x86_64;
+
+// the output for artefacts and exe
+output = "bin/";
+
+src_files = {
+    if (check_dir_exists("src/")) {
+       -> ("main.lx", "src/*lx");
+    }
+    -> ("main.lx");
+}
+
+compile:
+output("Getting internal and external libraries\n");
+get_libs -> () {
+        path_ex = find_external("raylib", "opengl");
+        path_in = find_internal("std::math", "std::stl::stack", "std::net::network");
+        return path_ex, path_in;
+}
+
+libs, clibs = get_libs();
+
+get_obj -> (cc, src_files, libs, clibs) {
+    output("Getting luma obj files\n");
+    obj_files = cc_o src_files -l libs;
+    output("Getting external library obj files\Combining all obj files\n");
+    return obj_files + translate(clibs);
+}
+// compiler, obj files, to where
+output("Compiling program\n");
+compile(cc, get_obj(), output);
+output("Compiled, output: ", output);
+
+clean:
+clean_all -> (where) {
+    remove(output);
+    output("Removed all artefacts\n");
+}
+
+# compile: and clean: are labels, there are the external commands a user can run (lpbs compile, lpbs clean).
+# Lets break it down. Post-Processing is about understanding end context from the src code and a solution.
+# The LPB System should generate bindings for the end result.
+# It should manage ffi for C and providing that compatability.
+# It should provide a way to create, manage, and work with shared libraries or static libraries.
+# Then it should build the program, it should read in a simp
 
 ### Manual Binding Generation
 ```bash

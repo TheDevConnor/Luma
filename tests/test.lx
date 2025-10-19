@@ -1,24 +1,27 @@
 @module "main"
 
-const Person -> struct {
-  name: *char,
-  age: int,
-
-  init -> fn (age: int, name: *char) void {
-    self.name = name;
-    self.age = age;
-  },
-
-  greet -> fn () void {
-    output("I am ", self.name, " and I am ", self.age, " years old.\n");
-  }
+const randomStruct -> struct {
+   x: int,
+   y: int,
+   z: int
 };
 
 pub const main -> fn () int {
-  let p: Person;
 
-  p.init(20, "Connor");
-  p.greet();
+    impl [func1: int] -> [randomStruct] {
+         const func1 -> fn() int {
+               self.x = 10;
+               self.y = 20;
+               self.z = 30;
 
-  return 0;
+               if (self.x < self.y &&  self.y < self.z) {
+                  return 1;
+               }
+               return 0;
+         }
+    }
+
+    randomStruct.func1();
+
+    return 0;
 }
