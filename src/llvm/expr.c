@@ -433,35 +433,82 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
 }
 
 LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node) {
-  LLVMValueRef callee = codegen_expr(ctx, node->expr.call.callee);
-  if (!callee)
-    return NULL;
-
-  LLVMValueRef *args = (LLVMValueRef *)arena_alloc(
-      ctx->arena, sizeof(LLVMValueRef) * node->expr.call.arg_count,
-      alignof(LLVMValueRef));
-
-  for (size_t i = 0; i < node->expr.call.arg_count; i++) {
-    args[i] = codegen_expr(ctx, node->expr.call.args[i]);
-    if (!args[i])
+  AstNode *callee = node->expr.call.callee;
+  LLVMValueRef callee_value = NULL;
+  LLVMValueRef *args = NULL;
+  size_t arg_count = node->expr.call.arg_count;
+  
+  // Check if this is a method call (obj.method())
+  if (callee->type == AST_EXPR_MEMBER && !callee->expr.member.is_compiletime) {
+    // Method call: obj.method(arg1, arg2)
+    // The typechecker has already injected 'self' as the first argument
+    // So we just need to codegen all arguments as-is
+    
+    // Get the method function
+    const char *member_name = callee->expr.member.member;
+    
+    // Look up the method in the current module
+    LLVMModuleRef current_llvm_module =
+        ctx->current_module ? ctx->current_module->module : ctx->module;
+    LLVMValueRef method_func = LLVMGetNamedFunction(current_llvm_module, member_name);
+    
+    if (!method_func) {
+      fprintf(stderr, "Error: Method '%s' not found\n", member_name);
       return NULL;
+    }
+    
+    callee_value = method_func;
+    
+    // Allocate space for all arguments (including injected self)
+    args = (LLVMValueRef *)arena_alloc(
+        ctx->arena, sizeof(LLVMValueRef) * arg_count,
+        alignof(LLVMValueRef));
+    
+    // Codegen all arguments (self is already in args[0] from typechecker)
+    for (size_t i = 0; i < arg_count; i++) {
+      args[i] = codegen_expr(ctx, node->expr.call.args[i]);
+      if (!args[i]) {
+        fprintf(stderr, "Error: Failed to generate argument %zu for method '%s'\n", 
+                i, member_name);
+        return NULL;
+      }
+    }
+    
+  } else {
+    // Regular function call or compile-time member access (module::func)
+    callee_value = codegen_expr(ctx, callee);
+    if (!callee_value) {
+      return NULL;
+    }
+    
+    // Allocate space for arguments
+    args = (LLVMValueRef *)arena_alloc(
+        ctx->arena, sizeof(LLVMValueRef) * arg_count,
+        alignof(LLVMValueRef));
+    
+    for (size_t i = 0; i < arg_count; i++) {
+      args[i] = codegen_expr(ctx, node->expr.call.args[i]);
+      if (!args[i]) {
+        return NULL;
+      }
+    }
   }
 
   // Get the function type to check return type
-  LLVMTypeRef func_type = LLVMGlobalGetValueType(callee);
+  LLVMTypeRef func_type = LLVMGlobalGetValueType(callee_value);
   LLVMTypeRef return_type = LLVMGetReturnType(func_type);
 
   // Check if return type is void
   if (LLVMGetTypeKind(return_type) == LLVMVoidTypeKind) {
     // For void functions, don't assign a name to the call
-    LLVMBuildCall2(ctx->builder, func_type, callee, args,
-                   node->expr.call.arg_count, "");
+    LLVMBuildCall2(ctx->builder, func_type, callee_value, args,
+                   arg_count, "");
     // Return a void constant since we can't return NULL
     return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
   } else {
     // For non-void functions, assign a name as usual
-    return LLVMBuildCall2(ctx->builder, func_type, callee, args,
-                          node->expr.call.arg_count, "call");
+    return LLVMBuildCall2(ctx->builder, func_type, callee_value, args,
+                          arg_count, "call");
   }
 }
 

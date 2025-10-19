@@ -350,10 +350,22 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     // TODO: Add in a check to see if we have any function modifiers like
     //  returns_ownership or takes_ownership
 
-    // Method: field_name = fn(...)
-    if (p_current(parser).type_ == TOK_EQUAL) {
-      p_consume(parser, TOK_EQUAL, "Expected '=' after field name");
-      field_function = fn_stmt(parser, field_name, public_member, false, false);
+    bool takes_ownership, returns_ownership = false;
+    while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
+           p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+        if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+            returns_ownership = true;
+            p_advance(parser);
+        } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+            takes_ownership = true;
+            p_advance(parser);
+        }
+    }
+
+    // Method: field_name -> fn(...)
+    if (p_current(parser).type_ == TOK_RIGHT_ARROW) {
+      p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after field name");
+      field_function = fn_stmt(parser, field_name, public_member, returns_ownership, takes_ownership);
     } else {
       // Data field: field_name: Type
       p_consume(parser, TOK_COLON, "Expected ':' after field name");
@@ -1013,4 +1025,101 @@ Stmt *switch_stmt(Parser *parser) {
 
   return create_switch_stmt(parser->arena, condition, (AstNode **)cases.data,
                             cases.count, (AstNode *)default_case, line, col);
+}
+// Impl [fun1: void, fun2: void, ...] -> [struct1, struct2, ...]
+Stmt *impl_stmt(Parser *parser) {
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+
+  GrowableArray function_name_list, function_name_types;
+  GrowableArray struct_name_list;
+
+  p_consume(parser, TOK_IMPL, "Expected 'impl' keyword");
+  p_consume(parser, TOK_LBRACKET, "Expected '[' after 'impl' keyword");
+
+  if (!growable_array_init(&function_name_list, parser->arena, 4,
+                           sizeof(Stmt *)) ||
+      !growable_array_init(&function_name_types, parser->arena, 4,
+                           sizeof(Stmt *))) {
+    fprintf(stderr, "Failed to initialize impl function array list\n");
+    return NULL;
+  }
+
+  if (!growable_array_init(&struct_name_list, parser->arena, 4,
+                           sizeof(Stmt *))) {
+    fprintf(stderr, "Failed to initialize impl struct array list");
+    return NULL;
+  }
+
+  while (p_has_tokens(parser) && p_current(parser).type_ != TOK_RBRACKET) {
+    int list_line = p_current(parser).line;
+    int list_col = p_current(parser).col;
+
+    if (p_current(parser).type_ != TOK_IDENTIFIER) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Required identifier", list_line, list_col,
+                   p_current(parser).length);
+      return NULL;
+    }
+
+    char *function_list_name = get_name(parser);
+    p_advance(parser);
+    p_consume(parser, TOK_COLON, "Expected ':' after parameter name");
+
+    Type *function_list_type = parse_type(parser);
+    if (!function_list_type) {
+      fprintf(stderr, "Failed to parse type for parameter '%s'\n",
+              function_list_name);
+      return NULL;
+    }
+    p_advance(parser);
+
+    char **name_identifier = (char **)growable_array_push(&function_name_list);
+    Type **type_specifier = (Type **)growable_array_push(&function_name_types);
+
+    if (!name_identifier || !type_specifier) {
+      fprintf(stderr, "Out of memory while growing function list for impl\n");
+      return NULL;
+    }
+    *name_identifier = function_list_name;
+    *type_specifier = function_list_type;
+
+    if (p_current(parser).type_ == TOK_COMMA) {
+      p_advance(parser);
+    }
+  }
+  p_consume(parser, TOK_RBRACKET, "Expected ']' after function parameters");
+  p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after function list");
+  p_consume(parser, TOK_LBRACKET, "Expected '[' after '->'");
+
+  while (p_has_tokens(parser) && p_current(parser).type_ != TOK_RBRACKET) {
+    int list_line = p_current(parser).line;
+    int list_col = p_current(parser).col;
+
+    if (p_current(parser).type_ != TOK_IDENTIFIER) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Required identifier", list_line, list_col,
+                   p_current(parser).length);
+      return NULL;
+    }
+    char *struct_list_name = get_name(parser);
+    p_advance(parser);
+    char **struct_identifier = (char **)growable_array_push(&struct_name_list);
+
+    if (!struct_identifier) {
+      fprintf(stderr, "Out of memory while growing struct list for impl\n");
+      return NULL;
+    }
+    *struct_identifier = struct_list_name;
+    if (p_current(parser).type_ == TOK_COMMA) {
+      p_advance(parser);
+    }
+  }
+  p_consume(parser, TOK_RBRACKET, "Expected ']' after struct list");
+  Stmt *body = block_stmt(parser);
+  return create_impl_stmt(parser->arena, (char **)function_name_list.data,
+                          (AstNode **)function_name_types.data, body,
+                          (char **)struct_name_list.data,
+                          function_name_list.count, struct_name_list.count,
+                          line, col);
 }

@@ -17,14 +17,14 @@
 
 /** @internal Macro to compare string to a key of known length */
 #define STR_EQUALS_LEN(str, key, len)                                          \
-  (strncmp(str, key, len) == 0 && key[len] == '\0')
+    (strncmp(str, key, len) == 0 && key[len] == '\0')
 
 /** @internal Macro to check if next two chars match given pair */
 #define MATCH_NEXT(lx, a, b) (peek(lx, 0) == (a) && peek(lx, 1) == (b))
 
 /** @internal Macro to construct a token */
 #define MAKE_TOKEN(type, start, lx, length, whitespace_len)                    \
-  make_token(type, start, lx->line, lx->col - 1, length, whitespace_len)
+    make_token(type, start, lx->line, lx->col - 1, length, whitespace_len)
 
 /** @internal Symbol to token type mapping */
 static const SymbolEntry symbols[] = {
@@ -81,6 +81,7 @@ static const KeywordEntry keywords[] = {
     {"defer", TOK_DEFER},
     {"in", TOK_IN},
     {"switch", TOK_SWITCH},
+    {"impl", TOK_IMPL},
     {"input", TOK_INPUT},
     {"system", TOK_SYSTEM},
 };
@@ -110,19 +111,19 @@ static const KeywordEntry function_attributes[] = {
 void report_lexer_error(Lexer *lx, const char *error_type, const char *file,
                         const char *msg, const char *line_text, int line,
                         int col, int tk_length) {
-  ErrorInformation err = {
-      .error_type = error_type,
-      .file_path = file,
-      .message = msg,
-      .line = line,
-      .col = col,
-      .line_text = arena_strdup(lx->arena, line_text),
-      .token_length = tk_length,
-      .label = "Undefined Token",
-      .note = NULL,
-      .help = NULL,
-  };
-  error_add(err);
+    ErrorInformation err = {
+        .error_type = error_type,
+        .file_path = file,
+        .message = msg,
+        .line = line,
+        .col = col,
+        .line_text = arena_strdup(lx->arena, line_text),
+        .token_length = tk_length,
+        .label = "Undefined Token",
+        .note = NULL,
+        .help = NULL,
+    };
+    error_add(err);
 }
 
 /**
@@ -133,29 +134,30 @@ void report_lexer_error(Lexer *lx, const char *error_type, const char *file,
  * @return Pointer to static buffer containing the line text
  */
 const char *get_line_text_from_source(const char *source, int target_line) {
-  static char line_buffer[1024];
-  const char *start = source;
-  int current_line = 1;
+    static char line_buffer[1024];
+    const char *start = source;
+    int current_line = 1;
 
-  while (current_line < target_line && *start != '\0') {
-    if (*start == '\n') {
-      current_line++;
+    while (current_line < target_line && *start != '\0') {
+        if (*start == '\n') {
+            current_line++;
+        }
+        start++;
     }
-    start++;
-  }
 
-  if (current_line != target_line) {
-    line_buffer[0] = '\0';
+    if (current_line != target_line) {
+        line_buffer[0] = '\0';
+        return line_buffer;
+    }
+
+    int i = 0;
+    while (*start != '\0' && *start != '\n' &&
+           i < (int)sizeof(line_buffer) - 1) {
+        line_buffer[i++] = *start++;
+    }
+    line_buffer[i] = '\0';
+
     return line_buffer;
-  }
-
-  int i = 0;
-  while (*start != '\0' && *start != '\n' && i < (int)sizeof(line_buffer) - 1) {
-    line_buffer[i++] = *start++;
-  }
-  line_buffer[i] = '\0';
-
-  return line_buffer;
 }
 
 /**
@@ -167,12 +169,12 @@ const char *get_line_text_from_source(const char *source, int target_line) {
  * @return LumaTokenType keyword token if found, else TOK_IDENTIFIER
  */
 static LumaTokenType lookup_keyword(const char *str, int length) {
-  for (int i = 0; i < (int)(sizeof(keywords) / sizeof(*keywords)); ++i) {
-    if (STR_EQUALS_LEN(str, keywords[i].text, length)) {
-      return keywords[i].type;
+    for (int i = 0; i < (int)(sizeof(keywords) / sizeof(*keywords)); ++i) {
+        if (STR_EQUALS_LEN(str, keywords[i].text, length)) {
+            return keywords[i].type;
+        }
     }
-  }
-  return TOK_IDENTIFIER;
+    return TOK_IDENTIFIER;
 }
 
 /**
@@ -184,14 +186,14 @@ static LumaTokenType lookup_keyword(const char *str, int length) {
  * @return LumaTokenType preprocessor token if found, else TOK_SYMBOL
  */
 static LumaTokenType lookup_preprocessor(const char *str, int length) {
-  for (int i = 0; i < (int)(sizeof(preprocessor_directives) /
-                            sizeof(*preprocessor_directives));
-       ++i) {
-    if (STR_EQUALS_LEN(str, preprocessor_directives[i].text, length)) {
-      return preprocessor_directives[i].type;
+    for (int i = 0; i < (int)(sizeof(preprocessor_directives) /
+                              sizeof(*preprocessor_directives));
+         ++i) {
+        if (STR_EQUALS_LEN(str, preprocessor_directives[i].text, length)) {
+            return preprocessor_directives[i].type;
+        }
     }
-  }
-  return TOK_SYMBOL;
+    return TOK_SYMBOL;
 }
 
 /**
@@ -203,12 +205,12 @@ static LumaTokenType lookup_preprocessor(const char *str, int length) {
  * @return LumaTokenType symbol token if found, else TOK_SYMBOL
  */
 static LumaTokenType lookup_symbol(const char *str, int length) {
-  for (int i = 0; i < (int)(sizeof(symbols) / sizeof(*symbols)); ++i) {
-    if (STR_EQUALS_LEN(str, symbols[i].text, length)) {
-      return symbols[i].type;
+    for (int i = 0; i < (int)(sizeof(symbols) / sizeof(*symbols)); ++i) {
+        if (STR_EQUALS_LEN(str, symbols[i].text, length)) {
+            return symbols[i].type;
+        }
     }
-  }
-  return TOK_SYMBOL;
+    return TOK_SYMBOL;
 }
 
 /**
@@ -219,11 +221,11 @@ static LumaTokenType lookup_symbol(const char *str, int length) {
  * @param arena Arena allocator to allocate tokens and strings
  */
 void init_lexer(Lexer *lexer, const char *source, ArenaAllocator *arena) {
-  lexer->arena = arena;
-  lexer->src = source;
-  lexer->current = source;
-  lexer->line = 1;
-  lexer->col = 0;
+    lexer->arena = arena;
+    lexer->src = source;
+    lexer->current = source;
+    lexer->line = 1;
+    lexer->col = 0;
 }
 
 /**
@@ -254,14 +256,14 @@ bool is_at_end(Lexer *lx) { return *lx->current == '\0'; }
  * @return The character that was advanced past
  */
 char advance(Lexer *lx) {
-  char c = *lx->current++;
-  if (c == '\n') {
-    lx->line++;
-    lx->col = 0;
-  } else if (c != '\0') {
-    lx->col++;
-  }
-  return c;
+    char c = *lx->current++;
+    if (c == '\n') {
+        lx->line++;
+        lx->col = 0;
+    } else if (c != '\0') {
+        lx->col++;
+    }
+    return c;
 }
 
 /**
@@ -277,7 +279,7 @@ char advance(Lexer *lx) {
  */
 Token make_token(LumaTokenType type, const char *start, int line, int col,
                  int length, int whitespace_len) {
-  return (Token){type, start, line, col, length, whitespace_len};
+    return (Token){type, start, line, col, length, whitespace_len};
 }
 
 /**
@@ -288,19 +290,19 @@ Token make_token(LumaTokenType type, const char *start, int line, int col,
  * @return Number of characters skipped
  */
 int skip_multiline_comment(Lexer *lx) {
-  int count = 0;
-  advance(lx); // skip '/'
-  advance(lx); // skip '*'
-  count += 2;
-  while (!is_at_end(lx) && !MATCH_NEXT(lx, '*', '/')) {
-    advance(lx);
-    count++;
-  }
-  if (!is_at_end(lx)) {
-    advance(lx); // skip '*'
+    int count = 0;
     advance(lx); // skip '/'
-  }
-  return count + 2;
+    advance(lx); // skip '*'
+    count += 2;
+    while (!is_at_end(lx) && !MATCH_NEXT(lx, '*', '/')) {
+        advance(lx);
+        count++;
+    }
+    if (!is_at_end(lx)) {
+        advance(lx); // skip '*'
+        advance(lx); // skip '/'
+    }
+    return count + 2;
 }
 
 /**
@@ -311,37 +313,37 @@ int skip_multiline_comment(Lexer *lx) {
  * @return Total count of skipped characters
  */
 int skip_whitespace(Lexer *lx) {
-  int whitespace_count = 0;
+    int whitespace_count = 0;
 
-  while (!is_at_end(lx)) {
-    char c = peek(lx, 0);
+    while (!is_at_end(lx)) {
+        char c = peek(lx, 0);
 
-    if (c == ' ' || c == '\t') {
-      // Count spaces and tabs as whitespace
-      advance(lx);
-      whitespace_count++;
-    } else if (c == '\n' || c == '\r') {
-      // Newline resets whitespace count - we only want leading whitespace on
-      // the current line
-      advance(lx);
-      whitespace_count = 0; // Reset because we're on a new line
-    } else if (c == '/' && peek(lx, 1) == '/') {
-      // Skip single-line comment
-      while (!is_at_end(lx) && peek(lx, 0) != '\n') {
-        advance(lx);
-      }
-      // Don't count comment characters as whitespace
-    } else if (c == '/' && peek(lx, 1) == '*') {
-      // Skip multiline comment
-      skip_multiline_comment(lx);
-      // Don't count comment characters as whitespace
-    } else {
-      // Not whitespace or comment, stop skipping
-      break;
+        if (c == ' ' || c == '\t') {
+            // Count spaces and tabs as whitespace
+            advance(lx);
+            whitespace_count++;
+        } else if (c == '\n' || c == '\r') {
+            // Newline resets whitespace count - we only want leading whitespace
+            // on the current line
+            advance(lx);
+            whitespace_count = 0; // Reset because we're on a new line
+        } else if (c == '/' && peek(lx, 1) == '/') {
+            // Skip single-line comment
+            while (!is_at_end(lx) && peek(lx, 0) != '\n') {
+                advance(lx);
+            }
+            // Don't count comment characters as whitespace
+        } else if (c == '/' && peek(lx, 1) == '*') {
+            // Skip multiline comment
+            skip_multiline_comment(lx);
+            // Don't count comment characters as whitespace
+        } else {
+            // Not whitespace or comment, stop skipping
+            break;
+        }
     }
-  }
 
-  return whitespace_count;
+    return whitespace_count;
 }
 
 /**
@@ -351,254 +353,255 @@ int skip_whitespace(Lexer *lx) {
  * @return Next token found in the input
  */
 Token next_token(Lexer *lx) {
-  int wh_count = skip_whitespace(lx);
-  if (is_at_end(lx)) {
-    return MAKE_TOKEN(TOK_EOF, lx->current, lx, 0, wh_count);
-  }
-
-  const char *start = lx->current;
-  char c = advance(lx);
-
-  // Preprocessor directives (starting with @)
-  if (c == '@') {
-    if (isalpha(peek(lx, 0))) {
-      // Read the rest of the directive
-      while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
-        advance(lx);
-      }
-      int len = (int)(lx->current - start);
-      LumaTokenType type = lookup_preprocessor(start, len);
-      if (type != TOK_SYMBOL) {
-        return MAKE_TOKEN(type, start, lx, len, wh_count);
-      }
-      // If not a known preprocessor directive, treat as error or symbol
-      static char error_msg[64];
-      snprintf(error_msg, sizeof(error_msg),
-               "Unknown preprocessor directive: '%.*s'", len, start);
-      report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - len, len);
-      return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
-    }
-    // Just @ by itself - treat as symbol
-    LumaTokenType single_type = lookup_symbol(start, 1);
-    return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
-  }
-
-  if (c == '#') {
-    if (isalpha(peek(lx, 0))) {
-      // Read the rest of the attribute
-      while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
-        advance(lx);
-      }
-      int len = (int)(lx->current - start);
-      for (int i = 0; i < (int)(sizeof(function_attributes) /
-                                sizeof(*function_attributes));
-           ++i) {
-        if (STR_EQUALS_LEN(start, function_attributes[i].text, len)) {
-          return MAKE_TOKEN(function_attributes[i].type, start, lx, len,
-                            wh_count);
-        }
-      }
-      // If not a known function attribute, treat as error
-      static char error_msg[64];
-      snprintf(error_msg, sizeof(error_msg),
-               "Unknown function attribute: '%.*s'", len, start);
-      report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - len, len);
-      return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
-    }
-    // Just # by itself - treat as symbol
-    LumaTokenType single_type = lookup_symbol(start, 1);
-    return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
-  }
-
-  // Identifiers and keywords
-  if (isalpha(c) || c == '_') {
-    while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
-      advance(lx);
-    }
-    int len = (int)(lx->current - start);
-    LumaTokenType type = lookup_keyword(start, len);
-    return MAKE_TOKEN(type, start, lx, len, wh_count);
-  }
-
-  // Numbers
-  if (isdigit(c)) {
-    // Read the integer part
-    while (isdigit(peek(lx, 0))) {
-      advance(lx);
-    }
-
-    // Check for decimal point
-    if (peek(lx, 0) == '.' && isdigit(peek(lx, 1))) {
-      advance(lx); // consume the '.'
-
-      // Read the fractional part
-      while (isdigit(peek(lx, 0))) {
-        advance(lx);
-      }
-
-      int len = (int)(lx->current - start);
-      return MAKE_TOKEN(TOK_NUM_FLOAT, start, lx, len,
-                        wh_count); // Make sure this is TOK_FLOAT_LITERAL
-    }
-
-    int len = (int)(lx->current - start);
-    return MAKE_TOKEN(TOK_NUMBER, start, lx, len,
-                      wh_count); // Make sure this is TOK_NUMBER
-  }
-
-  if (c == '\'') {
-    const char *char_start = lx->current; // Start after opening quote
-    char actual_char = 0; // The actual character value we'll store
-    int char_count = 0;   // How many characters we consumed
-
+    int wh_count = skip_whitespace(lx);
     if (is_at_end(lx)) {
-      // Unclosed character literal
-      report_lexer_error(lx, "LexerError", "unknown_file",
-                         "Unclosed character literal",
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - 1, 1);
-      return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+        return MAKE_TOKEN(TOK_EOF, lx->current, lx, 0, wh_count);
     }
 
-    char ch = peek(lx, 0);
+    const char *start = lx->current;
+    char c = advance(lx);
 
-    // Handle escape sequences
-    if (ch == '\\') {
-      advance(lx); // consume backslash
-      char_count++;
-
-      if (is_at_end(lx)) {
-        report_lexer_error(lx, "LexerError", "unknown_file",
-                           "Incomplete escape sequence in character literal",
-                           get_line_text_from_source(lx->src, lx->line),
-                           lx->line, lx->col - 2, 2);
-        return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
-      }
-
-      char escaped = peek(lx, 0);
-
-      // Convert escape sequence to actual character value
-      switch (escaped) {
-      case 'n':
-        actual_char = '\n';
-        break;
-      case 't':
-        actual_char = '\t';
-        break;
-      case 'r':
-        actual_char = '\r';
-        break;
-      case '\\':
-        actual_char = '\\';
-        break;
-      case '\'':
-        actual_char = '\'';
-        break;
-      case '\"':
-        actual_char = '\"';
-        break;
-      case '0':
-        actual_char = '\0';
-        break;
-      default: {
-        static char error_msg[64];
-        snprintf(error_msg, sizeof(error_msg),
-                 "Invalid escape sequence '\\%c' in character literal",
-                 escaped);
-        report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
-                           get_line_text_from_source(lx->src, lx->line),
-                           lx->line, lx->col - 2, 3);
-        return MAKE_TOKEN(TOK_ERROR, start, lx, 3, wh_count);
-      }
-      }
-
-      advance(lx); // consume escaped character
-      char_count++;
-
-    } else if (ch == '\'') {
-      // Empty character literal
-      report_lexer_error(lx, "LexerError", "unknown_file",
-                         "Empty character literal",
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - 1, 2);
-      advance(lx); // consume closing quote
-      return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
-
-    } else if (ch == '\n' || ch == '\r') {
-      // Newline in character literal
-      report_lexer_error(lx, "LexerError", "unknown_file",
-                         "Newline in character literal",
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - 1, 1);
-      return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
-
-    } else {
-      // Regular character
-      actual_char = ch;
-      advance(lx); // consume the character
-      char_count = 1;
+    // Preprocessor directives (starting with @)
+    if (c == '@') {
+        if (isalpha(peek(lx, 0))) {
+            // Read the rest of the directive
+            while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
+                advance(lx);
+            }
+            int len = (int)(lx->current - start);
+            LumaTokenType type = lookup_preprocessor(start, len);
+            if (type != TOK_SYMBOL) {
+                return MAKE_TOKEN(type, start, lx, len, wh_count);
+            }
+            // If not a known preprocessor directive, treat as error or symbol
+            static char error_msg[64];
+            snprintf(error_msg, sizeof(error_msg),
+                     "Unknown preprocessor directive: '%.*s'", len, start);
+            report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                               get_line_text_from_source(lx->src, lx->line),
+                               lx->line, lx->col - len, len);
+            return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
+        }
+        // Just @ by itself - treat as symbol
+        LumaTokenType single_type = lookup_symbol(start, 1);
+        return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
     }
 
-    // Check for closing quote
-    if (is_at_end(lx) || peek(lx, 0) != '\'') {
-      report_lexer_error(lx, "LexerError", "unknown_file",
-                         "Unclosed character literal",
-                         get_line_text_from_source(lx->src, lx->line), lx->line,
-                         lx->col - 1, (int)(lx->current - start));
-      return MAKE_TOKEN(TOK_ERROR, start, lx, (int)(lx->current - start),
-                        wh_count);
+    if (c == '#') {
+        if (isalpha(peek(lx, 0))) {
+            // Read the rest of the attribute
+            while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
+                advance(lx);
+            }
+            int len = (int)(lx->current - start);
+            for (int i = 0; i < (int)(sizeof(function_attributes) /
+                                      sizeof(*function_attributes));
+                 ++i) {
+                if (STR_EQUALS_LEN(start, function_attributes[i].text, len)) {
+                    return MAKE_TOKEN(function_attributes[i].type, start, lx,
+                                      len, wh_count);
+                }
+            }
+            // If not a known function attribute, treat as error
+            static char error_msg[64];
+            snprintf(error_msg, sizeof(error_msg),
+                     "Unknown function attribute: '%.*s'", len, start);
+            report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                               get_line_text_from_source(lx->src, lx->line),
+                               lx->line, lx->col - len, len);
+            return MAKE_TOKEN(TOK_ERROR, start, lx, len, wh_count);
+        }
+        // Just # by itself - treat as symbol
+        LumaTokenType single_type = lookup_symbol(start, 1);
+        return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
     }
 
-    advance(lx); // consume closing quote
-    int total_len = (int)(lx->current - start);
-
-    // CRITICAL: Store the actual character value, not the escape sequence
-    // We'll create a single-character string with the resolved value
-    char *char_storage = (char *)arena_alloc(lx->arena, 2, 1);
-    char_storage[0] = actual_char;
-    char_storage[1] = '\0';
-
-    return make_token(TOK_CHAR_LITERAL, char_storage, lx->line,
-                      lx->col - total_len, 1,
-                      wh_count); // length = 1 (single char)
-  }
-
-  // Strings
-  if (c == '"') {
-    while (!is_at_end(lx) && peek(lx, 0) != '"') {
-      advance(lx);
+    // Identifiers and keywords
+    if (isalpha(c) || c == '_') {
+        while (isalnum(peek(lx, 0)) || peek(lx, 0) == '_') {
+            advance(lx);
+        }
+        int len = (int)(lx->current - start);
+        LumaTokenType type = lookup_keyword(start, len);
+        return MAKE_TOKEN(type, start, lx, len, wh_count);
     }
+
+    // Numbers
+    if (isdigit(c)) {
+        // Read the integer part
+        while (isdigit(peek(lx, 0))) {
+            advance(lx);
+        }
+
+        // Check for decimal point
+        if (peek(lx, 0) == '.' && isdigit(peek(lx, 1))) {
+            advance(lx); // consume the '.'
+
+            // Read the fractional part
+            while (isdigit(peek(lx, 0))) {
+                advance(lx);
+            }
+
+            int len = (int)(lx->current - start);
+            return MAKE_TOKEN(TOK_NUM_FLOAT, start, lx, len,
+                              wh_count); // Make sure this is TOK_FLOAT_LITERAL
+        }
+
+        int len = (int)(lx->current - start);
+        return MAKE_TOKEN(TOK_NUMBER, start, lx, len,
+                          wh_count); // Make sure this is TOK_NUMBER
+    }
+
+    if (c == '\'') {
+        const char *char_start = lx->current; // Start after opening quote
+        char actual_char = 0; // The actual character value we'll store
+        int char_count = 0;   // How many characters we consumed
+
+        if (is_at_end(lx)) {
+            // Unclosed character literal
+            report_lexer_error(lx, "LexerError", "unknown_file",
+                               "Unclosed character literal",
+                               get_line_text_from_source(lx->src, lx->line),
+                               lx->line, lx->col - 1, 1);
+            return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+        }
+
+        char ch = peek(lx, 0);
+
+        // Handle escape sequences
+        if (ch == '\\') {
+            advance(lx); // consume backslash
+            char_count++;
+
+            if (is_at_end(lx)) {
+                report_lexer_error(
+                    lx, "LexerError", "unknown_file",
+                    "Incomplete escape sequence in character literal",
+                    get_line_text_from_source(lx->src, lx->line), lx->line,
+                    lx->col - 2, 2);
+                return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
+            }
+
+            char escaped = peek(lx, 0);
+
+            // Convert escape sequence to actual character value
+            switch (escaped) {
+            case 'n':
+                actual_char = '\n';
+                break;
+            case 't':
+                actual_char = '\t';
+                break;
+            case 'r':
+                actual_char = '\r';
+                break;
+            case '\\':
+                actual_char = '\\';
+                break;
+            case '\'':
+                actual_char = '\'';
+                break;
+            case '\"':
+                actual_char = '\"';
+                break;
+            case '0':
+                actual_char = '\0';
+                break;
+            default: {
+                static char error_msg[64];
+                snprintf(error_msg, sizeof(error_msg),
+                         "Invalid escape sequence '\\%c' in character literal",
+                         escaped);
+                report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                                   get_line_text_from_source(lx->src, lx->line),
+                                   lx->line, lx->col - 2, 3);
+                return MAKE_TOKEN(TOK_ERROR, start, lx, 3, wh_count);
+            }
+            }
+
+            advance(lx); // consume escaped character
+            char_count++;
+
+        } else if (ch == '\'') {
+            // Empty character literal
+            report_lexer_error(lx, "LexerError", "unknown_file",
+                               "Empty character literal",
+                               get_line_text_from_source(lx->src, lx->line),
+                               lx->line, lx->col - 1, 2);
+            advance(lx); // consume closing quote
+            return MAKE_TOKEN(TOK_ERROR, start, lx, 2, wh_count);
+
+        } else if (ch == '\n' || ch == '\r') {
+            // Newline in character literal
+            report_lexer_error(lx, "LexerError", "unknown_file",
+                               "Newline in character literal",
+                               get_line_text_from_source(lx->src, lx->line),
+                               lx->line, lx->col - 1, 1);
+            return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+
+        } else {
+            // Regular character
+            actual_char = ch;
+            advance(lx); // consume the character
+            char_count = 1;
+        }
+
+        // Check for closing quote
+        if (is_at_end(lx) || peek(lx, 0) != '\'') {
+            report_lexer_error(
+                lx, "LexerError", "unknown_file", "Unclosed character literal",
+                get_line_text_from_source(lx->src, lx->line), lx->line,
+                lx->col - 1, (int)(lx->current - start));
+            return MAKE_TOKEN(TOK_ERROR, start, lx, (int)(lx->current - start),
+                              wh_count);
+        }
+
+        advance(lx); // consume closing quote
+        int total_len = (int)(lx->current - start);
+
+        // CRITICAL: Store the actual character value, not the escape sequence
+        // We'll create a single-character string with the resolved value
+        char *char_storage = (char *)arena_alloc(lx->arena, 2, 1);
+        char_storage[0] = actual_char;
+        char_storage[1] = '\0';
+
+        return make_token(TOK_CHAR_LITERAL, char_storage, lx->line,
+                          lx->col - total_len, 1,
+                          wh_count); // length = 1 (single char)
+    }
+
+    // Strings
+    if (c == '"') {
+        while (!is_at_end(lx) && peek(lx, 0) != '"') {
+            advance(lx);
+        }
+        if (!is_at_end(lx)) {
+            advance(lx); // Skip closing quote
+        }
+        int len = (int)(lx->current - start - 2);
+        return MAKE_TOKEN(TOK_STRING, start + 1, lx, len, wh_count);
+    }
+
+    // Try to match two-character symbol
     if (!is_at_end(lx)) {
-      advance(lx); // Skip closing quote
+        char two[3] = {start[0], peek(lx, 0), '\0'};
+        LumaTokenType ttype = lookup_symbol(two, 2);
+        if (ttype != TOK_SYMBOL) {
+            advance(lx);
+            return MAKE_TOKEN(ttype, start, lx, 2, wh_count);
+        }
     }
-    int len = (int)(lx->current - start - 2);
-    return MAKE_TOKEN(TOK_STRING, start + 1, lx, len, wh_count);
-  }
 
-  // Try to match two-character symbol
-  if (!is_at_end(lx)) {
-    char two[3] = {start[0], peek(lx, 0), '\0'};
-    LumaTokenType ttype = lookup_symbol(two, 2);
-    if (ttype != TOK_SYMBOL) {
-      advance(lx);
-      return MAKE_TOKEN(ttype, start, lx, 2, wh_count);
-    }
-  }
+    // Single-character symbol fallback
+    LumaTokenType single_type = lookup_symbol(start, 1);
+    if (single_type != TOK_SYMBOL)
+        return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
 
-  // Single-character symbol fallback
-  LumaTokenType single_type = lookup_symbol(start, 1);
-  if (single_type != TOK_SYMBOL)
-    return MAKE_TOKEN(single_type, start, lx, 1, wh_count);
-
-  // Error token if none matched
-  static char error_msg[64];
-  snprintf(error_msg, sizeof(error_msg), "Token not found: '%c'", c);
-  report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
-                     get_line_text_from_source(lx->src, lx->line), lx->line,
-                     lx->col, 1);
-  return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
+    // Error token if none matched
+    static char error_msg[64];
+    snprintf(error_msg, sizeof(error_msg), "Token not found: '%c'", c);
+    report_lexer_error(lx, "LexerError", "unknown_file", error_msg,
+                       get_line_text_from_source(lx->src, lx->line), lx->line,
+                       lx->col, 1);
+    return MAKE_TOKEN(TOK_ERROR, start, lx, 1, wh_count);
 }

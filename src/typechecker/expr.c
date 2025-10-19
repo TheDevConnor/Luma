@@ -200,6 +200,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
 
   Symbol *func_symbol = NULL;
   const char *func_name = NULL;
+  bool is_method_call = false; // Track if this is a method call with injected self
 
   if (callee->type == AST_EXPR_IDENTIFIER) {
     // Simple function call: func()
@@ -207,6 +208,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     func_symbol = scope_lookup(scope, func_name);
 
   } else if (callee->type == AST_EXPR_MEMBER) {
+    
     // Member function call: could be module::func() or obj.method()
     const char *base_name = callee->expr.member.object->expr.identifier.name;
     const char *member_name = callee->expr.member.member;
@@ -272,7 +274,6 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
       }
 
       AstNode *base_type = base_symbol->type;
-
       // Handle pointer dereference: if we have a pointer to struct,
       // automatically dereference it
       if (base_type->type == AST_TYPE_POINTER) {
@@ -304,17 +305,98 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
       // Now check if it's a struct type and get the member
       if (base_type->type == AST_TYPE_STRUCT) {
         AstNode *member_type = get_struct_member_type(base_type, member_name);
+
         if (member_type && member_type->type == AST_TYPE_FUNCTION) {
           // This is a method call on a struct instance
           func_symbol = arena_alloc(arena, sizeof(Symbol), alignof(Symbol));
+          if (!func_symbol) {
+            tc_error(expr, "Memory Error", "Failed to allocate symbol for method '%s'", member_name);
+            return NULL;
+          }
+          
           func_symbol->name = member_name;
+          
           func_symbol->type = member_type;
+          
           func_symbol->is_public = true;
           func_symbol->is_mutable = false;
           func_symbol->scope_depth = 0;
-          func_symbol->returns_ownership = false; // ADD THIS
-          func_symbol->takes_ownership = false;   // ADD THIS
+          func_symbol->returns_ownership = false;
+          func_symbol->takes_ownership = false;
           func_name = member_name;
+
+          // CRITICAL: For method calls, we need to inject 'self' as the first argument
+          // Verify we have a valid object before injectin
+          if (!callee->expr.member.object) {
+            tc_error(expr, "Internal Error", "Method call has no object");
+            return NULL;
+          }
+
+          // Create a new arguments array with 'self' prepended
+          size_t new_arg_count = arg_count + 1;
+          AstNode **new_arguments = arena_alloc(arena, new_arg_count * sizeof(AstNode *), 
+                                                alignof(AstNode *));
+          
+          if (!new_arguments) {
+            tc_error(expr, "Memory Error", "Failed to allocate arguments array for method call");
+            return NULL;
+          }
+          
+          // CRITICAL: Check if we need to take the address of the object
+          // The method expects a pointer to the struct (self is Person*)
+          // But obj.method() gives us the struct value (Person)
+          // We need to automatically inject &obj instead of just obj
+          
+          // Get the method's parameter types to check what self expects
+          if (!member_type || member_type->type != AST_TYPE_FUNCTION) {
+            tc_error(expr, "Internal Error", "Method type is not a function");
+            return NULL;
+          }
+          
+          AstNode **method_param_types = member_type->type_data.function.param_types;
+          if (!method_param_types || member_type->type_data.function.param_count == 0) {
+            tc_error(expr, "Internal Error", "Method has no parameters (missing self?)");
+            return NULL;
+          }
+          
+          AstNode *self_param_type = method_param_types[0]; // First param is always self
+          AstNode *object_node = callee->expr.member.object;
+          
+          // Check what the method expects for self
+          bool expects_pointer = (self_param_type->type == AST_TYPE_POINTER);
+          
+          // Check what we have
+          Symbol *obj_symbol = scope_lookup(scope, base_name);
+          bool have_pointer = (obj_symbol && obj_symbol->type && 
+                               obj_symbol->type->type == AST_TYPE_POINTER);
+          
+          if (expects_pointer && !have_pointer) {
+            // Method expects pointer but we have value - take address
+            AstNode *addr_expr = arena_alloc(arena, sizeof(AstNode), alignof(AstNode));
+            addr_expr->type = AST_EXPR_ADDR;
+            addr_expr->category = Node_Category_EXPR;
+            addr_expr->line = object_node->line;
+            addr_expr->column = object_node->column;
+            addr_expr->expr.addr.object = object_node;
+            new_arguments[0] = addr_expr;
+          } else {
+            // Either method expects value, or we already have pointer
+            new_arguments[0] = object_node;
+          }
+          
+          // Copy the rest of the user-provided arguments
+          for (size_t i = 0; i < arg_count; i++) {
+            new_arguments[i + 1] = arguments[i];
+          }
+          
+          // Update the arguments and count for the rest of the function
+          arguments = new_arguments;
+          arg_count = new_arg_count;
+          is_method_call = true; // Mark that we injected self
+
+          expr->expr.call.args = new_arguments;
+          expr->expr.call.arg_count = new_arg_count;
+          
         } else if (member_type) {
           tc_error(expr, "Runtime Call Error",
                    "Cannot call non-function member '%s' on struct '%s'",
@@ -338,7 +420,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     tc_error(expr, "Call Error", "Unsupported callee type for function call");
     return NULL;
   }
-
+  
   if (!func_symbol) {
     tc_error(expr, "Call Error", "Undefined function '%s'",
              func_name ? func_name : "unknown");
@@ -362,22 +444,51 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  for (size_t i = 0; i < arg_count; i++) {
+  // For method calls, start from index 1 to skip the injected 'self' parameter
+  size_t start_index = is_method_call ? 1 : 0;
+  
+  for (size_t i = start_index; i < arg_count; i++) {
+    // Validate the argument pointer before dereferencing
+    if (!arguments) {
+      tc_error(expr, "Call Error",
+               "Arguments array is NULL for call to '%s'", func_name);
+      return NULL;
+    }
+    
+    if (!arguments[i]) {
+      tc_error(expr, "Call Error",
+               "Argument %zu in call to '%s' is NULL", i + 1, func_name);
+      return NULL;
+    }
+    
     AstNode *arg_type = typecheck_expression(arguments[i], scope, arena);
+    
     if (!arg_type) {
       tc_error(expr, "Call Error",
                "Failed to type-check argument %zu in call to '%s'", i + 1,
                func_name);
       return NULL;
     }
-
+    
+    // Validate param_types array
+    if (!param_types || !param_types[i]) {
+      tc_error(expr, "Call Error",
+               "Parameter %zu type in function '%s' is NULL", i + 1, func_name);
+      return NULL;
+    }
+    
     TypeMatchResult match = types_match(param_types[i], arg_type);
+    
     if (match == TYPE_MATCH_NONE) {
+      fprintf(stderr, "DEBUG: Type mismatch - NONE - about to report error\n");
+      
+      const char *param_str = type_to_string(param_types[i], arena);
+      const char *arg_str = type_to_string(arg_type, arena);
+      
       tc_error_help(expr, "Call Error",
                     "Argument %zu to function '%s' has wrong type.",
                     "Expected '%s', got '%s'", i + 1, func_name,
-                    type_to_string(param_types[i], arena),
-                    type_to_string(arg_type, arena));
+                    param_str, arg_str);
       return NULL;
     }
   }
@@ -385,7 +496,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
   // Handle ownership transfer from caller to function
   if (func_symbol->takes_ownership) {
     for (size_t i = 0; i < arg_count; i++) {
-      if (is_pointer_type(param_types[i])) {
+      if (param_types[i] && is_pointer_type(param_types[i])) {
         const char *arg_var = extract_variable_name(arguments[i]);
         if (arg_var) {
           StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
@@ -397,8 +508,7 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
       }
     }
   }
-  // ========== NEW CODE ENDS HERE ==========
-
+  
   return return_type;
 }
 

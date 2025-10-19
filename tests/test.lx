@@ -1,20 +1,24 @@
 @module "main"
 
-@use "stack" as st
+const Person -> struct {
+  name: *char,
+  age: int,
+
+  init -> fn (age: int, name: *char) void {
+    self.name = name;
+    self.age = age;
+  },
+
+  greet -> fn () void {
+    output("I am ", self.name, " and I am ", self.age, " years old.\n");
+  }
+};
 
 pub const main -> fn () int {
-  let stack: *Stack = st::createStack(20);
+  let p: Person;
 
-  st::push(stack, 20);
-  st::push(stack, 30);
-  st::push(stack, 50);
-  st::push(stack, 12);
-  st::push(stack, 311);
-  output("Peeked: ", st::peek(stack), "\n");
-  st::pop(stack);
-  st::pop(stack);
-
-  st::freeStack(stack);
+  p.init(20, "Connor");
+  p.greet();
 
   return 0;
 }
