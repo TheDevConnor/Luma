@@ -1,12 +1,8 @@
 @module "main"
 
-impl [func1: int, func2: char] -> [theStruct] {
-
-}
-
 pub const main -> fn () int {
 
+    output("Hello world\n");
 
-
-return 0;
+    return 0;
 }

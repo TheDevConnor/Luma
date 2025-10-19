@@ -11,7 +11,7 @@ pub const enable_raw_mode -> fn () void {
     if (raw_mode_enabled == 1) {
         return; // Already enabled
     }
-    
+   // nooo
     // Save terminal state and set up restoration on exit
     system("stty -g > /tmp/luma_termios_backup");
     
