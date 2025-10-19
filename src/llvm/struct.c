@@ -49,19 +49,22 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
   size_t data_field_count = 0;
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = node->stmt.struct_decl.public_members[i];
-    if (member->type == AST_STMT_FIELD_DECL && !member->stmt.field_decl.function) {
+    if (member->type == AST_STMT_FIELD_DECL &&
+        !member->stmt.field_decl.function) {
       data_field_count++;
     }
   }
   for (size_t i = 0; i < private_count; i++) {
     AstNode *member = node->stmt.struct_decl.private_members[i];
-    if (member->type == AST_STMT_FIELD_DECL && !member->stmt.field_decl.function) {
+    if (member->type == AST_STMT_FIELD_DECL &&
+        !member->stmt.field_decl.function) {
       data_field_count++;
     }
   }
 
   if (data_field_count == 0) {
-    fprintf(stderr, "Error: Struct %s must have at least one data field\n", struct_name);
+    fprintf(stderr, "Error: Struct %s must have at least one data field\n",
+            struct_name);
     return NULL;
   }
 
@@ -89,14 +92,24 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
   struct_info->field_is_public = (bool *)arena_alloc(
       ctx->arena, sizeof(bool) * data_field_count, alignof(bool));
 
+  // CRITICAL FIX: Create an OPAQUE struct type FIRST (forward declaration)
+  // This allows self-referential structs like: struct Node { next: *Node; }
+  struct_info->llvm_type = LLVMStructCreateNamed(ctx->context, struct_name);
+
+  // Add to context IMMEDIATELY so it can be found during field type resolution
+  add_struct_type(ctx, struct_info);
+  add_symbol(ctx, struct_name, NULL, struct_info->llvm_type, false);
+
   // Process public data fields
   size_t field_index = 0;
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = node->stmt.struct_decl.public_members[i];
-    if (member->type != AST_STMT_FIELD_DECL) continue;
-    
+    if (member->type != AST_STMT_FIELD_DECL)
+      continue;
+
     // Skip methods for now, we'll process them after the struct type is created
-    if (member->stmt.field_decl.function) continue;
+    if (member->stmt.field_decl.function)
+      continue;
 
     const char *field_name = member->stmt.field_decl.name;
 
@@ -109,13 +122,17 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
-    struct_info->field_names[field_index] = arena_strdup(ctx->arena, field_name);
-    struct_info->field_types[field_index] = codegen_type(ctx, member->stmt.field_decl.type);
-    struct_info->field_element_types[field_index] = extract_element_type_from_ast(ctx, member->stmt.field_decl.type);
+    struct_info->field_names[field_index] =
+        arena_strdup(ctx->arena, field_name);
+    struct_info->field_types[field_index] =
+        codegen_type(ctx, member->stmt.field_decl.type);
+    struct_info->field_element_types[field_index] =
+        extract_element_type_from_ast(ctx, member->stmt.field_decl.type);
     struct_info->field_is_public[field_index] = true;
 
     if (!struct_info->field_types[field_index]) {
-      fprintf(stderr, "Error: Failed to resolve type for field %s in struct %s\n",
+      fprintf(stderr,
+              "Error: Failed to resolve type for field %s in struct %s\n",
               field_name, struct_name);
       return NULL;
     }
@@ -125,9 +142,11 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
   // Process private data fields
   for (size_t i = 0; i < private_count; i++) {
     AstNode *member = node->stmt.struct_decl.private_members[i];
-    if (member->type != AST_STMT_FIELD_DECL) continue;
-    
-    if (member->stmt.field_decl.function) continue;
+    if (member->type != AST_STMT_FIELD_DECL)
+      continue;
+
+    if (member->stmt.field_decl.function)
+      continue;
 
     const char *field_name = member->stmt.field_decl.name;
 
@@ -139,40 +158,45 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
-    struct_info->field_names[field_index] = arena_strdup(ctx->arena, field_name);
-    struct_info->field_types[field_index] = codegen_type(ctx, member->stmt.field_decl.type);
-    struct_info->field_element_types[field_index] = extract_element_type_from_ast(ctx, member->stmt.field_decl.type);
-    struct_info->field_is_public[field_index] = member->stmt.field_decl.is_public;
+    struct_info->field_names[field_index] =
+        arena_strdup(ctx->arena, field_name);
+    struct_info->field_types[field_index] =
+        codegen_type(ctx, member->stmt.field_decl.type);
+    struct_info->field_element_types[field_index] =
+        extract_element_type_from_ast(ctx, member->stmt.field_decl.type);
+    struct_info->field_is_public[field_index] =
+        member->stmt.field_decl.is_public;
 
     if (!struct_info->field_types[field_index]) {
-      fprintf(stderr, "Error: Failed to resolve type for field %s in struct %s\n",
+      fprintf(stderr,
+              "Error: Failed to resolve type for field %s in struct %s\n",
               field_name, struct_name);
       return NULL;
     }
     field_index++;
   }
 
-  // Create LLVM struct type
-  struct_info->llvm_type = LLVMStructTypeInContext(
-      ctx->context, struct_info->field_types, data_field_count, false);
+  // CRITICAL: Set the struct body AFTER all field types are resolved
+  // This completes the opaque struct declaration with its actual fields
+  LLVMStructSetBody(struct_info->llvm_type, struct_info->field_types,
+                    data_field_count, false);
 
-  // Add to context BEFORE processing methods
-  add_struct_type(ctx, struct_info);
-  add_symbol(ctx, struct_name, NULL, struct_info->llvm_type, false);
-
-  // NOW process methods with access to the struct type
+  // NOW process methods with access to the complete struct type
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = node->stmt.struct_decl.public_members[i];
-    if (member->type != AST_STMT_FIELD_DECL) continue;
-    
+    if (member->type != AST_STMT_FIELD_DECL)
+      continue;
+
     // Only process methods
-    if (!member->stmt.field_decl.function) continue;
+    if (!member->stmt.field_decl.function)
+      continue;
 
     AstNode *func_node = member->stmt.field_decl.function;
     const char *method_name = member->stmt.field_decl.name;
 
     // Generate the method with implicit 'self' parameter
-    if (!codegen_struct_method(ctx, func_node, struct_info, method_name, true)) {
+    if (!codegen_struct_method(ctx, func_node, struct_info, method_name,
+                               true)) {
       fprintf(stderr, "Error: Failed to generate method '%s' for struct '%s'\n",
               method_name, struct_name);
       return NULL;
@@ -182,15 +206,19 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
   // Process private methods
   for (size_t i = 0; i < private_count; i++) {
     AstNode *member = node->stmt.struct_decl.private_members[i];
-    if (member->type != AST_STMT_FIELD_DECL) continue;
-    
-    if (!member->stmt.field_decl.function) continue;
+    if (member->type != AST_STMT_FIELD_DECL)
+      continue;
+
+    if (!member->stmt.field_decl.function)
+      continue;
 
     AstNode *func_node = member->stmt.field_decl.function;
     const char *method_name = member->stmt.field_decl.name;
 
-    if (!codegen_struct_method(ctx, func_node, struct_info, method_name, false)) {
-      fprintf(stderr, "Error: Failed to generate private method '%s' for struct '%s'\n",
+    if (!codegen_struct_method(ctx, func_node, struct_info, method_name,
+                               false)) {
+      fprintf(stderr,
+              "Error: Failed to generate private method '%s' for struct '%s'\n",
               method_name, struct_name);
       return NULL;
     }
@@ -199,11 +227,12 @@ LLVMValueRef codegen_stmt_struct(CodeGenContext *ctx, AstNode *node) {
   return NULL;
 }
 
-LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node, 
-                                   StructInfo *struct_info, const char *method_name,
-                                   bool is_public) {
+LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
+                                   StructInfo *struct_info,
+                                   const char *method_name, bool is_public) {
   if (!func_node || func_node->type != AST_STMT_FUNCTION) {
-    fprintf(stderr, "Error: Invalid function node for method '%s'\n", method_name);
+    fprintf(stderr, "Error: Invalid function node for method '%s'\n",
+            method_name);
     return NULL;
   }
 
@@ -214,29 +243,32 @@ LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
   char **original_param_names = func_node->stmt.func_decl.param_names;
 
   // CRITICAL: Methods need an implicit 'self' parameter as the FIRST parameter
-  // The typechecker injects 'self' when calling methods, so the method definition must match
+  // The typechecker injects 'self' when calling methods, so the method
+  // definition must match
   size_t param_count = original_param_count + 1; // +1 for 'self'
-  
+
   // Allocate arrays for ALL parameters (including self)
   LLVMTypeRef *llvm_param_types = (LLVMTypeRef *)arena_alloc(
       ctx->arena, sizeof(LLVMTypeRef) * param_count, alignof(LLVMTypeRef));
-  
+
   char **param_names = (char **)arena_alloc(
       ctx->arena, sizeof(char *) * param_count, alignof(char *));
-  
+
   AstNode **param_type_nodes = (AstNode **)arena_alloc(
       ctx->arena, sizeof(AstNode *) * param_count, alignof(AstNode *));
 
   // First parameter is 'self' - a pointer to the struct
   llvm_param_types[0] = LLVMPointerType(struct_info->llvm_type, 0);
   param_names[0] = "self";
-  param_type_nodes[0] = NULL; // We'll handle this specially for element type extraction
+  param_type_nodes[0] =
+      NULL; // We'll handle this specially for element type extraction
 
   // Copy the rest of the original parameters (shifted by 1)
   for (size_t i = 0; i < original_param_count; i++) {
     llvm_param_types[i + 1] = codegen_type(ctx, original_param_type_nodes[i]);
     if (!llvm_param_types[i + 1]) {
-      fprintf(stderr, "Error: Failed to resolve parameter type %zu for method '%s'\n",
+      fprintf(stderr,
+              "Error: Failed to resolve parameter type %zu for method '%s'\n",
               i, method_name);
       return NULL;
     }
@@ -247,22 +279,25 @@ LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
   // Create function type
   LLVMTypeRef llvm_return_type = codegen_type(ctx, return_type_node);
   if (!llvm_return_type) {
-    fprintf(stderr, "Error: Failed to resolve return type for method '%s'\n", method_name);
+    fprintf(stderr, "Error: Failed to resolve return type for method '%s'\n",
+            method_name);
     return NULL;
   }
 
-  LLVMTypeRef func_type = LLVMFunctionType(llvm_return_type, llvm_param_types, 
-                                           param_count, 0);
+  LLVMTypeRef func_type =
+      LLVMFunctionType(llvm_return_type, llvm_param_types, param_count, 0);
 
   // Get the current LLVM module
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
   // Create the function in the current module
-  LLVMValueRef func = LLVMAddFunction(current_llvm_module, method_name, func_type);
-  
+  LLVMValueRef func =
+      LLVMAddFunction(current_llvm_module, method_name, func_type);
+
   if (!func) {
-    fprintf(stderr, "Error: Failed to create LLVM function for method '%s'\n", method_name);
+    fprintf(stderr, "Error: Failed to create LLVM function for method '%s'\n",
+            method_name);
     return NULL;
   }
 
@@ -275,31 +310,34 @@ LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
 
   // CRITICAL: Save the old function context before starting method generation
   LLVMValueRef old_function = ctx->current_function;
-  
+
   // Set current function context
   ctx->current_function = func;
 
   // Create entry basic block
-  LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(
-      ctx->context, func, "entry");
+  LLVMBasicBlockRef entry =
+      LLVMAppendBasicBlockInContext(ctx->context, func, "entry");
   LLVMPositionBuilderAtEnd(ctx->builder, entry);
 
   // Add all parameters to symbol table (including self at index 0)
   for (size_t i = 0; i < param_count; i++) {
     LLVMValueRef param = LLVMGetParam(func, i);
     const char *param_name = param_names[i];
-    
+
     LLVMSetValueName2(param, param_name, strlen(param_name));
-    
+
     // Allocate stack space and store parameter
-    LLVMValueRef alloca = LLVMBuildAlloca(ctx->builder, llvm_param_types[i], param_name);
+    LLVMValueRef alloca =
+        LLVMBuildAlloca(ctx->builder, llvm_param_types[i], param_name);
     LLVMBuildStore(ctx->builder, param, alloca);
-    
-    // Extract element type for pointer parameters (needed for self which is *Person)
-    LLVMTypeRef element_type = extract_element_type_from_ast(ctx, param_type_nodes[i]);
-    
+
+    // Extract element type for pointer parameters (needed for self which is
+    // *Person)
+    LLVMTypeRef element_type =
+        extract_element_type_from_ast(ctx, param_type_nodes[i]);
+
     // Add to symbol table with element type information
-    add_symbol_with_element_type(ctx, param_name, alloca, llvm_param_types[i], 
+    add_symbol_with_element_type(ctx, param_name, alloca, llvm_param_types[i],
                                  element_type, false);
   }
 
@@ -318,7 +356,8 @@ LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
 
   // Verify the function
   if (LLVMVerifyFunction(func, LLVMReturnStatusAction)) {
-    fprintf(stderr, "Error: Function verification failed for method '%s'\n", method_name);
+    fprintf(stderr, "Error: Function verification failed for method '%s'\n",
+            method_name);
     LLVMDumpValue(func);
     // Restore context even on error
     ctx->current_function = old_function;

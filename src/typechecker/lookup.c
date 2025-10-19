@@ -48,14 +48,16 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
 
     if (analyzer) {
       old_skip_state = analyzer->skip_memory_tracking;
-      analyzer->skip_memory_tracking = true;
+      analyzer->skip_memory_tracking = true; // Enable defer mode
     }
 
+    // IMPORTANT: Don't create a new scope for defer - use the SAME scope
+    // so that deferred_frees goes to the correct function scope
     bool result =
         typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
 
     if (analyzer) {
-      analyzer->skip_memory_tracking = old_skip_state;
+      analyzer->skip_memory_tracking = old_skip_state; // Restore state
     }
 
     return result;

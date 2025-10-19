@@ -221,7 +221,6 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   return true;
 }
 
-// Stub implementations for remaining functions
 bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *name = node->stmt.func_decl.name;
   AstNode *return_type = node->stmt.func_decl.return_type;
@@ -318,23 +317,18 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       return false;
     }
 
-    // Process all deferred frees at function exit
+    // Process deferred frees - these represent cleanup at function exit
     StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
     if (analyzer && func_scope->deferred_frees.count > 0) {
-      bool old_skip = analyzer->skip_memory_tracking;
-      analyzer->skip_memory_tracking = false;
-
       for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
-        const char **var =
+        const char **var_ptr =
             (const char **)((char *)func_scope->deferred_frees.data +
                             i * sizeof(const char *));
-        static_memory_track_free(analyzer, *var, name);
+        if (*var_ptr) {
+          // Mark as freed at function exit
+          static_memory_track_free(analyzer, *var_ptr, name);
+        }
       }
-
-      // CRITICAL: Clear the deferred frees after processing
-      func_scope->deferred_frees.count = 0;
-
-      analyzer->skip_memory_tracking = old_skip;
     }
   }
 
@@ -384,7 +378,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = public_members[i];
     if (!member || member->type != AST_STMT_FIELD_DECL) {
-      tc_error(node, "Struct Error", "Invalid public member %zu in struct '%s'", 
+      tc_error(node, "Struct Error", "Invalid public member %zu in struct '%s'",
                i, struct_name);
       return false;
     }
@@ -433,8 +427,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < private_count; i++) {
     AstNode *member = private_members[i];
     if (!member || member->type != AST_STMT_FIELD_DECL) {
-      tc_error(node, "Struct Error", "Invalid private member %zu in struct '%s'",
-               i, struct_name);
+      tc_error(node, "Struct Error",
+               "Invalid private member %zu in struct '%s'", i, struct_name);
       return false;
     }
 
@@ -490,14 +484,15 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   // Add struct type to scope BEFORE processing methods
-  if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false, arena)) {
+  if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false,
+                        arena)) {
     tc_error_id(node, struct_name, "Symbol Error",
                 "Failed to add struct '%s' to scope", struct_name);
     return false;
   }
 
-  // Now we need to reserve space for methods in the arrays BEFORE processing them
-  // Count total fields (data + methods)
+  // Now we need to reserve space for methods in the arrays BEFORE processing
+  // them Count total fields (data + methods)
   size_t method_count = 0;
   for (size_t i = 0; i < public_count; i++) {
     if (public_members[i]->stmt.field_decl.function) {
@@ -511,24 +506,25 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   size_t total_member_count = data_field_count + method_count;
-  
+
   // Reallocate the arrays to hold all members (data + methods)
-  AstNode **full_member_types = arena_alloc(arena, total_member_count * sizeof(AstNode *), 
-                                            alignof(AstNode *));
-  const char **full_member_names = arena_alloc(arena, total_member_count * sizeof(char *), 
-                                               alignof(char *));
-  
+  AstNode **full_member_types = arena_alloc(
+      arena, total_member_count * sizeof(AstNode *), alignof(AstNode *));
+  const char **full_member_names =
+      arena_alloc(arena, total_member_count * sizeof(char *), alignof(char *));
+
   // Copy existing data fields
   for (size_t i = 0; i < data_field_count; i++) {
     full_member_types[i] = all_member_types[i];
     full_member_names[i] = all_member_names[i];
   }
-  
+
   // Update struct type to use new arrays
   struct_type->type_data.struct_type.member_types = full_member_types;
   struct_type->type_data.struct_type.member_names = full_member_names;
-  struct_type->type_data.struct_type.member_count = data_field_count; // Start with data fields
-  
+  struct_type->type_data.struct_type.member_count =
+      data_field_count; // Start with data fields
+
   member_index = data_field_count; // Continue from where we left off
 
   // SECOND PASS: Process methods with explicit 'self' parameter
@@ -539,7 +535,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
     if (field_function) {
       // This is a method - typecheck it with 'self' parameter
-      
+
       AstNode *func_node = field_function;
       if (func_node->type != AST_STMT_FUNCTION) {
         tc_error(node, "Internal Error", "Expected function node for method");
@@ -551,13 +547,14 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       method_scope->is_function_scope = true;
       method_scope->associated_node = func_node;
 
-      // **KEY ADDITION**: Add 'self' as the first parameter
-      // 'self' is a reference to the struct instance (could be pointer or value)
-      // For simplicity, let's make it a pointer to the struct
-      AstNode *self_type = create_pointer_type(arena, struct_type, 
-                                                func_node->line, func_node->column);
-      
-      if (!scope_add_symbol(method_scope, "self", self_type, false, true, arena)) {
+      // Add 'self' as the first parameter
+      // 'self' is a reference to the struct instance (could be pointer or
+      // value) For simplicity, let's make it a pointer to the struct
+      AstNode *self_type = create_pointer_type(
+          arena, struct_type, func_node->line, func_node->column);
+
+      if (!scope_add_symbol(method_scope, "self", self_type, false, true,
+                            arena)) {
         tc_error(func_node, "Method Error",
                  "Failed to add 'self' parameter to method '%s'", field_name);
         return false;
@@ -569,8 +566,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       AstNode **param_types = func_node->stmt.func_decl.param_types;
 
       for (size_t j = 0; j < param_count; j++) {
-        if (!scope_add_symbol(method_scope, param_names[j], param_types[j], 
-                             false, true, arena)) {
+        if (!scope_add_symbol(method_scope, param_names[j], param_types[j],
+                              false, true, arena)) {
           tc_error(func_node, "Method Parameter Error",
                    "Could not add parameter '%s' to method '%s' scope",
                    param_names[j], field_name);
@@ -589,27 +586,34 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         }
       }
 
-      // Register the method in the parent scope
+      // Register the method in the parent scope with QUALIFIED NAME
       // CRITICAL: Include 'self' as the first parameter in the method type
       AstNode *return_type = func_node->stmt.func_decl.return_type;
-      
+
       size_t method_param_count = param_count + 1; // +1 for self
-      AstNode **method_param_types = arena_alloc(arena, method_param_count * sizeof(AstNode *),
-                                                 alignof(AstNode *));
-      
+      AstNode **method_param_types = arena_alloc(
+          arena, method_param_count * sizeof(AstNode *), alignof(AstNode *));
+
       // First parameter is self
       method_param_types[0] = self_type;
-      
+
       // Copy the rest of the parameters
       for (size_t j = 0; j < param_count; j++) {
         method_param_types[j + 1] = param_types[j];
       }
-      
-      AstNode *method_type = create_function_type(
-          arena, method_param_types, method_param_count, return_type, 
-          func_node->line, func_node->column);
 
-      if (!scope_add_symbol(scope, field_name, method_type, is_public, false, arena)) {
+      AstNode *method_type =
+          create_function_type(arena, method_param_types, method_param_count,
+                               return_type, func_node->line, func_node->column);
+
+      // Create qualified method name: StructName.MethodName
+      size_t qualified_len = strlen(struct_name) + strlen(field_name) + 2;
+      char *qualified_method_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_method_name, qualified_len, "%s.%s", struct_name,
+               field_name);
+
+      if (!scope_add_symbol(scope, qualified_method_name, method_type,
+                            is_public, false, arena)) {
         tc_error(func_node, "Method Registration Error",
                  "Failed to register method '%s' in scope", field_name);
         return false;
@@ -619,7 +623,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       full_member_types[member_index] = method_type;
       full_member_names[member_index] = field_name;
       member_index++;
-      
+
       // Update the struct's member count to include this method
       struct_type->type_data.struct_type.member_count = member_index;
     }
@@ -643,10 +647,11 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       method_scope->associated_node = func_node;
 
       // Add 'self' parameter
-      AstNode *self_type = create_pointer_type(arena, struct_type,
-                                                func_node->line, func_node->column);
-      
-      if (!scope_add_symbol(method_scope, "self", self_type, false, true, arena)) {
+      AstNode *self_type = create_pointer_type(
+          arena, struct_type, func_node->line, func_node->column);
+
+      if (!scope_add_symbol(method_scope, "self", self_type, false, true,
+                            arena)) {
         tc_error(func_node, "Method Error",
                  "Failed to add 'self' parameter to method '%s'", field_name);
         return false;
@@ -658,7 +663,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
       for (size_t j = 0; j < param_count; j++) {
         if (!scope_add_symbol(method_scope, param_names[j], param_types[j],
-                             false, true, arena)) {
+                              false, true, arena)) {
           tc_error(func_node, "Method Parameter Error",
                    "Could not add parameter '%s' to method '%s' scope",
                    param_names[j], field_name);
@@ -677,25 +682,32 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       }
 
       AstNode *return_type = func_node->stmt.func_decl.return_type;
-      
+
       // CRITICAL: Include 'self' as the first parameter in the method type
       size_t method_param_count = param_count + 1; // +1 for self
-      AstNode **method_param_types = arena_alloc(arena, method_param_count * sizeof(AstNode *),
-                                                 alignof(AstNode *));
-      
+      AstNode **method_param_types = arena_alloc(
+          arena, method_param_count * sizeof(AstNode *), alignof(AstNode *));
+
       // First parameter is self
       method_param_types[0] = self_type;
-      
+
       // Copy the rest of the parameters
       for (size_t j = 0; j < param_count; j++) {
         method_param_types[j + 1] = param_types[j];
       }
-      
-      AstNode *method_type = create_function_type(
-          arena, method_param_types, method_param_count, return_type,
-          func_node->line, func_node->column);
 
-      if (!scope_add_symbol(scope, field_name, method_type, false, false, arena)) {
+      AstNode *method_type =
+          create_function_type(arena, method_param_types, method_param_count,
+                               return_type, func_node->line, func_node->column);
+
+      // Create qualified method name: StructName.MethodName
+      size_t qualified_len = strlen(struct_name) + strlen(field_name) + 2;
+      char *qualified_method_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_method_name, qualified_len, "%s.%s", struct_name,
+               field_name);
+
+      if (!scope_add_symbol(scope, qualified_method_name, method_type, false,
+                            false, arena)) {
         tc_error(func_node, "Method Registration Error",
                  "Failed to register method '%s' in scope", field_name);
         return false;
@@ -705,7 +717,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       full_member_types[member_index] = method_type;
       full_member_names[member_index] = field_name;
       member_index++;
-      
+
       // Update the struct's member count to include this method
       struct_type->type_data.struct_type.member_count = member_index;
     }
@@ -713,6 +725,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   return true;
 }
+
 bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *enum_name = node->stmt.enum_decl.name;
   char **member_names = node->stmt.enum_decl.members;
