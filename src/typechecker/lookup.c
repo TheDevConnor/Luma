@@ -133,6 +133,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_input_expr(expr, scope, arena);
   case AST_EXPR_SYSTEM:
     return typecheck_system_expr(expr, scope, arena);
+  case AST_EXPR_SYSCALL:
+    return typecheck_syscall_expr(expr, scope, arena);
   case AST_EXPR_ALLOC:
     return typecheck_alloc_expr(expr, scope, arena);
   case AST_EXPR_FREE:

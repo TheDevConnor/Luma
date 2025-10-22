@@ -996,6 +996,85 @@ AstNode *typecheck_system_expr(AstNode *expr, Scope *scope,
   return create_basic_type(arena, "int", expr->line, expr->column);
 }
 
+/**
+ * @brief Type check a syscall expression
+ *
+ * Syscall requires:
+ * - First argument: syscall number (int)
+ * - Remaining arguments: syscall parameters (typically int or pointer types)
+ *
+ * Returns: int (the return value from the syscall)
+ */
+AstNode *typecheck_syscall_expr(AstNode *expr, Scope *scope,
+                                ArenaAllocator *arena) {
+  if (expr->type != AST_EXPR_SYSCALL) {
+    tc_error(expr, "Internal Error", "Expected syscall expression node");
+    return NULL;
+  }
+
+  AstNode **args = expr->expr.syscall.args;
+  size_t arg_count = expr->expr.syscall.count;
+
+  // Syscall requires at least one argument (the syscall number)
+  if (arg_count == 0) {
+    tc_error(expr, "Syscall Error",
+             "syscall() requires at least one argument (syscall number)");
+    return NULL;
+  }
+
+  // Type check the syscall number (first argument)
+  AstNode *syscall_num_type = typecheck_expression(args[0], scope, arena);
+  if (!syscall_num_type) {
+    tc_error(expr, "Syscall Error",
+             "Failed to determine type of syscall number");
+    return NULL;
+  }
+
+  // Verify syscall number is numeric (typically int)
+  if (!is_numeric_type(syscall_num_type)) {
+    tc_error_help(expr, "Syscall Number Type Error",
+                  "The syscall number must be a numeric type (typically int)",
+                  "Syscall number has type '%s', expected numeric type",
+                  type_to_string(syscall_num_type, arena));
+    return NULL;
+  }
+
+  // Type check all remaining arguments
+  for (size_t i = 1; i < arg_count; i++) {
+    if (!args[i]) {
+      tc_error(expr, "Syscall Error", "Argument %zu is NULL", i + 1);
+      return NULL;
+    }
+
+    AstNode *arg_type = typecheck_expression(args[i], scope, arena);
+    if (!arg_type) {
+      tc_error(expr, "Syscall Error", "Failed to type-check argument %zu",
+               i + 1);
+      return NULL;
+    }
+
+    // Syscall arguments should typically be numeric or pointer types
+    // We allow any type but warn about non-standard types
+    bool is_valid_syscall_arg =
+        is_numeric_type(arg_type) || is_pointer_type(arg_type) ||
+        (arg_type->type == AST_TYPE_BASIC &&
+         strcmp(arg_type->type_data.basic.name, "void") == 0);
+
+    if (!is_valid_syscall_arg) {
+      tc_error_help(
+          expr, "Syscall Argument Type Warning",
+          "Syscall arguments are typically numeric or pointer types",
+          "Argument %zu has type '%s' which may not be valid for syscalls",
+          i + 1, type_to_string(arg_type, arena));
+      // Don't return false - this is a warning, not an error
+    }
+  }
+
+  // syscall() returns a long or int (platform dependent)
+  // For simplicity, we return int here
+  return create_basic_type(arena, "int", expr->line, expr->column);
+}
+
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   // sizeof always returns size_t (or int in simplified systems)

@@ -67,33 +67,33 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
     const char *snippet;
     const char *detail;
   } keywords[] = {
-      // Top-level declarations
-      {"const fn", "const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+      // Top-level declarations (updated with -> syntax)
+      {"const fn", "const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
        "Function declaration (Private by default)"},
       {"pub const fn",
-       "pub const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "pub const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
        "Public Function declaration"},
       {"priv const fn",
-       "priv const ${1:name} = fn (${2:params}) ${3:Type} {\n\t$0\n}",
+       "priv const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
        "Private Function declaration"},
 
       {"const struct",
-       "const ${1:Name} = struct {\n\t${2:field}: ${3:Type}$0,\n};",
+       "const ${1:Name} -> struct {\n\t${2:field}: ${3:Type}$0,\n};",
        "Struct definition"},
-      {"const enum", "const ${1:Name} = enum {\n\t${2:Variant}$0,\n};",
+      {"const enum", "const ${1:Name} -> enum {\n\t${2:Variant}$0,\n};",
        "Enum definition"},
       {"const var", "const ${1:name}: ${2:Type} = ${3:value};$0",
        "Top-level constant"},
 
       // Function attributes for memory management
       {"#returns_ownership",
-       "#returns_ownership\nconst ${1:name} = fn (${2:params}) *${3:Type} "
+       "#returns_ownership\nconst ${1:name} -> fn (${2:params}) *${3:Type} "
        "{\n\tlet ${4:ptr}: *${3:Type} = "
        "cast<*${3:Type}>(alloc(sizeof<${3:Type}>));\n\t$0\n\treturn "
        "${4:ptr};\n};",
        "Function that returns owned pointer"},
       {"#takes_ownership",
-       "#takes_ownership\nconst ${1:name} = fn (${2:ptr}: *${3:Type}) "
+       "#takes_ownership\nconst ${1:name} -> fn (${2:ptr}: *${3:Type}) "
        "${4:void} {\n\t$0\n\tfree(${2:ptr});\n};",
        "Function that takes ownership and frees"},
 
@@ -127,6 +127,47 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
       {"defer", "defer free(${1:ptr});$0", "Defer statement"},
       {"defer block", "defer {\n\t${1:cleanup()};\n\t$0\n}", "Defer block"},
 
+      // Syscalls - Common Linux syscalls
+      {"syscall", "syscall(${1:syscall_num}, ${2:args});$0",
+       "Raw syscall invocation"},
+      {"syscall read",
+       "let ${1:bytes_read}: int = syscall(0, ${2:fd}, ${3:buffer}, "
+       "${4:count});$0",
+       "read(fd, buf, count) - syscall 0"},
+      {"syscall write",
+       "let ${1:bytes_written}: int = syscall(1, ${2:fd}, ${3:buffer}, "
+       "${4:count});$0",
+       "write(fd, buf, count) - syscall 1"},
+      {"syscall open",
+       "let ${1:fd}: int = syscall(2, ${2:pathname}, ${3:flags}, ${4:mode});$0",
+       "open(pathname, flags, mode) - syscall 2"},
+      {"syscall close", "syscall(3, ${1:fd});$0", "close(fd) - syscall 3"},
+      {"syscall exit", "syscall(60, ${1:status});$0",
+       "exit(status) - syscall 60"},
+      {"syscall fork", "let ${1:pid}: int = syscall(57);$0",
+       "fork() - syscall 57"},
+      {"syscall execve", "syscall(59, ${1:filename}, ${2:argv}, ${3:envp});$0",
+       "execve(filename, argv, envp) - syscall 59"},
+      {"syscall mmap",
+       "let ${1:addr}: *void = cast<*void>(syscall(9, ${2:addr}, ${3:length}, "
+       "${4:prot}, ${5:flags}, ${6:fd}, ${7:offset}));$0",
+       "mmap(addr, length, prot, flags, fd, offset) - syscall 9"},
+      {"syscall munmap", "syscall(11, ${1:addr}, ${2:length});$0",
+       "munmap(addr, length) - syscall 11"},
+      {"syscall getpid", "let ${1:pid}: int = syscall(39);$0",
+       "getpid() - syscall 39"},
+      {"syscall socket",
+       "let ${1:sockfd}: int = syscall(41, ${2:domain}, ${3:type}, "
+       "${4:protocol});$0",
+       "socket(domain, type, protocol) - syscall 41"},
+      {"syscall connect",
+       "syscall(42, ${1:sockfd}, ${2:addr}, ${3:addrlen});$0",
+       "connect(sockfd, addr, addrlen) - syscall 42"},
+      {"syscall accept",
+       "let ${1:fd}: int = syscall(43, ${2:sockfd}, ${3:addr}, "
+       "${4:addrlen});$0",
+       "accept(sockfd, addr, addrlen) - syscall 43"},
+
       // Module system
       {"@module", "@module \"${1:name}\"$0", "Module declaration"},
       {"@use", "@use \"${1:module}\" as ${2:alias}$0", "Import module"},
@@ -136,18 +177,29 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
       {"break", "break;$0", "Break statement"},
       {"continue", "continue;$0", "Continue statement"},
 
-      // Struct with access modifiers
+      // Struct with access modifiers (updated with -> syntax)
       {"struct pub/priv",
-       "const ${1:Name} = struct {\npub:\n\t${2:public_field}: "
+       "const ${1:Name} -> struct {\npub:\n\t${2:public_field}: "
        "${3:Type},\npriv:\n\t${4:private_field}: ${5:Type}$0\n};",
        "Struct with access modifiers"},
 
-      // Common patterns
-      {"main", "const main = fn () int {\n\t$0\n\treturn 0;\n};",
+      // Common patterns (updated with -> syntax)
+      {"main", "const main -> fn () int {\n\t$0\n\treturn 0;\n};",
        "Main function"},
       {"outputln", "outputln(${1:message});$0", "Output with newline"},
       {"cast", "cast<${1:Type}>(${2:value})$0", "Type cast"},
       {"sizeof", "sizeof<${1:Type}>$0", "Size of type"},
+
+      // Syscall helper patterns
+      {"syscall write string",
+       "let ${1:message}: *char = ${2:\"Hello, World!\\n\"};\n"
+       "syscall(1, 1, ${1:message}, ${3:14});$0",
+       "Write string to stdout using syscall"},
+      {"syscall error check",
+       "let ${1:result}: int = syscall(${2:num}, ${3:args});\n"
+       "if ${1:result} < 0 {\n\t// Error: result contains negative "
+       "errno\n\t$0\n}",
+       "Syscall with error checking"},
   };
 
   for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {

@@ -381,6 +381,46 @@ Expr *system_expr(Parser *parser) {
   return create_system_expr(parser->arena, command, line, col);
 }
 
+Expr *syscall_expr(Parser *parser) {
+  p_advance(parser);
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+
+  p_consume(
+      parser, TOK_LPAREN,
+      "Expected a '(' before you give the params for the syscall command");
+
+  GrowableArray args;
+  if (!growable_array_init(&args, parser->arena, 2, sizeof(Expr *))) {
+    fprintf(stderr, "Failed to initialize array elements\n");
+    return NULL;
+  }
+
+  while (p_current(parser).type_ != TOK_RPAREN) {
+    Expr *arg = parse_expr(parser, BP_NONE);
+    if (!arg) {
+      fprintf(stderr, "Expected expression inside array\n");
+      return NULL;
+    }
+
+    Expr **slot = (Expr **)growable_array_push(&args);
+    if (!slot) {
+      fprintf(stderr, "Out of memory while growing array elements\n");
+      return NULL;
+    }
+
+    *slot = arg;
+
+    if (p_current(parser).type_ == TOK_COMMA)
+      p_advance(parser);
+  }
+  p_consume(parser, TOK_RPAREN,
+            "Expected a ')' after you give your arguments for syscall.");
+
+  return create_syscall_expr(parser->arena, (Expr **)args.data, args.count,
+                             line, col);
+}
+
 // size_t sizeof(TYPE);
 // sizeof<int>         Compile-time constant
 // sizeof<[10]int>     Compile-time constant

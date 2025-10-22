@@ -194,6 +194,14 @@ AstNode *create_system_expr(ArenaAllocator *arena, Expr *command, size_t line,
   return node;
 }
 
+AstNode *create_syscall_expr(ArenaAllocator *arena, Expr **args, size_t count,
+                             size_t line, size_t col) {
+  AstNode *node = create_expr(arena, AST_EXPR_SYSCALL, line, col);
+  node->expr.syscall.args = args;
+  node->expr.syscall.count = count;
+  return node;
+}
+
 AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type,
                             size_t line, size_t col) {
   AstNode *node = create_expr(arena, AST_EXPR_SIZEOF, line, col);

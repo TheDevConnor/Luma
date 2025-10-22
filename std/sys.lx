@@ -1,0 +1,306 @@
+/*
+ * sys.lx - Linux System Call Interface
+ * 
+ * PLATFORM: This module is ONLY compatible with x86_64 Linux systems.
+ * It provides direct system call wrappers using the Linux syscall ABI.
+ * 
+ * WARNING: This code will NOT work on:
+ *   - macOS (different syscall numbers and ABI)
+ *   - Windows (completely different system call mechanism)
+ *   - ARM/ARM64 Linux (different syscall numbers)
+ *   - 32-bit x86 Linux (different syscall numbers and calling convention)
+ * 
+ * The syscall numbers and behavior are specific to the Linux kernel
+ * on x86_64 architecture. Port carefully if targeting other platforms.
+ * 
+ * KNOWN ISSUES:
+ *   - pipe() syscall may have issues with file descriptor handling
+ */
+@module "sys"
+
+// TODO: Allow enums to have a custom assigned value
+// Syscall numbers (Linux x86_64)
+pub const SYS_READ: int = 0;
+pub const SYS_WRITE: int = 1;
+pub const SYS_OPEN: int = 2;
+pub const SYS_CLOSE: int = 3;
+pub const SYS_STAT: int = 4;
+pub const SYS_FSTAT: int = 5;
+pub const SYS_LSEEK: int = 8;
+pub const SYS_MMAP: int = 9;
+pub const SYS_MUNMAP: int = 11;
+pub const SYS_BRK: int = 12;
+pub const SYS_IOCTL: int = 16;
+pub const SYS_PREAD: int = 17;
+pub const SYS_PWRITE: int = 18;
+pub const SYS_PIPE: int = 22;
+pub const SYS_SELECT: int = 23;
+pub const SYS_DUP: int = 32;
+pub const SYS_DUP2: int = 33;
+pub const SYS_GETPID: int = 39;
+pub const SYS_FORK: int = 57;
+pub const SYS_EXECVE: int = 59;
+pub const SYS_EXIT: int = 60;
+pub const SYS_WAIT4: int = 61;
+pub const SYS_KILL: int = 62;
+pub const SYS_FCNTL: int = 72;
+pub const SYS_GETCWD: int = 79;
+pub const SYS_CHDIR: int = 80;
+pub const SYS_MKDIR: int = 83;
+pub const SYS_RMDIR: int = 84;
+pub const SYS_UNLINK: int = 87;
+pub const SYS_GETUID: int = 102;
+pub const SYS_GETGID: int = 104;
+pub const SYS_GETTIMEOFDAY: int = 96;
+pub const SYS_CLOCK_GETTIME: int = 228;
+
+// File flags
+pub const O_RDONLY: int = 0;
+pub const O_WRONLY: int = 1;
+pub const O_RDWR: int = 2;
+pub const O_CREAT: int = 64;
+pub const O_EXCL: int = 128;
+pub const O_NOCTTY: int = 256;
+pub const O_TRUNC: int = 512;
+pub const O_APPEND: int = 1024;
+pub const O_NONBLOCK: int = 2048;
+pub const O_DIRECTORY: int = 65536;
+pub const O_CLOEXEC: int = 524288;
+
+// File permissions
+pub const S_IRWXU: int = 448;  // 0700 - user rwx
+pub const S_IRUSR: int = 256;  // 0400 - user read
+pub const S_IWUSR: int = 128;  // 0200 - user write
+pub const S_IXUSR: int = 64;   // 0100 - user execute
+
+pub const S_IRWXG: int = 56;   // 0070 - group rwx
+pub const S_IRGRP: int = 32;   // 0040 - group read
+pub const S_IWGRP: int = 16;   // 0020 - group write
+pub const S_IXGRP: int = 8;    // 0010 - group execute
+
+pub const S_IRWXO: int = 7;    // 0007 - other rwx
+pub const S_IROTH: int = 4;    // 0004 - other read
+pub const S_IWOTH: int = 2;    // 0002 - other write
+pub const S_IXOTH: int = 1;    // 0001 - other execute
+
+// Common permission combinations
+pub const MODE_0644: int = 420;  // rw-r--r--
+pub const MODE_0755: int = 493;  // rwxr-xr-x
+pub const MODE_0777: int = 511;  // rwxrwxrwx
+
+// lseek whence values
+pub const SEEK_SET: int = 0;
+pub const SEEK_CUR: int = 1;
+pub const SEEK_END: int = 2;
+
+// Standard file descriptors
+pub const STDIN: int = 0;
+pub const STDOUT: int = 1;
+pub const STDERR: int = 2;
+
+// mmap protection flags
+pub const PROT_NONE: int = 0;
+pub const PROT_READ: int = 1;
+pub const PROT_WRITE: int = 2;
+pub const PROT_EXEC: int = 4;
+
+// mmap flags
+pub const MAP_SHARED: int = 1;
+pub const MAP_PRIVATE: int = 2;
+pub const MAP_ANONYMOUS: int = 32;
+pub const MAP_ANON: int = 32;  // Alias for MAP_ANONYMOUS
+pub const MAP_FIXED: int = 16;
+
+// Signals
+pub const SIGHUP: int = 1;
+pub const SIGINT: int = 2;
+pub const SIGQUIT: int = 3;
+pub const SIGILL: int = 4;
+pub const SIGTRAP: int = 5;
+pub const SIGABRT: int = 6;
+pub const SIGBUS: int = 7;
+pub const SIGFPE: int = 8;
+pub const SIGKILL: int = 9;
+pub const SIGSEGV: int = 11;
+pub const SIGPIPE: int = 13;
+pub const SIGALRM: int = 14;
+pub const SIGTERM: int = 15;
+pub const SIGCHLD: int = 17;
+
+// Wait flags
+pub const WNOHANG: int = 1;
+pub const WUNTRACED: int = 2;
+
+// Error codes (commonly returned as negative values)
+pub const EPERM: int = 1;       // Operation not permitted
+pub const ENOENT: int = 2;      // No such file or directory
+pub const ESRCH: int = 3;       // No such process
+pub const EINTR: int = 4;       // Interrupted system call
+pub const EIO: int = 5;         // I/O error
+pub const ENXIO: int = 6;       // No such device or address
+pub const E2BIG: int = 7;       // Argument list too long
+pub const EBADF: int = 9;       // Bad file descriptor
+pub const ECHILD: int = 10;     // No child processes
+pub const EAGAIN: int = 11;     // Try again
+pub const ENOMEM: int = 12;     // Out of memory
+pub const EACCES: int = 13;     // Permission denied
+pub const EFAULT: int = 14;     // Bad address
+pub const EBUSY: int = 16;      // Device or resource busy
+pub const EEXIST: int = 17;     // File exists
+pub const ENODEV: int = 19;     // No such device
+pub const ENOTDIR: int = 20;    // Not a directory
+pub const EISDIR: int = 21;     // Is a directory
+pub const EINVAL: int = 22;     // Invalid argument
+pub const ENFILE: int = 23;     // File table overflow
+pub const EMFILE: int = 24;     // Too many open files
+pub const ENOSPC: int = 28;     // No space left on device
+pub const EPIPE: int = 32;      // Broken pipe
+
+// ============= Process Management =============
+
+pub const exit -> fn  (code: int) void {
+    __syscall__(SYS_EXIT, code);
+}
+
+pub const fork -> fn  () int {
+    return __syscall__(SYS_FORK);
+}
+
+pub const getpid -> fn  () int {
+    return __syscall__(SYS_GETPID);
+}
+
+pub const getuid -> fn  () int {
+    return __syscall__(SYS_GETUID);
+}
+
+pub const getgid -> fn  () int {
+    return __syscall__(SYS_GETGID);
+}
+
+pub const kill -> fn  (pid: int, sig: int) int {
+    return __syscall__(SYS_KILL, pid, sig);
+}
+
+pub const wait4 -> fn  (pid: int, status: *int, options: int, rusage: *void) int {
+    return __syscall__(SYS_WAIT4, pid, cast<int>(status), options, cast<int>(rusage));
+}
+
+pub const execve -> fn  (path: *char, argv: **char, envp: **char) int {
+    return __syscall__(SYS_EXECVE, cast<int>(path), cast<int>(argv), cast<int>(envp));
+}
+
+// ============= File Operations =============
+
+pub const read -> fn  (fd: int, buf: *void, count: int) int {
+    return __syscall__(SYS_READ, fd, cast<int>(buf), count);
+}
+
+pub const write -> fn  (fd: int, buf: *void, count: int) int {
+    return __syscall__(SYS_WRITE, fd, cast<int>(buf), count);
+}
+
+pub const open -> fn  (path: *char, flags: int, mode: int) int {
+    return __syscall__(SYS_OPEN, cast<int>(path), flags, mode);
+}
+
+pub const close -> fn  (fd: int) int {
+    return __syscall__(SYS_CLOSE, fd);
+}
+
+pub const lseek -> fn  (fd: int, offset: int, whence: int) int {
+    return __syscall__(SYS_LSEEK, fd, offset, whence);
+}
+
+pub const pread -> fn  (fd: int, buf: *void, count: int, offset: int) int {
+    return __syscall__(SYS_PREAD, fd, cast<int>(buf), count, offset);
+}
+
+pub const pwrite -> fn  (fd: int, buf: *void, count: int, offset: int) int {
+    return __syscall__(SYS_PWRITE, fd, cast<int>(buf), count, offset);
+}
+
+pub const dup -> fn  (oldfd: int) int {
+    return __syscall__(SYS_DUP, oldfd);
+}
+
+pub const dup2 -> fn  (oldfd: int, newfd: int) int {
+    return __syscall__(SYS_DUP2, oldfd, newfd);
+}
+
+pub const pipe -> fn  (pipefd: *int) int {
+    return __syscall__(SYS_PIPE, cast<int>(pipefd));
+}
+
+pub const unlink -> fn  (path: *char) int {
+    return __syscall__(SYS_UNLINK, cast<int>(path));
+}
+
+// ============= Directory Operations =============
+
+pub const mkdir -> fn  (path: *char, mode: int) int {
+    return __syscall__(SYS_MKDIR, cast<int>(path), mode);
+}
+
+pub const rmdir -> fn  (path: *char) int {
+    return __syscall__(SYS_RMDIR, cast<int>(path));
+}
+
+pub const chdir -> fn  (path: *char) int {
+    return __syscall__(SYS_CHDIR, cast<int>(path));
+}
+
+pub const getcwd -> fn  (buf: *char, size: int) *char {
+    let result: int = __syscall__(SYS_GETCWD, cast<int>(buf), size);
+    if (result < 0) {
+        return cast<*char>(0);
+    }
+    return buf;
+}
+
+// ============= Memory Management =============
+
+pub const brk -> fn (addr: *void) int {
+    return __syscall__(SYS_BRK, cast<int>(addr));
+}
+
+pub const mmap -> fn (addr: *void, length: int, prot: int, flags: int, fd: int, offset: int) *void {
+    let result: int = __syscall__(SYS_MMAP, cast<int>(addr), length, prot, flags, fd, offset);
+    return cast<*void>(result);
+}
+
+pub const munmap -> fn (addr: *void, length: int) int {
+    return __syscall__(SYS_MUNMAP, cast<int>(addr), length);
+}
+
+// ============= Helper Functions =============
+
+// Check if result is an error
+pub const is_error -> fn (result: int) bool {
+    return result < 0 && result >= -4095;
+}
+
+// Get error number from result
+pub const get_errno -> fn (result: int) int {
+    if (is_error(result)) {
+        return -result;
+    }
+    return 0;
+}
+
+// Write string to file descriptor
+pub const write_str -> fn (fd: int, s: *char) int {
+    let len: int = 0;
+    loop (s[len] != cast<char>(0)) : (++len) {}
+    return write(fd, cast<*void>(s), len);
+}
+
+// Print to stdout
+pub const print -> fn (s: *char) int {
+    return write_str(STDOUT, s);
+}
+
+// Print to stderr
+pub const eprint -> fn (s: *char) int {
+    return write_str(STDERR, s);
+}

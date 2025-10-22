@@ -437,55 +437,55 @@ LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef callee_value = NULL;
   LLVMValueRef *args = NULL;
   size_t arg_count = node->expr.call.arg_count;
-  
+
   // Check if this is a method call (obj.method())
   if (callee->type == AST_EXPR_MEMBER && !callee->expr.member.is_compiletime) {
     // Method call: obj.method(arg1, arg2)
     // The typechecker has already injected 'self' as the first argument
     // So we just need to codegen all arguments as-is
-    
+
     // Get the method function
     const char *member_name = callee->expr.member.member;
-    
+
     // Look up the method in the current module
     LLVMModuleRef current_llvm_module =
         ctx->current_module ? ctx->current_module->module : ctx->module;
-    LLVMValueRef method_func = LLVMGetNamedFunction(current_llvm_module, member_name);
-    
+    LLVMValueRef method_func =
+        LLVMGetNamedFunction(current_llvm_module, member_name);
+
     if (!method_func) {
       fprintf(stderr, "Error: Method '%s' not found\n", member_name);
       return NULL;
     }
-    
+
     callee_value = method_func;
-    
+
     // Allocate space for all arguments (including injected self)
     args = (LLVMValueRef *)arena_alloc(
-        ctx->arena, sizeof(LLVMValueRef) * arg_count,
-        alignof(LLVMValueRef));
-    
+        ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
     // Codegen all arguments (self is already in args[0] from typechecker)
     for (size_t i = 0; i < arg_count; i++) {
       args[i] = codegen_expr(ctx, node->expr.call.args[i]);
       if (!args[i]) {
-        fprintf(stderr, "Error: Failed to generate argument %zu for method '%s'\n", 
-                i, member_name);
+        fprintf(stderr,
+                "Error: Failed to generate argument %zu for method '%s'\n", i,
+                member_name);
         return NULL;
       }
     }
-    
+
   } else {
     // Regular function call or compile-time member access (module::func)
     callee_value = codegen_expr(ctx, callee);
     if (!callee_value) {
       return NULL;
     }
-    
+
     // Allocate space for arguments
     args = (LLVMValueRef *)arena_alloc(
-        ctx->arena, sizeof(LLVMValueRef) * arg_count,
-        alignof(LLVMValueRef));
-    
+        ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
     for (size_t i = 0; i < arg_count; i++) {
       args[i] = codegen_expr(ctx, node->expr.call.args[i]);
       if (!args[i]) {
@@ -501,8 +501,7 @@ LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node) {
   // Check if return type is void
   if (LLVMGetTypeKind(return_type) == LLVMVoidTypeKind) {
     // For void functions, don't assign a name to the call
-    LLVMBuildCall2(ctx->builder, func_type, callee_value, args,
-                   arg_count, "");
+    LLVMBuildCall2(ctx->builder, func_type, callee_value, args, arg_count, "");
     // Return a void constant since we can't return NULL
     return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
   } else {
@@ -1035,7 +1034,7 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     } else if (node->expr.index.object->type == AST_EXPR_MEMBER) {
       AstNode *member_expr = node->expr.index.object;
       const char *field_name = member_expr->expr.member.member;
-      
+
       // Get the struct info
       StructInfo *struct_info = NULL;
       for (StructInfo *info = ctx->struct_types; info; info = info->next) {
@@ -1380,6 +1379,170 @@ LLVMValueRef codegen_expr_system(CodeGenContext *ctx, AstNode *node) {
                         "system_call");
 }
 
+/**
+ * @brief Generate LLVM IR for syscall expression
+ *
+ * Syscall in x86_64 Linux:
+ * - syscall number goes in %rax
+ * - arguments go in %rdi, %rsi, %rdx, %r10, %r8, %r9 (in that order)
+ * - return value comes back in %rax
+ *
+ * We use inline assembly to invoke the syscall instruction.
+ */
+LLVMValueRef codegen_expr_syscall(CodeGenContext *ctx, AstNode *node) {
+  if (!node || node->type != AST_EXPR_SYSCALL) {
+    fprintf(stderr, "Error: Expected syscall expression node\n");
+    return NULL;
+  }
+
+  AstNode **args = node->expr.syscall.args;
+  size_t arg_count = node->expr.syscall.count;
+
+  // Syscall requires at least 1 argument (the syscall number)
+  if (arg_count == 0) {
+    fprintf(
+        stderr,
+        "Error: syscall() requires at least one argument (syscall number)\n");
+    return NULL;
+  }
+
+  // Maximum 7 arguments: syscall_num + 6 syscall args
+  if (arg_count > 7) {
+    fprintf(stderr, "Error: syscall() supports maximum 7 arguments (syscall "
+                    "number + 6 parameters)\n");
+    return NULL;
+  }
+
+  // Get current LLVM module
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+
+  // Generate all arguments
+  LLVMValueRef *llvm_args = (LLVMValueRef *)arena_alloc(
+      ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
+  for (size_t i = 0; i < arg_count; i++) {
+    llvm_args[i] = codegen_expr(ctx, args[i]);
+    if (!llvm_args[i]) {
+      fprintf(stderr, "Error: Failed to generate syscall argument %zu\n",
+              i + 1);
+      return NULL;
+    }
+
+    // Ensure all arguments are i64 (syscalls expect 64-bit values)
+    LLVMTypeRef arg_type = LLVMTypeOf(llvm_args[i]);
+    LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
+
+    if (arg_kind == LLVMIntegerTypeKind) {
+      unsigned bits = LLVMGetIntTypeWidth(arg_type);
+      if (bits < 64) {
+        // Zero-extend smaller integers to i64
+        llvm_args[i] = LLVMBuildZExt(ctx->builder, llvm_args[i],
+                                     LLVMInt64TypeInContext(ctx->context),
+                                     "syscall_arg_ext");
+      } else if (bits > 64) {
+        // Truncate larger integers to i64
+        llvm_args[i] = LLVMBuildTrunc(ctx->builder, llvm_args[i],
+                                      LLVMInt64TypeInContext(ctx->context),
+                                      "syscall_arg_trunc");
+      }
+    } else if (arg_kind == LLVMPointerTypeKind) {
+      // Convert pointer to i64
+      llvm_args[i] = LLVMBuildPtrToInt(ctx->builder, llvm_args[i],
+                                       LLVMInt64TypeInContext(ctx->context),
+                                       "syscall_ptr_to_int");
+    } else if (arg_kind == LLVMFloatTypeKind ||
+               arg_kind == LLVMDoubleTypeKind) {
+      // Convert float/double to i64 (reinterpret bits, don't convert value)
+      fprintf(stderr,
+              "Warning: syscall argument %zu is float/double, casting to int\n",
+              i + 1);
+      llvm_args[i] = LLVMBuildFPToSI(ctx->builder, llvm_args[i],
+                                     LLVMInt64TypeInContext(ctx->context),
+                                     "syscall_float_to_int");
+    }
+  }
+
+  // Build inline assembly string based on number of arguments
+  // Linux x86_64 syscall convention:
+  // rax = syscall number
+  // rdi, rsi, rdx, r10, r8, r9 = arguments 1-6
+
+  const char *asm_template;
+  const char *constraints;
+
+  switch (arg_count) {
+  case 1: // syscall number only
+    asm_template = "syscall";
+    constraints = "={rax},{rax}";
+    break;
+  case 2: // syscall + 1 arg
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi}";
+    break;
+  case 3: // syscall + 2 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi}";
+    break;
+  case 4: // syscall + 3 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx}";
+    break;
+  case 5: // syscall + 4 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10}";
+    break;
+  case 6: // syscall + 5 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8}";
+    break;
+  case 7: // syscall + 6 args (maximum)
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8},{r9}";
+    break;
+  default:
+    fprintf(stderr, "Error: Invalid syscall argument count\n");
+    return NULL;
+  }
+
+  // Create parameter types array (all i64)
+  LLVMTypeRef *param_types = (LLVMTypeRef *)arena_alloc(
+      ctx->arena, sizeof(LLVMTypeRef) * arg_count, alignof(LLVMTypeRef));
+
+  for (size_t i = 0; i < arg_count; i++) {
+    param_types[i] = LLVMInt64TypeInContext(ctx->context);
+  }
+
+  // Create inline assembly function type: i64 (args...)
+  LLVMTypeRef asm_func_type = LLVMFunctionType(
+      LLVMInt64TypeInContext(ctx->context), // return type (syscall result)
+      param_types, arg_count,
+      false // not vararg
+  );
+
+  // Create the inline assembly call
+  LLVMValueRef asm_func =
+      LLVMGetInlineAsm(asm_func_type,
+                       (char *)asm_template, // assembly template
+                       strlen(asm_template),
+                       (char *)constraints, // constraints
+                       strlen(constraints),
+                       true,                    // has side effects
+                       false,                   // align stack
+                       LLVMInlineAsmDialectATT, // AT&T syntax
+                       false                    // can throw
+      );
+
+  // Call the inline assembly
+  LLVMValueRef result = LLVMBuildCall2(ctx->builder, asm_func_type, asm_func,
+                                       llvm_args, arg_count, "syscall_result");
+
+  // Mark as volatile to prevent optimization
+  LLVMSetVolatile(result, true);
+
+  return result;
+}
+
 // sizeof<type || expr>
 LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
   LLVMTypeRef type;
@@ -1564,7 +1727,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
 
   // Final fallback if we couldn't determine the type
   if (!element_type) {
-    fprintf(stderr, "Warning: Could not determine pointer element type for dereference, defaulting to i64\n");
+    fprintf(stderr, "Warning: Could not determine pointer element type for "
+                    "dereference, defaulting to i64\n");
     element_type = LLVMInt64TypeInContext(ctx->context);
   }
 
