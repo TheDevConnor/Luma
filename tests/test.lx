@@ -1,27 +1,79 @@
 @module "main"
 
-const randomStruct -> struct {
-   x: int,
-   y: int,
-   z: int
-};
-
 pub const main -> fn () int {
-
-    impl [func1: int] -> [randomStruct] {
-         const func1 -> fn() int {
-               self.x = 10;
-               self.y = 20;
-               self.z = 30;
-
-               if (self.x < self.y &&  self.y < self.z) {
-                  return 1;
-               }
-               return 0;
-         }
-    }
-
-    randomStruct.func1();
-
-    return 0;
+  // Bitwise OR (|) - combines bits
+  // Used to SET specific bits to 1
+  let flags: int = 0;      // 0000 0000
+  flags = flags | 4;       // 0000 0100 (set bit 2)
+  flags = flags | 8;       // 0000 1100 (set bit 3)
+  output("flags after OR: ", flags, "\n");  // Output: 12
+  
+  // Bitwise AND (&) - masks bits
+  // Used to CHECK if specific bits are set
+  let has_bit_2: int = flags & 4;  // Check if bit 2 is set
+  let has_bit_1: int = flags & 2;  // Check if bit 1 is set
+  output("has bit 2: ", has_bit_2, "\n");  // Output: 4 (true)
+  output("has bit 1: ", has_bit_1, "\n");  // Output: 0 (false)
+  
+  // Bitwise NOT (~) - inverts all bits
+  let mask: int = 4;           // 0000 0100
+  let inverted: int = ~mask;   // 1111 1011 (all bits flipped)
+  output("mask: ", mask, "\n");
+  output("~mask: ", inverted, "\n");  // Output: -5 (in two's complement)
+  
+  // Combining: clear specific bits (AND with NOT)
+  // Clear bit 2 from flags (which has bits 2 and 3 set)
+  flags = flags & ~4;  // Clear bit 2: 1100 & 1011 = 1000
+  output("flags after clearing bit 2: ", flags, "\n");  // Output: 8
+  
+  // Practical example: file permissions
+  let read: int = 4;    // 100
+  let write: int = 2;   // 010
+  let execute: int = 1; // 001
+  
+  let perms: int = read | write | execute;  // 111 = 7 (rwx)
+  output("permissions: ", perms, "\n");  // Output: 7
+  
+  // Check if writable
+  if ((perms & write) != 0) {
+      output("File is writable!\n");
+  }
+  
+  // Remove write permission using ~
+  perms = perms & ~write;  // 111 & 101 = 101 (r-x)
+  output("permissions after removing write: ", perms, "\n");  // Output: 5
+  
+  // Check if writable now
+  if ((perms & write) == 0) {
+      output("File is no longer writable!\n");
+  }
+  
+  // Bitwise XOR (^) - toggles bits
+  let toggle: int = 15;     // 1111
+  toggle = toggle ^ 5;      // 1111 ^ 0101 = 1010
+  output("15 ^ 5: ", toggle, "\n");  // Output: 10
+  
+  // Left shift (<<) - multiply by powers of 2
+  let shifted_left: int = 1 << 3;  // 0001 << 3 = 1000
+  output("1 << 3: ", shifted_left, "\n");  // Output: 8
+  
+  // Right shift (>>) - divide by powers of 2
+  let shifted_right: int = 16 >> 2;  // 10000 >> 2 = 00100
+  output("16 >> 2: ", shifted_right, "\n");  // Output: 4
+  
+  return 0;
 }
+
+// flags after OR: 12
+// has bit 2: 4
+// has bit 1: 0
+// mask: 4
+// ~mask: -5
+// flags after clearing bit 2: 8
+// permissions: 7
+// File is writable!
+// permissions after removing write: 5
+// File is no longer writable!
+// 15 ^ 5: 10
+// 1 << 3: 8
+// 16 >> 2: 4

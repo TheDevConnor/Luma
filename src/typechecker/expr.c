@@ -105,6 +105,29 @@ AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
     return array;
   }
 
+  // Bitwise operators (&, |, ^, <<, >>)
+  if (op == BINOP_BIT_AND || op == BINOP_BIT_OR || op == BINOP_BIT_XOR ||
+      op == BINOP_SHL || op == BINOP_SHR) {
+    if (!is_numeric_type(left_type)) {
+      tc_error_help(expr, "Type Error",
+                    "Bitwise operations require integer operands",
+                    "Left operand has non-integer type '%s'",
+                    type_to_string(left_type, arena));
+      return NULL;
+    }
+
+    if (!is_numeric_type(right_type)) {
+      tc_error_help(expr, "Type Error",
+                    "Bitwise operations require integer operands",
+                    "Right operand has non-integer type '%s'",
+                    type_to_string(right_type, arena));
+      return NULL;
+    }
+
+    // Bitwise operations return int
+    return create_basic_type(arena, "int", expr->line, expr->column);
+  }
+
   tc_error(expr, "Unsupported Operation", "Unsupported binary operation");
   return NULL;
 }
@@ -138,6 +161,14 @@ AstNode *typecheck_unary_expr(AstNode *expr, Scope *scope,
   if (op == UNOP_NOT) {
     // In many languages, logical NOT works with any type (truthy/falsy)
     return create_basic_type(arena, "bool", expr->line, expr->column);
+  }
+
+  if (op == UNOP_BIT_NOT) {
+    if (!is_numeric_type(operand_type)) {
+      tc_error(expr, "Type Error", "Bitwise NOT on non-integer type");
+      return NULL;
+    }
+    return operand_type; // Bitwise NOT does not change type
   }
 
   tc_error(expr, "Type Error", "Unsupported unary operation");

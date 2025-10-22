@@ -333,12 +333,53 @@ LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node) {
     // Range operations work with both integers and floats
     return create_range_struct(ctx, left, right);
 
+  // Bitwise operations (only for integers)
+  case BINOP_BIT_AND:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise AND not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildAnd(ctx->builder, left, right, "bitand");
+
+  case BINOP_BIT_OR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise OR not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildOr(ctx->builder, left, right, "bitor");
+
+  case BINOP_BIT_XOR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise XOR not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildXor(ctx->builder, left, right, "bitxor");
+
+  case BINOP_SHL:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Left shift not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildShl(ctx->builder, left, right, "shl");
+
+  case BINOP_SHR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Right shift not supported for floating point values\n");
+      return NULL;
+    }
+    // Use arithmetic right shift (sign-extending for signed integers)
+    return LLVMBuildAShr(ctx->builder, left, right, "ashr");
+
   default:
     return NULL;
   }
 }
 
-// Enhanced codegen_expr_unary function with float support
 LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef operand = codegen_expr(ctx, node->expr.unary.operand);
   if (!operand)
@@ -364,6 +405,15 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
       return NULL;
     }
     return LLVMBuildNot(ctx->builder, operand, "not");
+
+  case UNOP_BIT_NOT:
+    if (is_float) {
+      fprintf(
+          stderr,
+          "Error: Bitwise NOT (~) not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildNot(ctx->builder, operand, "bitnot");
 
   case UNOP_PRE_INC:
   case UNOP_POST_INC: {

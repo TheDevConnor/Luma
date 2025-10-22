@@ -212,6 +212,11 @@ BindingPower get_bp(LumaTokenType kind) {
   case TOK_GE:
     return BP_RELATIONAL;
 
+  // Shift operators (ADD THIS SECTION)
+  case TOK_SHIFT_LEFT:
+  case TOK_SHIFT_RIGHT:
+    return BP_SHIFT;
+
   // Arithmetic
   case TOK_PLUS:
   case TOK_MINUS:
@@ -271,6 +276,7 @@ Expr *nud(Parser *parser) {
   case TOK_MINUS:
   case TOK_PLUS:
   case TOK_BANG:
+  case TOK_TILDE:
   case TOK_PLUSPLUS:
   case TOK_MINUSMINUS:
     return unary(parser);
@@ -344,9 +350,11 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_AMP:
   case TOK_PIPE:
   case TOK_CARET:
-  case TOK_AND: // Add logical AND
-  case TOK_OR:  // Add logical OR
+  case TOK_AND:
+  case TOK_OR:
   case TOK_RANGE:
+  case TOK_SHIFT_LEFT:
+  case TOK_SHIFT_RIGHT:
     return binary(parser, left, bp);
   case TOK_LPAREN:
     return call_expr(parser, left, bp);
@@ -357,11 +365,10 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_PLUSPLUS:
   case TOK_MINUSMINUS:
   case TOK_LBRACKET:
-    // Handle member access, postfix increment/decrement, and indexing
     return prefix_expr(parser, left, bp);
   default:
     p_advance(parser);
-    return left; // No valid LED found, return left expression
+    return left;
   }
 }
 
