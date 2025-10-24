@@ -1,23 +1,23 @@
 @module "main"
 
 @use "string" as string
-@use "time" as time
 @use "io" as io
 
 pub const main -> fn () int {
-  let t: Timer = time::timer_start(); // Start timer
   let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/tests/test.lx");
   let size: int = string::strlen(path);
   defer { free(path); }
+
   loop [i: int = 0](i < size) : (++i) {
-    if (path[i] == ' ' || path[i] == '\n' || path[i] == '\t') {
+    if (path[i] == ' '  || 
+        path[i] == '\n' || 
+        path[i] == '\t') {
       continue;
     }
 
     output(string::from_char(path[i]), "\n");
   }
-  let elapsed: int = time::timer_elapsed_ms(t);
-  output("Elapsed time: ", elapsed, "ms\n");
+
   return 0;
 }
 

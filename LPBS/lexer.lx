@@ -1,0 +1,3 @@
+@module "lexer"
+
+pub const LPBS_Tokens -> enum {};

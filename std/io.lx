@@ -1,6 +1,10 @@
 @module "io"
 
 @use "sys" as sys
+@use "memory" as mem
+
+const INITIAL_BUFFER_SIZE: int = 4096;  // Start with 4KB
+const BUFFER_GROWTH_FACTOR: int = 2;     // Double size when growing
 
 #returns_ownership
 pub const read_file -> fn (path: *char) *char {
@@ -10,18 +14,67 @@ pub const read_file -> fn (path: *char) *char {
     return cast<*char>(0);
   }
 
-  // TODO: Make dynamic later
-  let buffer: *char = cast<*char>(alloc(1024 * sizeof<char>));
-  let bytes_read: int = sys::read(fd, cast<*void>(buffer), 1023);
+  // Start with initial buffer
+  let buffer_size: int = INITIAL_BUFFER_SIZE;
+  let buffer: *char = cast<*char>(alloc(buffer_size * sizeof<char>));
+  if (buffer == cast<*char>(0)) {
+    sys::eprint("Error: Failed to allocate initial buffer\n");
+    sys::close(fd);
+    return cast<*char>(0);
+  }
 
-  if (sys::is_error(bytes_read)) {
+  let total_read: int = 0;
+  let bytes_read: int = 0;
+
+  loop {
+    // Read into buffer at current position
+    let read_size: int = buffer_size - total_read - 1; // Leave room for null terminator
+    bytes_read = sys::read(fd, cast<*void>(cast<int>(buffer) + total_read), read_size);
+
+    if (sys::is_error(bytes_read)) {
       sys::eprint("Error: Failed to read from file\n");
       sys::close(fd);
       free(buffer);
       return cast<*char>(0);
+    }
+
+    // If we read 0 bytes, we've reached EOF
+    if (bytes_read == 0) {
+      break;
+    }
+
+    total_read = total_read + bytes_read;
+
+    // If buffer is full (minus null terminator space), grow it
+    if (total_read >= buffer_size - 1) {
+      let new_size: int = buffer_size * BUFFER_GROWTH_FACTOR;
+      let new_buffer: *char = cast<*char>(mem::realloc(cast<*void>(buffer), new_size * sizeof<char>));
+      
+      if (new_buffer == cast<*char>(0)) {
+        sys::eprint("Error: Failed to grow buffer\n");
+        sys::close(fd);
+        free(buffer);
+        return cast<*char>(0);
+      }
+
+      buffer = new_buffer;
+      buffer_size = new_size;
+    }
   }
 
-  buffer[bytes_read] = cast<char>(0); // Null Terminator 
+  // Null terminate the string
+  buffer[total_read] = cast<char>(0);
+
+  // shrink buffer to exact size to save memory
+  if (total_read < buffer_size - 1) {
+    let final_buffer: *char = cast<*char>(alloc((total_read + 1) * sizeof<char>));
+    if (final_buffer != cast<*char>(0)) {
+      mem::memcpy(cast<*void>(final_buffer), cast<*void>(buffer), total_read + 1);
+      free(buffer);
+      buffer = final_buffer;
+    }
+  }
+
   sys::close(fd);
   return buffer;
 }
