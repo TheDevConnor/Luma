@@ -1,0 +1,37 @@
+<map id="LSPDocument" name="LSPDocument">
+<area shape="rect" id="Node000001" title=" " alt="" coords="211,713,323,739"/>
+<area shape="rect" id="Node000002" href="$structToken.html" title="Represents a single token extracted by the lexer." alt="" coords="7,196,65,221"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="31,235,16,300,10,339,8,378,8,639,13,653,28,666,80,688,147,704,211,715,210,720,146,710,78,693,25,670,9,656,3,640,3,378,5,338,11,299,26,234"/>
+<area shape="rect" id="Node000003" href="$structAstNode.html" title=" " alt="" coords="43,367,120,392"/>
+<area shape="poly" id="edge4_Node000003_Node000002" title=" " alt="" coords="45,234,81,366,76,367,40,236"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="89,405,101,455,121,512,147,565,170,604,234,688,256,711,252,715,230,691,166,607,142,568,116,514,96,457,83,406"/>
+<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="106,357,120,355,133,357,143,366,147,379,141,395,128,403,111,403,93,395,95,390,112,398,127,398,137,392,141,379,138,368,131,362,120,360,107,363"/>
+<area shape="rect" id="Node000004" href="$structScope.html" title="Represents a lexical scope with hierarchical relationships." alt="" coords="288,537,349,563"/>
+<area shape="poly" id="edge11_Node000004_Node000003" title=" " alt="" coords="90,404,111,459,129,488,152,511,185,529,221,540,257,546,288,547,287,552,256,551,220,545,183,534,149,515,125,491,106,462,85,406"/>
+<area shape="poly" id="edge5_Node000001_Node000004" title=" " alt="" coords="287,572,259,596,237,626,233,649,238,672,260,711,255,714,233,674,228,649,232,624,255,592,284,568"/>
+<area shape="poly" id="edge6_Node000004_Node000004" title=" " alt="" coords="364,540,372,543,376,550,367,559,350,561,349,555,365,554,371,550,369,548,362,545"/>
+<area shape="rect" id="Node000013" href="$structImportedModule.html" title=" " alt="" coords="290,625,419,651"/>
+<area shape="poly" id="edge21_Node000013_Node000004" title=" " alt="" coords="331,575,352,624,347,626,326,577"/>
+<area shape="rect" id="Node000005" href="$structGrowableArray.html" title="Growable array backed by an arena allocator." alt="" coords="481,196,599,221"/>
+<area shape="poly" id="edge7_Node000004_Node000005" title=" " alt="" coords="468,217,422,226,375,241,331,266,313,281,297,300,282,330,275,363,275,397,279,431,297,493,315,536,310,538,292,495,274,433,269,398,270,362,277,328,292,297,309,278,328,261,373,237,421,221,467,212"/>
+<area shape="rect" id="Node000008" href="$structStaticMemoryAnalyzer.html" title=" " alt="" coords="429,367,600,392"/>
+<area shape="poly" id="edge13_Node000008_Node000005" title=" " alt="" coords="519,233,512,246,505,279,505,313,514,366,509,367,499,313,499,279,507,244,515,230"/>
+<area shape="rect" id="Node000009" href="$structBuildConfig.html" title="Configuration structure to hold build options parsed from CLI." alt="" coords="624,367,720,392"/>
+<area shape="poly" id="edge16_Node000009_Node000005" title=" " alt="" coords="570,228,587,244,614,276,637,310,668,365,664,368,633,313,610,279,583,247,567,232"/>
+<area shape="rect" id="Node000006" href="$structArenaAllocator.html" title="Arena allocator structure." alt="" coords="619,108,738,133"/>
+<area shape="poly" id="edge22_Node000001_Node000006" title=" " alt="" coords="714,139,745,167,756,186,760,207,760,640,756,649,745,657,708,672,654,684,589,695,445,713,323,723,323,718,445,707,588,690,653,679,707,667,743,653,752,646,755,639,755,208,751,188,741,171,710,143"/>
+<area shape="poly" id="edge8_Node000005_Node000006" title=" " alt="" coords="648,143,620,160,559,198,557,193,617,155,645,138"/>
+<area shape="poly" id="edge14_Node000008_Node000006" title=" " alt="" coords="684,147,683,209,675,244,659,276,649,287,638,291,613,301,566,337,529,368,526,364,563,332,611,296,636,286,646,282,655,273,670,242,678,208,679,147"/>
+<area shape="rect" id="Node000007" href="$structBuffer.html" title="Represents a memory buffer in the arena." alt="" coords="648,5,709,31"/>
+<area shape="poly" id="edge9_Node000006_Node000007" title=" " alt="" coords="681,45,681,108,676,108,676,45"/>
+<area shape="poly" id="edge10_Node000007_Node000007" title=" " alt="" coords="724,7,732,11,736,18,727,28,710,30,709,25,725,23,731,18,729,15,722,12"/>
+<area shape="poly" id="edge12_Node000004_Node000008" title=" " alt="" coords="492,403,334,539,330,535,489,399"/>
+<area shape="poly" id="edge15_Node000004_Node000009" title=" " alt="" coords="660,405,640,434,614,462,572,495,524,516,477,530,430,540,350,549,349,544,429,534,476,525,522,511,569,490,610,458,636,430,656,402"/>
+<area shape="rect" id="Node000010" href="$structLSPDiagnostic.html" title=" " alt="" coords="795,625,909,651"/>
+<area shape="poly" id="edge17_Node000001_Node000010" title=" " alt="" coords="830,662,805,678,777,692,738,701,687,709,562,719,323,727,323,722,561,714,686,704,737,696,775,687,803,674,827,657"/>
+<area shape="rect" id="Node000011" href="$structLSPRange.html" title=" " alt="" coords="809,537,895,563"/>
+<area shape="poly" id="edge18_Node000010_Node000011" title=" " alt="" coords="855,577,855,625,849,625,849,577"/>
+<area shape="rect" id="Node000012" href="$structLSPPosition.html" title=" " alt="" coords="803,367,901,392"/>
+<area shape="poly" id="edge19_Node000011_Node000012" title=" " alt="" coords="855,406,855,537,849,537,849,406"/>
+<area shape="poly" id="edge20_Node000001_Node000013" title=" " alt="" coords="335,662,281,715,277,711,331,658"/>
+</map>

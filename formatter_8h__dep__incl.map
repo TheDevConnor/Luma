@@ -1,0 +1,11 @@
+<map id="src/lsp/formatter/formatter.h" name="src/lsp/formatter/formatter.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="249,5,456,31"/>
+<area shape="rect" id="Node000002" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="5,79,135,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="295,37,116,81,115,76,293,31"/>
+<area shape="rect" id="Node000003" href="$lsp_2formatter_2expr_8c.html" title=" " alt="" coords="159,79,333,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="326,40,265,81,262,76,323,36"/>
+<area shape="rect" id="Node000004" href="$formatter_8c.html" title=" " alt="" coords="357,79,564,104"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="383,36,444,76,442,81,380,40"/>
+<area shape="rect" id="Node000005" href="$lsp_2formatter_2stmt_8c.html" title=" " alt="" coords="588,79,763,104"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="418,31,624,76,623,81,417,36"/>
+</map>

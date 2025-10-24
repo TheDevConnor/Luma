@@ -1,0 +1,23 @@
+<map id="src/lsp/formatter/formatter.h" name="src/lsp/formatter/formatter.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="6,5,213,31"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,79,72,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,33,62,71,58,67,96,29"/>
+<area shape="rect" id="Node000003" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="74,225,217,265"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="114,30,143,211,137,212,109,31"/>
+<area shape="rect" id="Node000007" href="$ast_8h.html" title=" " alt="" coords="203,79,306,104"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="134,28,220,70,218,75,132,33"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="102,313,189,339"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="148,266,148,299,143,299,143,266"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="235,313,317,339"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="178,263,246,304,244,308,176,268"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="352,313,427,339"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="205,263,341,306,340,312,203,268"/>
+<area shape="poly" id="edge9_Node000007_Node000003" title=" " alt="" coords="239,106,214,127,189,154,171,183,158,214,153,211,166,181,185,150,210,123,236,102"/>
+<area shape="poly" id="edge7_Node000007_Node000005" title=" " alt="" coords="278,102,304,122,326,151,338,182,341,208,337,235,326,266,316,287,302,305,297,301,311,284,322,264,331,233,336,208,333,183,322,153,301,126,274,106"/>
+<area shape="poly" id="edge8_Node000007_Node000006" title=" " alt="" coords="284,102,318,121,349,150,369,188,382,229,391,299,386,300,376,230,364,190,345,154,315,125,282,106"/>
+<area shape="rect" id="Node000008" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="198,152,311,177"/>
+<area shape="poly" id="edge10_Node000007_Node000008" title=" " alt="" coords="257,104,257,138,252,138,252,104"/>
+<area shape="poly" id="edge11_Node000008_Node000003" title=" " alt="" coords="240,180,185,219,181,215,237,175"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="241,233,311,258"/>
+<area shape="poly" id="edge12_Node000008_Node000009" title=" " alt="" coords="260,177,272,219,267,220,255,178"/>
+</map>
