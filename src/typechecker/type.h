@@ -309,6 +309,8 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
                                    ArenaAllocator *arena);
 AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
                               ArenaAllocator *arena);
+AstNode *typecheck_syscall_expr(AstNode *expr, Scope *scope,
+                                ArenaAllocator *arena);
 
 AstNode *get_enclosing_function_return_type(Scope *scope);
 

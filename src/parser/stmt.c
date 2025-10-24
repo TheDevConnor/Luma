@@ -342,34 +342,51 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     int field_line = p_current(parser).line;
     int field_col = p_current(parser).col;
 
+    // CRITICAL FIX: Check for ownership modifiers BEFORE parsing the field name
+    bool takes_ownership = false;
+    bool returns_ownership = false;
+
+    if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+      returns_ownership = true;
+      p_advance(parser);
+    } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+      takes_ownership = true;
+      p_advance(parser);
+    }
+
+    // Now parse the field name (after consuming any ownership modifiers)
     char *field_name = get_name(parser);
-    Stmt *field_function = NULL;
-    Type *field_type = NULL;
+    if (!field_name) {
+      parser_error(parser, "Parse Error", __FILE__,
+                   "Expected field or method name", field_line, field_col, 1);
+      return NULL;
+    }
+
     p_advance(parser);
 
-    // TODO: Add in a check to see if we have any function modifiers like
-    //  returns_ownership or takes_ownership
-
-    bool takes_ownership, returns_ownership = false;
-    while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
-           p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-        if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
-            returns_ownership = true;
-            p_advance(parser);
-        } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-            takes_ownership = true;
-            p_advance(parser);
-        }
-    }
+    Stmt *field_function = NULL;
+    Type *field_type = NULL;
 
     // Method: field_name -> fn(...)
     if (p_current(parser).type_ == TOK_RIGHT_ARROW) {
       p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after field name");
-      field_function = fn_stmt(parser, field_name, public_member, returns_ownership, takes_ownership);
+      field_function = fn_stmt(parser, field_name, public_member,
+                               returns_ownership, takes_ownership);
     } else {
       // Data field: field_name: Type
       p_consume(parser, TOK_COLON, "Expected ':' after field name");
       field_type = parse_type(parser);
+
+      // Data fields shouldn't have ownership modifiers
+      if (takes_ownership || returns_ownership) {
+        parser_error(
+            parser, "Invalid Modifier", __FILE__,
+            "Ownership modifiers (#takes_ownership, #returns_ownership) "
+            "are only valid for methods, not data fields",
+            field_line, field_col, 1);
+        return NULL;
+      }
+
       p_advance(parser);
     }
 
@@ -387,8 +404,14 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     Stmt *field_decl = create_field_decl_stmt(
         parser->arena, field_name, field_type, field_function, public_member,
         field_line, field_col);
+
     Stmt **slot = public_member ? (Stmt **)growable_array_push(&public_fields)
                                 : (Stmt **)growable_array_push(&private_fields);
+
+    if (!slot) {
+      fprintf(stderr, "Failed to add field to struct.\n");
+      return NULL;
+    }
 
     *slot = field_decl;
   }

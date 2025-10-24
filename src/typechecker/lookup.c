@@ -22,6 +22,7 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     return typecheck_if_decl(stmt, scope, arena);
   case AST_STMT_BLOCK: {
     Scope *block_scope = create_child_scope(scope, "block", arena);
+    stmt->stmt.block.scope = (void *)block_scope;
 
     for (size_t i = 0; i < stmt->stmt.block.stmt_count; i++) {
       if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena,
@@ -48,14 +49,16 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
 
     if (analyzer) {
       old_skip_state = analyzer->skip_memory_tracking;
-      analyzer->skip_memory_tracking = true;
+      analyzer->skip_memory_tracking = true; // Enable defer mode
     }
 
+    // IMPORTANT: Don't create a new scope for defer - use the SAME scope
+    // so that deferred_frees goes to the correct function scope
     bool result =
         typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
 
     if (analyzer) {
-      analyzer->skip_memory_tracking = old_skip_state;
+      analyzer->skip_memory_tracking = old_skip_state; // Restore state
     }
 
     return result;
@@ -131,6 +134,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_input_expr(expr, scope, arena);
   case AST_EXPR_SYSTEM:
     return typecheck_system_expr(expr, scope, arena);
+  case AST_EXPR_SYSCALL:
+    return typecheck_syscall_expr(expr, scope, arena);
   case AST_EXPR_ALLOC:
     return typecheck_alloc_expr(expr, scope, arena);
   case AST_EXPR_FREE:

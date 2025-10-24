@@ -30,6 +30,8 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
     return codegen_expr_input(ctx, node);
   case AST_EXPR_SYSTEM:
     return codegen_expr_system(ctx, node);
+  case AST_EXPR_SYSCALL:
+    return codegen_expr_syscall(ctx, node);
   case AST_EXPR_SIZEOF:
     return codegen_expr_sizeof(ctx, node);
   case AST_EXPR_ALLOC:
