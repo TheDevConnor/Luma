@@ -11,6 +11,7 @@ pub const main -> fn () int {
   // loop [i: int = 0](i < 100) : (++i) {
   //   output(string::from_char(path[i]), "\n");
   // }
+  
   output(path, "\n");
   let elapsed: int = time::timer_elapsed_ms(t);
   output("Elapsed time: ", elapsed, "ms\n");

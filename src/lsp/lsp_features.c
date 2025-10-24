@@ -43,163 +43,65 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena) {
-  fprintf(stderr,
-          "[LSP] lsp_completion called: doc=%p, position=(%d,%d), arena=%p\n",
-          (void *)doc, position.line, position.character, (void *)arena);
-
   if (!doc || !completion_count) {
-    fprintf(stderr,
-            "[LSP] lsp_completion early return: doc=%p, completion_count=%p\n",
-            (void *)doc, (void *)completion_count);
     return NULL;
   }
 
-  Token *token = lsp_token_at_position(doc, position);
-  fprintf(stderr, "[LSP] Token at position: %p\n", (void *)token);
-
   GrowableArray completions;
   growable_array_init(&completions, arena, 32, sizeof(LSPCompletionItem));
-  fprintf(stderr, "[LSP] Initialized completions array\n");
 
-  // Add keyword snippets based on Luma syntax
+  // Add keyword snippets
   const struct {
     const char *label;
     const char *snippet;
     const char *detail;
   } keywords[] = {
-      // Top-level declarations (updated with -> syntax)
-      {"const fn", "const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
-       "Function declaration (Private by default)"},
+      {"const fn",
+       "const ${1:name} -> fn (${2:params}) ${3:Type} {\\n\\t$0\\n}",
+       "Function declaration"},
       {"pub const fn",
-       "pub const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
-       "Public Function declaration"},
-      {"priv const fn",
-       "priv const ${1:name} -> fn (${2:params}) ${3:Type} {\n\t$0\n}",
-       "Private Function declaration"},
+       "pub const ${1:name} -> fn (${2:params}) ${3:Type} {\\n\\t$0\\n}",
+       "Public function"},
 
       {"const struct",
-       "const ${1:Name} -> struct {\n\t${2:field}: ${3:Type}$0,\n};",
+       "const ${1:Name} -> struct {\\n\\t${2:field}: ${3:Type}$0,\\n};",
        "Struct definition"},
-      {"const enum", "const ${1:Name} -> enum {\n\t${2:Variant}$0,\n};",
+      {"const enum", "const ${1:Name} -> enum {\\n\\t${2:Variant}$0,\\n};",
        "Enum definition"},
       {"const var", "const ${1:name}: ${2:Type} = ${3:value};$0",
        "Top-level constant"},
 
-      // Function attributes for memory management
-      {"#returns_ownership",
-       "#returns_ownership\nconst ${1:name} -> fn (${2:params}) *${3:Type} "
-       "{\n\tlet ${4:ptr}: *${3:Type} = "
-       "cast<*${3:Type}>(alloc(sizeof<${3:Type}>));\n\t$0\n\treturn "
-       "${4:ptr};\n};",
-       "Function that returns owned pointer"},
-      {"#takes_ownership",
-       "#takes_ownership\nconst ${1:name} -> fn (${2:ptr}: *${3:Type}) "
-       "${4:void} {\n\t$0\n\tfree(${2:ptr});\n};",
-       "Function that takes ownership and frees"},
-
-      // Control flow
-      {"if", "if ${1:condition} {\n\t$0\n}", "If statement"},
-      {"if else", "if ${1:condition} {\n\t${2}\n} else {\n\t$0\n}",
+      {"if", "if ${1:condition} {\\n\\t$0\\n}", "If statement"},
+      {"if else", "if ${1:condition} {\\n\\t${2}\\n} else {\\n\\t$0\\n}",
        "If-else statement"},
-      {"if elif",
-       "if ${1:condition} {\n\t${2}\n} elif ${3:condition} {\n\t${4}\n} else "
-       "{\n\t$0\n}",
-       "If-elif-else statement"},
 
-      // Loop constructs
-      {"loop", "loop {\n\t$0\n}", "Infinite loop"},
+      {"loop", "loop {\\n\\t$0\\n}", "Infinite loop"},
       {"loop for",
-       "loop [${1:i}: int = 0](${1:i} < ${2:10}) : (++${1:i}) {\n\t$0\n}",
+       "loop [${1:i}: int = 0](${1:i} < ${2:10}) : (++${1:i}) {\\n\\t$0\\n}",
        "For-style loop"},
-      {"loop while", "loop (${1:condition}) {\n\t$0\n}", "While-style loop"},
 
-      // Switch statement
-      {"switch", "switch (${1:value}) {\n\t${2:case} => ${3:result};$0\n}",
+      {"switch", "switch (${1:value}) {\\n\\t${2:case} => ${3:result};$0\\n}",
        "Switch statement"},
 
-      // Variables
       {"let", "let ${1:name}: ${2:Type} = ${3:value};$0",
        "Variable declaration"},
 
-      // Memory management
-      {"alloc", "cast<*${1:Type}>(alloc(sizeof<${1:Type}>))",
-       "Allocate memory"},
       {"defer", "defer free(${1:ptr});$0", "Defer statement"},
-      {"defer block", "defer {\n\t${1:cleanup()};\n\t$0\n}", "Defer block"},
+      {"defer block", "defer {\\n\\t${1:cleanup()};\\n\\t$0\\n}",
+       "Defer block"},
 
-      // Syscalls - Common Linux syscalls
-      {"syscall", "syscall(${1:syscall_num}, ${2:args});$0",
-       "Raw syscall invocation"},
-      {"syscall read",
-       "let ${1:bytes_read}: int = syscall(0, ${2:fd}, ${3:buffer}, "
-       "${4:count});$0",
-       "read(fd, buf, count) - syscall 0"},
-      {"syscall write",
-       "let ${1:bytes_written}: int = syscall(1, ${2:fd}, ${3:buffer}, "
-       "${4:count});$0",
-       "write(fd, buf, count) - syscall 1"},
-      {"syscall open",
-       "let ${1:fd}: int = syscall(2, ${2:pathname}, ${3:flags}, ${4:mode});$0",
-       "open(pathname, flags, mode) - syscall 2"},
-      {"syscall close", "syscall(3, ${1:fd});$0", "close(fd) - syscall 3"},
-      {"syscall exit", "syscall(60, ${1:status});$0",
-       "exit(status) - syscall 60"},
-      {"syscall fork", "let ${1:pid}: int = syscall(57);$0",
-       "fork() - syscall 57"},
-      {"syscall execve", "syscall(59, ${1:filename}, ${2:argv}, ${3:envp});$0",
-       "execve(filename, argv, envp) - syscall 59"},
-      {"syscall mmap",
-       "let ${1:addr}: *void = cast<*void>(syscall(9, ${2:addr}, ${3:length}, "
-       "${4:prot}, ${5:flags}, ${6:fd}, ${7:offset}));$0",
-       "mmap(addr, length, prot, flags, fd, offset) - syscall 9"},
-      {"syscall munmap", "syscall(11, ${1:addr}, ${2:length});$0",
-       "munmap(addr, length) - syscall 11"},
-      {"syscall getpid", "let ${1:pid}: int = syscall(39);$0",
-       "getpid() - syscall 39"},
-      {"syscall socket",
-       "let ${1:sockfd}: int = syscall(41, ${2:domain}, ${3:type}, "
-       "${4:protocol});$0",
-       "socket(domain, type, protocol) - syscall 41"},
-      {"syscall connect",
-       "syscall(42, ${1:sockfd}, ${2:addr}, ${3:addrlen});$0",
-       "connect(sockfd, addr, addrlen) - syscall 42"},
-      {"syscall accept",
-       "let ${1:fd}: int = syscall(43, ${2:sockfd}, ${3:addr}, "
-       "${4:addrlen});$0",
-       "accept(sockfd, addr, addrlen) - syscall 43"},
+      {"@module", "@module \\\"${1:name}\\\"$0", "Module declaration"},
+      {"@use", "@use \\\"${1:module}\\\" as ${2:alias}$0", "Import module"},
 
-      // Module system
-      {"@module", "@module \"${1:name}\"$0", "Module declaration"},
-      {"@use", "@use \"${1:module}\" as ${2:alias}$0", "Import module"},
-
-      // Other statements
       {"return", "return ${1:value};$0", "Return statement"},
       {"break", "break;$0", "Break statement"},
       {"continue", "continue;$0", "Continue statement"},
 
-      // Struct with access modifiers (updated with -> syntax)
-      {"struct pub/priv",
-       "const ${1:Name} -> struct {\npub:\n\t${2:public_field}: "
-       "${3:Type},\npriv:\n\t${4:private_field}: ${5:Type}$0\n};",
-       "Struct with access modifiers"},
-
-      // Common patterns (updated with -> syntax)
-      {"main", "const main -> fn () int {\n\t$0\n\treturn 0;\n};",
+      {"main", "const main -> fn () int {\\n\\t$0\\n\\treturn 0;\\n};",
        "Main function"},
       {"outputln", "outputln(${1:message});$0", "Output with newline"},
       {"cast", "cast<${1:Type}>(${2:value})$0", "Type cast"},
       {"sizeof", "sizeof<${1:Type}>$0", "Size of type"},
-
-      // Syscall helper patterns
-      {"syscall write string",
-       "let ${1:message}: *char = ${2:\"Hello, World!\\n\"};\n"
-       "syscall(1, 1, ${1:message}, ${3:14});$0",
-       "Write string to stdout using syscall"},
-      {"syscall error check",
-       "let ${1:result}: int = syscall(${2:num}, ${3:args});\n"
-       "if ${1:result} < 0 {\n\t// Error: result contains negative "
-       "errno\n\t$0\n}",
-       "Syscall with error checking"},
   };
 
   for (size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
@@ -217,25 +119,23 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
     }
   }
 
-  fprintf(stderr, "[LSP] Added %zu keyword completions\n", completions.count);
+  // Find the most specific scope at the cursor position
+  Scope *local_scope = doc->scope;
+  // if (doc->ast) {
+  //   local_scope = find_scope_at_position(doc->ast, position, doc->scope);
+  // }
 
-  // Add symbols from scope (variables, functions, etc.)
-  fprintf(stderr, "[LSP] Checking document scope: %p\n", (void *)doc->scope);
-  if (doc->scope) {
-    Scope *current_scope = doc->scope;
+  // Add symbols from local scope and all parent scopes
+  if (local_scope) {
+    Scope *current_scope = local_scope;
     int scope_depth = 0;
-    while (current_scope) {
-      fprintf(stderr, "[LSP] Scope depth %d: symbols.data=%p, count=%zu\n",
-              scope_depth, (void *)current_scope->symbols.data,
-              current_scope->symbols.count);
 
-      // SAFETY CHECK: Validate scope has valid data
+    while (current_scope) {
       if (current_scope->symbols.data && current_scope->symbols.count > 0) {
         for (size_t i = 0; i < current_scope->symbols.count; i++) {
           Symbol *sym = (Symbol *)((char *)current_scope->symbols.data +
                                    i * sizeof(Symbol));
 
-          // SAFETY CHECK: Validate symbol has valid name and type
           if (!sym || !sym->name || !sym->type) {
             continue;
           }
@@ -245,90 +145,77 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
           if (item) {
             item->label = arena_strdup(arena, sym->name);
 
-            // Determine kind based on symbol type
             if (sym->type->type == AST_TYPE_FUNCTION) {
               item->kind = LSP_COMPLETION_FUNCTION;
-              // Create function call snippet
+
+              // Create function call snippet with placeholders for params
               char snippet[512];
-              snprintf(snippet, sizeof(snippet), "%s($0)", sym->name);
+              snprintf(snippet, sizeof(snippet), "%s()$0", sym->name);
               item->insert_text = arena_strdup(arena, snippet);
               item->format = LSP_INSERT_FORMAT_SNIPPET;
+
+              // Show function signature in detail (type_to_string handles this
+              // now)
+              item->detail = type_to_string(sym->type, arena);
             } else if (sym->type->type == AST_TYPE_STRUCT) {
               item->kind = LSP_COMPLETION_STRUCT;
               item->insert_text = arena_strdup(arena, sym->name);
               item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+              item->detail = type_to_string(sym->type, arena);
             } else {
               item->kind = LSP_COMPLETION_VARIABLE;
               item->insert_text = arena_strdup(arena, sym->name);
               item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+              item->detail = type_to_string(sym->type, arena);
             }
 
-            item->detail = type_to_string(sym->type, arena);
+            // Add scope depth info for sorting (prefer local variables)
+            if (scope_depth == 0) {
+              item->sort_text = arena_strdup(arena, "0");
+            } else {
+              char sort[8];
+              snprintf(sort, sizeof(sort), "%d", scope_depth);
+              item->sort_text = arena_strdup(arena, sort);
+            }
+
             item->documentation = NULL;
-            item->sort_text = NULL;
             item->filter_text = NULL;
           }
         }
       }
-      scope_depth++;
-      current_scope = current_scope->parent;
-    }
-    fprintf(stderr, "[LSP] Finished adding scope symbols, total depth: %d\n",
-            scope_depth);
-  }
 
-  fprintf(stderr, "[LSP] Checking %zu imports for completions\n",
-          doc->import_count);
+      current_scope = current_scope->parent;
+      scope_depth++;
+    }
+  }
 
   // Add imported module symbols
   if (doc->imports && doc->import_count > 0) {
     for (size_t i = 0; i < doc->import_count; i++) {
       ImportedModule *import = &doc->imports[i];
 
-      fprintf(stderr,
-              "[LSP] Import %zu: module_path='%s', alias='%s', scope=%p\n", i,
-              import->module_path ? import->module_path : "NULL",
-              import->alias ? import->alias : "NULL", (void *)import->scope);
-
-      // CRITICAL SAFETY CHECKS
-      if (!import->scope) {
-        fprintf(stderr, "[LSP] Skipping import - no scope\n");
+      if (!import->scope || !import->scope->symbols.data) {
         continue;
       }
 
-      // Validate scope structure
-      if (!import->scope->symbols.data) {
-        fprintf(stderr, "[LSP] Skipping import - scope has no symbol data\n");
-        continue;
-      }
-
-      fprintf(stderr, "[LSP] Import scope has %zu symbols\n",
-              import->scope->symbols.count);
-
-      // Add symbols with prefix (e.g., "string::strlen")
       const char *prefix = import->alias ? import->alias : "module";
 
       for (size_t j = 0; j < import->scope->symbols.count; j++) {
         Symbol *sym = (Symbol *)((char *)import->scope->symbols.data +
                                  j * sizeof(Symbol));
 
-        // SAFETY CHECK: Validate symbol
-        if (!sym || !sym->name || !sym->type) {
-          fprintf(stderr, "[LSP]   Symbol %zu: INVALID (skipping)\n", j);
+        if (!sym || !sym->name || !sym->type || !sym->is_public) {
           continue;
         }
 
-        fprintf(stderr, "[LSP]   Symbol %zu: '%s', is_public=%d\n", j,
-                sym->name, sym->is_public);
-
-        // Only include public symbols
-        if (!sym->is_public)
+        // FILTER OUT INTERNAL SYMBOLS (those starting with __)
+        if (strncmp(sym->name, "__", 2) == 0) {
           continue;
+        }
 
         LSPCompletionItem *item =
             (LSPCompletionItem *)growable_array_push(&completions);
         if (item) {
-          // Format: "alias::name"
           size_t label_len = strlen(prefix) + strlen(sym->name) + 3;
           char *label = arena_alloc(arena, label_len, 1);
           snprintf(label, label_len, "%s::%s", prefix, sym->name);
@@ -339,9 +226,12 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                            : LSP_COMPLETION_VARIABLE;
           item->insert_text = arena_strdup(arena, label);
           item->format = LSP_INSERT_FORMAT_PLAIN_TEXT;
+
+          // Show function signature or type
           item->detail = type_to_string(sym->type, arena);
+
           item->documentation = NULL;
-          item->sort_text = NULL;
+          item->sort_text = arena_strdup(arena, "9");
           item->filter_text = NULL;
         }
       }
@@ -349,7 +239,5 @@ LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
   }
 
   *completion_count = completions.count;
-  fprintf(stderr, "[LSP] Returning %zu completion items\n", *completion_count);
-  fflush(stderr); // CRITICAL: Ensure logs are written before return
   return (LSPCompletionItem *)completions.data;
 }

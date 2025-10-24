@@ -152,30 +152,44 @@ LSPPosition extract_position(const char *json) {
 }
 
 const char *find_json_value(const char *json, const char *key) {
+  if (!json || !key) {
+    return NULL;
+  }
+
+  // Build the search pattern: "key":
   char search[256];
   snprintf(search, sizeof(search), "\"%s\"", key);
 
-  const char *found = strstr(json, search);
-  if (!found) {
-    return NULL;
+  const char *current = json;
+  
+  // Search for all occurrences of the key until we find a valid one
+  while ((current = strstr(current, search)) != NULL) {
+    // Move past the key
+    const char *after_key = current + strlen(search);
+    
+    // Skip whitespace
+    while (*after_key && isspace(*after_key)) {
+      after_key++;
+    }
+    
+    // Check if followed by colon (indicates this is a key, not a value)
+    if (*after_key == ':') {
+      // Skip the colon
+      after_key++;
+      
+      // Skip whitespace after colon
+      while (*after_key && isspace(*after_key)) {
+        after_key++;
+      }
+      
+      return after_key;
+    }
+    
+    // Not a valid key-value pair, continue searching
+    current = after_key;
   }
 
-  // Skip to colon
-  const char *colon = found + strlen(search);
-  while (*colon && *colon != ':') {
-    colon++;
-  }
-
-  if (!*colon)
-    return NULL;
-  colon++; // Skip the colon
-
-  // Skip whitespace
-  while (*colon && isspace(*colon)) {
-    colon++;
-  }
-
-  return colon;
+  return NULL;
 }
 
 LSPMethod lsp_parse_method(const char *json) {
@@ -185,10 +199,9 @@ LSPMethod lsp_parse_method(const char *json) {
   }
 
   // Log the first part of the JSON for debugging
-  fprintf(stderr, "[LSP] parse_method: checking first 200 chars: %.200s\n",
-          json);
+  fprintf(stderr, "[LSP] parse_method: checking message: %.200s\n", json);
 
-  // Find the "method" value
+  // Find the "method" value - it could be anywhere in the JSON
   const char *method_value = find_json_value(json, "method");
   if (!method_value) {
     fprintf(stderr, "[LSP] parse_method: no 'method' field found\n");
