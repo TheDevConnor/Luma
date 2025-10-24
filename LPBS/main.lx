@@ -1,23 +1,27 @@
 @module "main"
 
 @use "string" as string
+@use "lexer" as lexer
 @use "io" as io
 
 pub const main -> fn () int {
-  let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/tests/test.lx");
-  let size: int = string::strlen(path);
-  defer { free(path); }
-
-  loop [i: int = 0](i < size) : (++i) {
-    if (path[i] == ' '  || 
-        path[i] == '\n' || 
-        path[i] == '\t') {
-      continue;
-    }
-
-    output(string::from_char(path[i]), "\n");
+  let path: *char = io::read_file("/home/connor/Projects/Luma/tests/test.lx");
+  let lex: *Token = lexer::scan(path);
+  
+  output("Token count: ");
+  output(lex.size);
+  output("\n");
+  
+  loop [i: int = 0](i < lex.size) : (++i) {
+    let tk: Token = lex.list[i];
+    output("Token ");
+    output(tk.type);
+    output(": ");
+    output(tk.value);
+    output("\n");
   }
-
+ 
+  free(path);
+  lexer::free_tokens(lex);
   return 0;
 }
-

@@ -598,12 +598,21 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
 
 AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
-  const char *base_name = expr->expr.member.object->expr.identifier.name;
+  // Get the base object and member name
+  AstNode *base_object = expr->expr.member.object;
   const char *member_name = expr->expr.member.member;
   bool is_compiletime = expr->expr.member.is_compiletime;
 
   if (is_compiletime) {
     // Compile-time access (::) - for modules, enums, static members
+    // This requires base_object to be an identifier
+    if (base_object->type != AST_EXPR_IDENTIFIER) {
+      tc_error(expr, "Compile-time Access Error",
+               "Compile-time access '::' requires an identifier on the left");
+      return NULL;
+    }
+
+    const char *base_name = base_object->expr.identifier.name;
 
     // First try module-qualified symbol lookup
     Symbol *module_symbol =
@@ -657,71 +666,97 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
   } else {
     // Runtime access (.) - for struct members, instance data
 
-    Symbol *base_symbol = scope_lookup(scope, base_name);
-    if (!base_symbol) {
-      tc_error(expr, "Runtime Access Error", "Undefined identifier '%s'",
-               base_name);
-      return NULL;
-    }
-
-    if (!base_symbol->type) {
+    // CRITICAL FIX: Typecheck the base expression first
+    // This handles complex expressions like lex.list[i]
+    AstNode *base_type = typecheck_expression(base_object, scope, arena);
+    if (!base_type) {
       tc_error(expr, "Runtime Access Error",
-               "Symbol '%s' has no type information", base_name);
+               "Failed to determine type of base expression");
       return NULL;
     }
-
-    AstNode *base_type = base_symbol->type;
-
-    // printf("DEBUG: Runtime member access - base '%s' has type %p (category
-    // %d, "
-    //        "type %d)\n",
-    //        base_name, (void *)base_type, base_type->category,
-    //        base_type->type);
 
     // Handle pointer dereference: if we have a pointer to struct, automatically
     // dereference it
     if (base_type->type == AST_TYPE_POINTER) {
-      // printf("DEBUG: Base type is pointer, checking pointee\n");
       AstNode *pointee = base_type->type_data.pointer.pointee_type;
       if (pointee && pointee->type == AST_TYPE_BASIC) {
-        // printf("DEBUG: Pointee is basic type: '%s'\n",
-        //        pointee->type_data.basic.name);
-        // Check if the pointee is a struct type name
-        Symbol *struct_symbol =
-            scope_lookup(scope, pointee->type_data.basic.name);
+        const char *type_name = pointee->type_data.basic.name;
+
+        // First try direct lookup
+        Symbol *struct_symbol = scope_lookup(scope, type_name);
+
+        // If not found, try looking in imported modules
+        if (!struct_symbol) {
+          // Check each imported module for this type
+          Scope *current = scope;
+          while (current && !struct_symbol) {
+            for (size_t i = 0; i < current->imported_modules.count; i++) {
+              ModuleImport *import =
+                  (ModuleImport *)((char *)current->imported_modules.data +
+                                   i * sizeof(ModuleImport));
+
+              // Try to find the type in the imported module's scope
+              struct_symbol = scope_lookup_current_only_with_visibility(
+                  import->module_scope, type_name, scope);
+
+              if (struct_symbol && struct_symbol->type &&
+                  struct_symbol->type->type == AST_TYPE_STRUCT) {
+                break;
+              }
+              struct_symbol = NULL;
+            }
+            current = current->parent;
+          }
+        }
+
         if (struct_symbol && struct_symbol->type &&
             struct_symbol->type->type == AST_TYPE_STRUCT) {
-          // printf("DEBUG: Found struct type through pointer\n");
           base_type = struct_symbol->type; // Use the struct type
         }
       } else if (pointee && pointee->type == AST_TYPE_STRUCT) {
-        // printf("DEBUG: Pointee is direct struct type\n");
         base_type = pointee;
       }
     }
 
     // Handle case where base_type is a basic type that references a struct
     if (base_type->type == AST_TYPE_BASIC) {
-      // printf("DEBUG: Base type is basic: '%s'\n",
-      //        base_type->type_data.basic.name);
-      // Look up the struct type by name
-      Symbol *struct_symbol =
-          scope_lookup(scope, base_type->type_data.basic.name);
+      const char *type_name = base_type->type_data.basic.name;
+
+      // First try direct lookup
+      Symbol *struct_symbol = scope_lookup(scope, type_name);
+
+      // If not found, try looking in imported modules
+      if (!struct_symbol) {
+        Scope *current = scope;
+        while (current && !struct_symbol) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+
+            struct_symbol = scope_lookup_current_only_with_visibility(
+                import->module_scope, type_name, scope);
+
+            if (struct_symbol && struct_symbol->type &&
+                struct_symbol->type->type == AST_TYPE_STRUCT) {
+              break;
+            }
+            struct_symbol = NULL;
+          }
+          current = current->parent;
+        }
+      }
+
       if (struct_symbol && struct_symbol->type &&
           struct_symbol->type->type == AST_TYPE_STRUCT) {
-        // printf("DEBUG: Found struct type by name lookup\n");
         base_type = struct_symbol->type; // Use the actual struct type
       }
     }
 
     // Now check if it's a struct type and get the member
     if (base_type->type == AST_TYPE_STRUCT) {
-      // printf("DEBUG: Checking struct '%s' for member '%s'\n",
-      //        base_type->type_data.struct_type.name, member_name);
-
       AstNode *member_type = get_struct_member_type(base_type, member_name);
       if (member_type) {
-        // printf("DEBUG: Found member type: %p\n", (void *)member_type);
         return member_type;
       }
 
@@ -732,29 +767,9 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
     } else {
       // Base is not a struct - runtime access is invalid
-      // printf("DEBUG: Base type is not a struct (type=%d)\n",
-      // base_type->type);
-
-      // Check if user should have used compile-time access instead
-      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
-        // Could be an enum or module
-        Symbol *potential_enum =
-            scope_lookup(scope, base_symbol->type->type_data.basic.name);
-        if (potential_enum) {
-          tc_error_help(expr, "Access Method Error",
-                        "Use '::' for compile-time access to enum members",
-                        "Cannot use runtime access '.' on type '%s' - did you "
-                        "mean '%s::%s'?",
-                        base_name, base_name, member_name);
-        } else {
-          tc_error(expr, "Runtime Access Error",
-                   "Cannot use runtime access '.' on non-struct type '%s'",
-                   base_name);
-        }
-      } else {
-        tc_error(expr, "Runtime Access Error",
-                 "Type '%s' does not support member access", base_name);
-      }
+      tc_error(expr, "Runtime Access Error",
+               "Cannot use runtime access '.' on non-struct type '%s'",
+               type_to_string(base_type, arena));
       return NULL;
     }
   }

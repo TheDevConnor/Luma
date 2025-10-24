@@ -1085,15 +1085,47 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
       AstNode *member_expr = node->expr.index.object;
       const char *field_name = member_expr->expr.member.member;
 
-      // Get the struct info
-      StructInfo *struct_info = NULL;
-      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
-        int field_idx = get_field_index(info, field_name);
-        if (field_idx >= 0) {
-          struct_info = info;
-          // Use the element type stored for this field
-          pointee_type = struct_info->field_element_types[field_idx];
-          break;
+      // Need to get the base object to find which struct this field belongs to
+      AstNode *base_obj = member_expr->expr.member.object;
+
+      if (base_obj->type == AST_EXPR_IDENTIFIER) {
+        const char *base_name = base_obj->expr.identifier.name;
+        LLVM_Symbol *base_sym = find_symbol(ctx, base_name);
+
+        if (base_sym) {
+          // Determine the struct type
+          LLVMTypeRef base_type = base_sym->type;
+          StructInfo *struct_info = NULL;
+
+          // If base is a pointer to struct, get the pointee type
+          if (LLVMGetTypeKind(base_type) == LLVMPointerTypeKind &&
+              base_sym->element_type) {
+            // Find struct info by its LLVM type
+            for (StructInfo *info = ctx->struct_types; info;
+                 info = info->next) {
+              if (info->llvm_type == base_sym->element_type) {
+                struct_info = info;
+                break;
+              }
+            }
+          } else {
+            // Direct struct type
+            for (StructInfo *info = ctx->struct_types; info;
+                 info = info->next) {
+              if (info->llvm_type == base_type) {
+                struct_info = info;
+                break;
+              }
+            }
+          }
+
+          if (struct_info) {
+            int field_idx = get_field_index(struct_info, field_name);
+            if (field_idx >= 0) {
+              // Use the element type stored for this field
+              pointee_type = struct_info->field_element_types[field_idx];
+            }
+          }
         }
       }
     }

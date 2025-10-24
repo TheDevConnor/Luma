@@ -13,19 +13,18 @@ LLVMValueRef codegen_stmt_expression(CodeGenContext *ctx, AstNode *node) {
   return codegen_expr(ctx, node->stmt.expr_stmt.expression);
 }
 
-void add_symbol_with_element_type(CodeGenContext *ctx, const char *name, 
-                                  LLVMValueRef value, LLVMTypeRef type, 
+void add_symbol_with_element_type(CodeGenContext *ctx, const char *name,
+                                  LLVMValueRef value, LLVMTypeRef type,
                                   LLVMTypeRef element_type, bool is_function) {
   if (ctx->current_module) {
-    add_symbol_to_module_with_element_type(ctx->current_module, name, value, 
-                                          type, element_type, is_function);
+    add_symbol_to_module_with_element_type(ctx->current_module, name, value,
+                                           type, element_type, is_function);
   }
 }
 
-void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module, 
-                                           const char *name, LLVMValueRef value, 
-                                           LLVMTypeRef type, LLVMTypeRef element_type, 
-                                           bool is_function) {
+void add_symbol_to_module_with_element_type(
+    ModuleCompilationUnit *module, const char *name, LLVMValueRef value,
+    LLVMTypeRef type, LLVMTypeRef element_type, bool is_function) {
   LLVM_Symbol *sym = (LLVM_Symbol *)malloc(sizeof(LLVM_Symbol));
   sym->name = strdup(name);
   sym->value = value;
@@ -36,18 +35,20 @@ void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module,
   module->symbols = sym;
 }
 
-LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node) {
-  if (!type_node) return NULL;
-  
+LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx,
+                                          AstNode *type_node) {
+  if (!type_node)
+    return NULL;
+
   if (type_node->type == AST_TYPE_POINTER) {
     // This is a pointer type, get what it points to
     AstNode *pointee = type_node->type_data.pointer.pointee_type;
-    
+
     // Generate the full type for what this pointer points to
     // This correctly handles **char -> *char, ***int -> **int, etc.
     return codegen_type(ctx, pointee);
   }
-  
+
   return NULL; // Not a pointer type
 }
 
@@ -58,14 +59,16 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     return NULL;
 
   // Extract element type if this is a pointer
-  LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.var_decl.var_type);
+  LLVMTypeRef element_type =
+      extract_element_type_from_ast(ctx, node->stmt.var_decl.var_type);
 
   LLVMValueRef var_ref;
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
   if (ctx->current_function == NULL) {
-    var_ref = LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
+    var_ref =
+        LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
     if (node->stmt.var_decl.is_public) {
       LLVMSetLinkage(var_ref, LLVMExternalLinkage);
     } else {
@@ -80,30 +83,38 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     LLVMValueRef init_val = codegen_expr(ctx, node->stmt.var_decl.initializer);
     if (init_val) {
       LLVMTypeRef init_type = LLVMTypeOf(init_val);
-      
+
       if (var_type != init_type) {
         // Handle type conversions
         LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
         LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
-        
+
         if (var_kind == LLVMDoubleTypeKind && init_kind == LLVMFloatTypeKind) {
-          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type, "float_to_double");
-        } else if (var_kind == LLVMFloatTypeKind && init_kind == LLVMDoubleTypeKind) {
-          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type, "double_to_float");
-        } else if (var_kind == LLVMIntegerTypeKind && 
-                  (init_kind == LLVMFloatTypeKind || init_kind == LLVMDoubleTypeKind)) {
-          init_val = LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
-        } else if ((var_kind == LLVMFloatTypeKind || var_kind == LLVMDoubleTypeKind) && 
+          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type,
+                                    "float_to_double");
+        } else if (var_kind == LLVMFloatTypeKind &&
+                   init_kind == LLVMDoubleTypeKind) {
+          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type,
+                                      "double_to_float");
+        } else if (var_kind == LLVMIntegerTypeKind &&
+                   (init_kind == LLVMFloatTypeKind ||
+                    init_kind == LLVMDoubleTypeKind)) {
+          init_val =
+              LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
+        } else if ((var_kind == LLVMFloatTypeKind ||
+                    var_kind == LLVMDoubleTypeKind) &&
                    init_kind == LLVMIntegerTypeKind) {
-          init_val = LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
+          init_val =
+              LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
         }
       }
-      
+
       if (ctx->current_function == NULL) {
         if (LLVMIsConstant(init_val)) {
           LLVMSetInitializer(var_ref, init_val);
         } else {
-          fprintf(stderr, "Error: Global variable initializer must be constant\n");
+          fprintf(stderr,
+                  "Error: Global variable initializer must be constant\n");
           LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
         }
       } else {
@@ -121,7 +132,8 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
   }
 
   // Add symbol with element type information
-  add_symbol_with_element_type(ctx, node->stmt.var_decl.name, var_ref, var_type, element_type, false);
+  add_symbol_with_element_type(ctx, node->stmt.var_decl.name, var_ref, var_type,
+                               element_type, false);
   return var_ref;
 }
 
@@ -180,9 +192,11 @@ LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
                                           node->stmt.func_decl.param_names[i]);
     LLVMBuildStore(ctx->builder, param, alloca);
 
-    // Extract element type for the pointer 
-    LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
-    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i], alloca, param_types[i], element_type, false);
+    // Extract element type for the pointer
+    LLVMTypeRef element_type =
+        extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
+    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i],
+                                 alloca, param_types[i], element_type, false);
   }
 
   // Create blocks for normal return and cleanup
@@ -780,7 +794,6 @@ LLVMValueRef codegen_infinite_loop(CodeGenContext *ctx, AstNode *node) {
 // loop (i < 10) { ... }
 // loop (i < 10) : (i++) { ... }
 LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
-  // Create basic blocks for the loop structure
   LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "while_cond");
   LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
@@ -788,42 +801,43 @@ LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
   LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "while_end");
 
-  // Jump to condition check
+  // ADD THIS: Save and set loop context
+  LLVMBasicBlockRef old_continue = ctx->loop_continue_block;
+  LLVMBasicBlockRef old_break = ctx->loop_break_block;
+  ctx->loop_continue_block = cond_block; // Continue jumps back to condition
+  ctx->loop_break_block = after_block;   // Break jumps to after loop
+
   LLVMBuildBr(ctx->builder, cond_block);
 
-  // Generate condition block
   LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
   if (node->stmt.loop_stmt.condition) {
     LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
     if (!cond) {
-      fprintf(
-          stderr,
-          "Error: Failed to generate condition for while loop at line %zu\n",
-          node->line);
+      // ADD THIS: Restore on error
+      ctx->loop_continue_block = old_continue;
+      ctx->loop_break_block = old_break;
       return NULL;
     }
     LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
   } else {
-    // Infinite loop if no condition
     LLVMBuildBr(ctx->builder, body_block);
   }
 
-  // Generate loop body
   LLVMPositionBuilderAtEnd(ctx->builder, body_block);
   codegen_stmt(ctx, node->stmt.loop_stmt.body);
 
-  // Generate increment expressions if they exist
   if (node->stmt.loop_stmt.optional) {
     codegen_expr(ctx, node->stmt.loop_stmt.optional);
   }
 
-  // If body doesn't have a terminator, jump back to condition check
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-    LLVMBuildBr(ctx->builder,
-                cond_block); // Jump back to condition, not after_block
+    LLVMBuildBr(ctx->builder, cond_block);
   }
 
-  // Continue with after loop block
+  // ADD THIS: Restore old loop context
+  ctx->loop_continue_block = old_continue;
+  ctx->loop_break_block = old_break;
+
   LLVMPositionBuilderAtEnd(ctx->builder, after_block);
   return NULL;
 }

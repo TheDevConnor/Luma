@@ -1,3 +1,180 @@
 @module "lexer"
 
-pub const LPBS_Tokens -> enum {};
+@use "string" as string
+
+pub const TokenType -> enum {
+  TOK_NUMBER,
+  TOK_IDENT,
+  TOK_STRING,
+  TOK_SYMBOL,
+  TOK_WHITESPACE,
+  TOK_UNKNOWN,
+};
+
+pub const Token -> struct {
+  list: *Token,
+  size: int,
+  capacity: int,
+  value: *char,
+  type: int,
+  line: int,
+  col: int,
+};
+
+const make_token -> fn (type: int, value: *char, line: int, col: int) Token {
+  let tk: Token;
+  tk.type = type;
+  tk.value = value;
+  tk.line = line;
+  tk.col = col;
+  return tk;
+}
+
+const is_digit -> fn (ch: char) bool {
+  return (ch >= '0' && ch <= '9');
+}
+
+const is_alpha -> fn (ch: char) bool {
+  return ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '@');
+}
+
+const is_alnum -> fn (ch: char) bool {
+  return (is_alpha(ch) || is_digit(ch));
+}
+
+const is_whitespace -> fn (ch: char) bool {
+  return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r');
+}
+
+#returns_ownership
+pub const scan -> fn (path: *char) *Token {
+  let src_len: int = string::strlen(path);
+  let tks: *Token = cast<*Token>(alloc(sizeof<Token>));
+  
+  tks.capacity = src_len * 2;  // Increase capacity
+  tks.list = cast<*Token>(alloc(tks.capacity * sizeof<Token>));
+  tks.size = 0; 
+  tks.line = 1;
+  tks.col  = 1;
+
+  let i: int = 0;
+  loop (i < src_len) {
+    let ch: char = path[i];
+    
+    // Skip whitespace but count lines/cols
+    if (is_whitespace(ch)) {
+      if (ch == '\n') {
+        tks.line = tks.line + 1;
+        tks.col = 1;
+      } else {
+        tks.col = tks.col + 1;
+      }
+      i = i + 1;
+      continue;
+    }
+    
+    // Handle identifiers and keywords
+    if (is_alpha(ch)) {
+      let start_pos: int = i;
+      let start_col: int = tks.col;
+      
+      // Scan to end of identifier
+      loop ((i < src_len) && is_alnum(path[i])) {
+        i = i + 1;
+        tks.col = tks.col + 1;
+      }
+      
+      let length: int = i - start_pos;
+      let word: *char = cast<*char>(alloc(length + 1));
+      
+      // Copy the identifier
+      let k: int = 0;
+      loop (k < length) {
+        word[k] = path[start_pos + k];
+        k = k + 1;
+      }
+      word[length] = '\0';
+      
+      // Store token
+      tks.list[tks.size] = make_token(TokenType::TOK_IDENT, word, tks.line, start_col);
+      tks.size = tks.size + 1;
+      continue;
+    }
+    
+    // Handle numbers
+    if (is_digit(ch)) {
+      let start_pos: int = i;
+      let start_col: int = tks.col;
+      
+      loop ((i < src_len) && is_digit(path[i])) {
+        i = i + 1;
+        tks.col = tks.col + 1;
+      }
+      
+      let length: int = i - start_pos;
+      let num: *char = cast<*char>(alloc(length + 1));
+      
+      let k: int = 0;
+      loop (k < length) {
+        num[k] = path[start_pos + k];
+        k = k + 1;
+      }
+      num[length] = '\0';
+      
+      tks.list[tks.size] = make_token(TokenType::TOK_NUMBER, num, tks.line, start_col);
+      tks.size = tks.size + 1;
+      continue;
+    }
+    
+    // Handle string literals
+    if (ch == '"') {
+      let start_col: int = tks.col;
+      i = i + 1;
+      tks.col = tks.col + 1;
+      let start_pos: int = i;
+      
+      loop ((i < src_len) && (path[i] != '"')) {
+        i = i + 1;
+        tks.col = tks.col + 1;
+      }
+      
+      let length: int = i - start_pos;
+      let str_val: *char = cast<*char>(alloc(length + 1));
+      
+      let k: int = 0;
+      loop (k < length) {
+        str_val[k] = path[start_pos + k];
+        k = k + 1;
+      }
+      str_val[length] = '\0';
+      
+      tks.list[tks.size] = make_token(TokenType::TOK_STRING, str_val, tks.line, start_col);
+      tks.size = tks.size + 1;
+      
+      i = i + 1;  // Skip closing quote
+      tks.col = tks.col + 1;
+      continue;
+    }
+    
+    // Handle single character symbols
+    let start_col: int = tks.col;
+    tks.list[tks.size] = make_token(TokenType::TOK_SYMBOL,  string::from_char(ch), tks.line, start_col);
+    tks.size = tks.size + 1;
+    tks.col = tks.col + 1;
+    i = i + 1;
+  }
+
+  return tks;
+}
+
+#takes_ownership
+pub const free_tokens -> fn (tks: *Token) void {
+  loop [i: int = 0](i < tks.size) {
+    if (tks.list[i].value != cast<*char>(0)) {
+      free(tks.list[i].value);
+    }
+    i = i + 1;
+  }
+  free(tks.list);
+  free(tks);
+}
