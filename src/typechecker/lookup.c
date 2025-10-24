@@ -22,6 +22,7 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     return typecheck_if_decl(stmt, scope, arena);
   case AST_STMT_BLOCK: {
     Scope *block_scope = create_child_scope(scope, "block", arena);
+    stmt->stmt.block.scope = (void *)block_scope;
 
     for (size_t i = 0; i < stmt->stmt.block.stmt_count; i++) {
       if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena,

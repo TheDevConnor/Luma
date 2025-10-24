@@ -1,0 +1,27 @@
+@module "io"
+
+@use "sys" as sys
+
+#returns_ownership
+pub const read_file -> fn (path: *char) *char {
+  let fd: int = sys::open(path, sys::O_RDONLY, 0);
+  if (sys::is_error(fd)) {
+    sys::eprint("Error: Failed to open file for reading\n");
+    return cast<*char>(0);
+  }
+
+  // TODO: Make dynamic later
+  let buffer: *char = cast<*char>(alloc(1024 * sizeof<char>));
+  let bytes_read: int = sys::read(fd, cast<*void>(buffer), 1023);
+
+  if (sys::is_error(bytes_read)) {
+      sys::eprint("Error: Failed to read from file\n");
+      sys::close(fd);
+      free(buffer);
+      return cast<*char>(0);
+  }
+
+  buffer[bytes_read] = cast<char>(0); // Null Terminator 
+  sys::close(fd);
+  return buffer;
+}

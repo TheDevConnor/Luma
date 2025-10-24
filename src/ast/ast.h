@@ -360,28 +360,29 @@ struct AstNode {
           AstNode *body; // Changed from Stmt* to AstNode*
           bool returns_ownership;
           bool takes_ownership;
+          void *scope;
         } func_decl;
 
         // If statement
         struct {
-          AstNode *condition;   // Changed from Expr* to AstNode*
-          AstNode *then_stmt;   // Changed from Stmt* to AstNode*
-          AstNode **elif_stmts; // Changed from Stmt* to AstNode*
-          int elif_count;       // Number of elif statements
-          AstNode *else_stmt;   // Changed from Stmt* to AstNode*
+          AstNode *condition;
+          AstNode *then_stmt;
+          AstNode **elif_stmts;
+          int elif_count;
+          AstNode *else_stmt;
+          void *scope;
+          void *then_scope;
+          void *else_scope;
         } if_stmt;
 
         // Loop statement (Combined while and for)
         struct {
-          AstNode *condition; // Changed from Expr* to AstNode*
-          AstNode *optional;  // Optional expression (e.g., for loop
-                              // initializer)
-          AstNode *body;      // Changed from Stmt* to AstNode*
-          // For loops can be represented as a while loop with an
-          // initializer and increment
-          AstNode **initializer; // Optional initializer for for loops
-                                 // (Changed from Stmt* to AstNode*)
-          size_t init_count;     // Number of initializers
+          AstNode *condition;
+          AstNode *optional;
+          AstNode *body;
+          AstNode **initializer;
+          size_t init_count;
+          void *scope;
         } loop_stmt;
 
         // Return statement
@@ -389,10 +390,10 @@ struct AstNode {
           AstNode *value; // Changed from Expr* to AstNode*
         } return_stmt;
 
-        // Block statement
         struct {
-          AstNode **statements; // Changed from Stmt** to AstNode**
+          AstNode **statements;
           size_t stmt_count;
+          void *scope;
         } block;
 
         // Print statement
@@ -411,10 +412,11 @@ struct AstNode {
         } defer_stmt;
 
         struct {
-          AstNode *condition;     // The switch expression
-          struct AstNode **cases; // Array of case clauses
+          AstNode *condition;
+          struct AstNode **cases;
           size_t case_count;
-          struct AstNode *default_case; // Optional default case
+          struct AstNode *default_case;
+          void *scope;
         } switch_stmt;
 
         // impl [fun1, fun2, ...] -> [struct1, struct2, ...] {}

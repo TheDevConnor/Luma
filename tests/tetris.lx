@@ -1,7 +1,9 @@
 @module "main"
 
 @use "terminal" as term
+@use "time" as time
 @use "termfx" as tx
+@use "math" as math
 
 const FIELD_W: int = 14;
 const FIELD_H: int = 24;
@@ -295,6 +297,10 @@ pub const main -> fn () int {
         if (lines > 0) {
           lines_cleared_total = lines_cleared_total + lines;
           score = score + (lines * lines * 100);
+
+          if (lines_cleared_total % 10 == 0 && speed > 2) {
+            --speed;
+          }
         }
         
         // Spawn new piece
@@ -326,6 +332,7 @@ pub const main -> fn () int {
                 break;
               }
             }
+            time::usleep(10000);
           }
         }
       }
@@ -335,8 +342,8 @@ pub const main -> fn () int {
 
     draw_screen(current_piece, current_rotation, current_x, current_y, 
                 score, lines_cleared_total, next_piece);
-
-    loop [i: int = 0](i < 20000000) :(++i) {}
+    
+    time::usleep(20000);
   }
   
   term::disable_raw_mode();

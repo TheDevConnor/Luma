@@ -287,6 +287,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   func_scope->is_function_scope = true;
   func_scope->associated_node = node;
 
+  node->stmt.func_decl.scope = (void *)func_scope;
+
   // Add parameters to function scope (parameters are always local)
   for (size_t i = 0; i < param_count; i++) {
     if (!scope_add_symbol(func_scope, param_names[i], param_types[i], false,
@@ -853,6 +855,9 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Scope *then_branch = create_child_scope(scope, "then_branch", arena);
   Scope *else_branch = create_child_scope(scope, "else_branch", arena);
+  node->stmt.if_stmt.scope = (void *)scope;
+  node->stmt.if_stmt.then_scope = (void *)then_branch;
+  node->stmt.if_stmt.else_scope = (void *)else_branch;
 
   // Typecheck main if condition
   Type *expected =
@@ -1016,6 +1021,7 @@ bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
 bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
                                   ArenaAllocator *arena) {
   Scope *loop_scope = create_child_scope(scope, "infinite_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)loop_scope;
 
   if (node->stmt.loop_stmt.body == NULL) {
     fprintf(stderr, "Error: Loop body cannot be null at line %zu\n",
@@ -1034,6 +1040,7 @@ bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
 bool typecheck_while_loop_decl(AstNode *node, Scope *scope,
                                ArenaAllocator *arena) {
   Scope *while_loop = create_child_scope(scope, "while_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)while_loop;
 
   if (!typecheck_expression(node->stmt.loop_stmt.condition, while_loop,
                             arena)) {
@@ -1064,6 +1071,7 @@ bool typecheck_while_loop_decl(AstNode *node, Scope *scope,
 bool typecheck_for_loop_decl(AstNode *node, Scope *scope,
                              ArenaAllocator *arena) {
   Scope *lookup_scope = create_child_scope(scope, "for_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)lookup_scope;
 
   // Define the initializer
   for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
@@ -1179,6 +1187,7 @@ bool typecheck_switch_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   // Create a new scope for the switch body
   Scope *switch_scope = create_child_scope(scope, "switch", arena);
+  node->stmt.switch_stmt.scope = (void *)switch_scope;
 
   // Track if we've seen a default case
   bool has_default = false;
