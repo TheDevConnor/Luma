@@ -192,6 +192,7 @@ Expr *input_expr(Parser *parser);
 Expr *system_expr(Parser *parser);
 Expr *syscall_expr(Parser *parser);
 Expr *sizeof_expr(Parser *parser);
+Expr *struct_expr(Parser *parser);
 
 Type *tnud(Parser *parser);
 Type *tled(Parser *parser, Type *left, BindingPower bp);

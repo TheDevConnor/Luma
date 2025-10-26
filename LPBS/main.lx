@@ -5,7 +5,7 @@
 @use "io" as io
 
 pub const main -> fn () int {
-  let path: *char = io::read_file("/home/connor/Projects/Luma/tests/test.lx");
+  let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/tests/bubble_sort.lx");
   let lex: *Token = lexer::scan(path);
   
   output("Token count: ");

@@ -236,6 +236,7 @@ BindingPower get_bp(LumaTokenType kind) {
   case TOK_LBRACKET:
   case TOK_DOT:
   case TOK_RESOLVE:
+  case TOK_LBRACE:
     return BP_CALL;
 
   case TOK_RANGE:
@@ -284,6 +285,8 @@ Expr *nud(Parser *parser) {
     return grouping(parser);
   case TOK_LBRACKET:
     return array_expr(parser);
+  case TOK_LBRACE:
+    return struct_expr(parser);
   case TOK_STAR:
     return deref_expr(parser);
   case TOK_AMP:

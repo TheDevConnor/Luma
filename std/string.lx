@@ -135,3 +135,15 @@ pub const putchar -> fn(c: char) int {
   
   return cast<int>(c);
 }
+
+pub const is_digit -> fn (ch: char) bool {
+  return (ch >= '0' && ch <= '9');
+}
+
+pub const is_alpha -> fn (ch: char) bool {
+  return ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '@');
+}
+
+pub const is_alnum -> fn (ch: char) bool {
+  return (is_alpha(ch) || is_digit(ch));
+}

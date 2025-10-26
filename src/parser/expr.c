@@ -273,6 +273,11 @@ Expr *array_expr(Parser *parser) {
                            elements.count, line, col);
 }
 
+Expr *struct_expr(Parser *parser) {
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+}
+
 Expr *deref_expr(Parser *parser) {
   p_advance(parser); // Advance past the *
   int line = p_current(parser).line;

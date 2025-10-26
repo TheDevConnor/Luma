@@ -6,16 +6,27 @@
 
 pub const main -> fn () int {
   let t: Timer = time::timer_start(); // Start timer
-  let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/tests/test.lx");
-  let size: int = string::strlen(path);
+  let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/tests/bubble_sort.lx");
   defer { free(path); }
-  loop [i: int = 0](i < size) : (++i) {
-    if (path[i] == ' ' || path[i] == '\n' || path[i] == '\t') {
+
+  let line: int = 1;
+  output("0", line, "| ");
+  loop [i: int = 0](i >= 0) : (++i) {
+    if (path[i] == '\n') {
+      line++;
+      if (line < 10) {
+        output("\n0", line, "| ");
+      } else {
+        output("\n", line, "| ");
+      }
       continue;
+    } elif (path[i] == '\0') { 
+      break; 
     }
 
-    output(string::from_char(path[i]), "\n");
+    output(string::from_char(path[i]));
   }
+
   let elapsed: int = time::timer_elapsed_ms(t);
   output("Elapsed time: ", elapsed, "ms\n");
   return 0;

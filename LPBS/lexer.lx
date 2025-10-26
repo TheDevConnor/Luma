@@ -8,8 +8,19 @@ pub const TokenType -> enum {
   TOK_STRING,
   TOK_SYMBOL,
   TOK_WHITESPACE,
+
+  TOK_EQUALS,
+  TOK_SEMICOLON,
+  TOK_LPAREN,
+  TOK_RPAREN,
+  TOK_LBRACE,
+  TOK_RBRACE,
   TOK_UNKNOWN,
 };
+
+const K_Symbol_Map -> struct { value: *char, type: int };
+const D_Symbol_Map -> struct { value: *char, type: int };
+const S_Symbol_Map -> struct { value:  char, type: int };
 
 pub const Token -> struct {
   list: *Token,
@@ -21,6 +32,22 @@ pub const Token -> struct {
   col: int,
 };
 
+// const s_symbol: [S_Symbol; 6] = [
+//   {value: "=", type: TOK_EQUALS}, {value: ";", type: TOK_SEMICOLON}, {value: "(", type: TOK_LPAREN},
+//   {value: ")", type: TOK_RPAREN}, {value: "{", type: TOK_LBRACE}, {value: "}", type: TOK_RBRACE}
+// ];
+
+#takes_ownership
+pub const free_tokens -> fn (tks: *Token) void {
+  loop [i: int = 0](i < tks.size) : (++i) {
+    if (tks.list[i].value != cast<*char>(0)) {
+      free(tks.list[i].value);
+    }
+  }
+  free(tks.list);
+  free(tks);
+}
+
 const make_token -> fn (type: int, value: *char, line: int, col: int) Token {
   let tk: Token;
   tk.type = type;
@@ -28,18 +55,6 @@ const make_token -> fn (type: int, value: *char, line: int, col: int) Token {
   tk.line = line;
   tk.col = col;
   return tk;
-}
-
-const is_digit -> fn (ch: char) bool {
-  return (ch >= '0' && ch <= '9');
-}
-
-const is_alpha -> fn (ch: char) bool {
-  return ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '@');
-}
-
-const is_alnum -> fn (ch: char) bool {
-  return (is_alpha(ch) || is_digit(ch));
 }
 
 const is_whitespace -> fn (ch: char) bool {
@@ -74,12 +89,12 @@ pub const scan -> fn (path: *char) *Token {
     }
     
     // Handle identifiers and keywords
-    if (is_alpha(ch)) {
+    if (string::is_alpha(ch)) {
       let start_pos: int = i;
       let start_col: int = tks.col;
       
       // Scan to end of identifier
-      loop ((i < src_len) && is_alnum(path[i])) {
+      loop ((i < src_len) && string::is_alnum(path[i])) {
         i = i + 1;
         tks.col = tks.col + 1;
       }
@@ -102,11 +117,11 @@ pub const scan -> fn (path: *char) *Token {
     }
     
     // Handle numbers
-    if (is_digit(ch)) {
+    if (string::is_digit(ch)) {
       let start_pos: int = i;
       let start_col: int = tks.col;
       
-      loop ((i < src_len) && is_digit(path[i])) {
+      loop ((i < src_len) && string::is_digit(path[i])) {
         i = i + 1;
         tks.col = tks.col + 1;
       }
@@ -167,14 +182,4 @@ pub const scan -> fn (path: *char) *Token {
   return tks;
 }
 
-#takes_ownership
-pub const free_tokens -> fn (tks: *Token) void {
-  loop [i: int = 0](i < tks.size) {
-    if (tks.list[i].value != cast<*char>(0)) {
-      free(tks.list[i].value);
-    }
-    i = i + 1;
-  }
-  free(tks.list);
-  free(tks);
-}
+
