@@ -45,6 +45,8 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
   case AST_EXPR_MEMBER:
     // Enhanced member access that handles both module.symbol and struct.field
     return codegen_expr_member_access_enhanced(ctx, node);
+  case AST_EXPR_STRUCT:
+    return codegen_expr_struct_literal(ctx, node);
   default:
     fprintf(stderr, "Error: Unknown expression type: %d\n", node->type);
     return NULL;

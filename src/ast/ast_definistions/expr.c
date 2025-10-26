@@ -209,3 +209,14 @@ AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type,
   node->expr.size_of.is_type = is_type;
   return node;
 }
+
+Expr *create_struct_expr(ArenaAllocator *arena, char *name, char **field_names,
+                         AstNode **field_values, size_t field_count, int line,
+                         int col) {
+  AstNode *node = create_expr(arena, AST_EXPR_STRUCT, line, col);
+  node->expr.struct_expr.name = name;
+  node->expr.struct_expr.field_names = field_names;
+  node->expr.struct_expr.field_value = field_values;
+  node->expr.struct_expr.field_count = field_count;
+  return node;
+}

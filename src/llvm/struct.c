@@ -459,11 +459,12 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
       for (StructInfo *info = ctx->struct_types; info; info = info->next) {
         if (info->llvm_type == symbol_type) {
           struct_info = info;
-          struct_ptr = sym->value; // This is already the struct address (alloca)
+          struct_ptr =
+              sym->value; // This is already the struct address (alloca)
           break;
         }
       }
-      
+
       if (!struct_info) {
         // Try finding by field name
         for (StructInfo *info = ctx->struct_types; info; info = info->next) {
@@ -497,17 +498,19 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
 
   } else if (object->type == AST_EXPR_INDEX) {
     // NEW: Handle indexed struct access like lex.list[i].value
-    
+
     // First, generate the indexed expression (e.g., lex.list[i])
     LLVMValueRef indexed_value = codegen_expr_index(ctx, object);
     if (!indexed_value) {
-      fprintf(stderr, "Error: Failed to generate indexed expression for struct access\n");
+      fprintf(
+          stderr,
+          "Error: Failed to generate indexed expression for struct access\n");
       return NULL;
     }
-    
+
     LLVMTypeRef indexed_type = LLVMTypeOf(indexed_value);
     LLVMTypeKind indexed_kind = LLVMGetTypeKind(indexed_type);
-    
+
     // Check if the indexed result is a struct value
     if (indexed_kind == LLVMStructTypeKind) {
       // Find which struct type this is
@@ -517,7 +520,7 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
           break;
         }
       }
-      
+
       if (!struct_info) {
         // Try to find by field name
         for (StructInfo *info = ctx->struct_types; info; info = info->next) {
@@ -528,16 +531,18 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
           }
         }
       }
-      
+
       if (struct_info) {
         // Allocate space to store the struct value so we can GEP into it
-        struct_ptr = LLVMBuildAlloca(ctx->builder, indexed_type, "indexed_struct_temp");
+        struct_ptr =
+            LLVMBuildAlloca(ctx->builder, indexed_type, "indexed_struct_temp");
         LLVMBuildStore(ctx->builder, indexed_value, struct_ptr);
       }
     } else if (indexed_kind == LLVMPointerTypeKind) {
-      // The indexed expression returned a pointer (shouldn't happen for array[i] but handle it)
+      // The indexed expression returned a pointer (shouldn't happen for
+      // array[i] but handle it)
       struct_ptr = indexed_value;
-      
+
       // Try to find struct info by field name
       for (StructInfo *info = ctx->struct_types; info; info = info->next) {
         int field_idx = get_field_index(info, field_name);
@@ -547,7 +552,10 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
         }
       }
     } else {
-      fprintf(stderr, "Error: Indexed expression does not produce a struct (kind: %d)\n", indexed_kind);
+      fprintf(
+          stderr,
+          "Error: Indexed expression does not produce a struct (kind: %d)\n",
+          indexed_kind);
       return NULL;
     }
 
@@ -557,9 +565,9 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
     if (!call_result) {
       return NULL;
     }
-    
+
     LLVMTypeRef result_type = LLVMTypeOf(call_result);
-    
+
     if (LLVMGetTypeKind(result_type) == LLVMStructTypeKind) {
       // Find struct info
       for (StructInfo *info = ctx->struct_types; info; info = info->next) {
@@ -568,7 +576,7 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
           break;
         }
       }
-      
+
       if (!struct_info) {
         // Try by field name
         for (StructInfo *info = ctx->struct_types; info; info = info->next) {
@@ -579,25 +587,30 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
           }
         }
       }
-      
+
       if (struct_info) {
         // Store the result so we can GEP into it
-        struct_ptr = LLVMBuildAlloca(ctx->builder, result_type, "call_result_temp");
+        struct_ptr =
+            LLVMBuildAlloca(ctx->builder, result_type, "call_result_temp");
         LLVMBuildStore(ctx->builder, call_result, struct_ptr);
       }
     }
-    
+
   } else {
     // Handle other cases
-    fprintf(stderr, "Error: Unsupported struct access pattern (object type: %d)\n", object->type);
+    fprintf(stderr,
+            "Error: Unsupported struct access pattern (object type: %d)\n",
+            object->type);
     return NULL;
   }
 
   if (!struct_info || !struct_ptr) {
-    fprintf(stderr,
-            "Error: Could not determine struct type for member access '%s.%s'\n",
-            object->type == AST_EXPR_IDENTIFIER ? object->expr.identifier.name : "?",
-            field_name);
+    fprintf(
+        stderr,
+        "Error: Could not determine struct type for member access '%s.%s'\n",
+        object->type == AST_EXPR_IDENTIFIER ? object->expr.identifier.name
+                                            : "?",
+        field_name);
     return NULL;
   }
 
@@ -621,9 +634,20 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
       LLVMBuildStructGEP2(ctx->builder, struct_info->llvm_type, struct_ptr,
                           field_index, "field_ptr");
 
-  // Load the field value
-  return LLVMBuildLoad2(ctx->builder, struct_info->field_types[field_index],
-                        field_ptr, "field_val");
+  // CRITICAL FIX: If this field is a pointer type, we need to preserve element
+  // type info This is done by checking
+  // struct_info->field_element_types[field_index]
+  LLVMValueRef result =
+      LLVMBuildLoad2(ctx->builder, struct_info->field_types[field_index],
+                     field_ptr, "field_val");
+
+  // Store element type information in a way that can be retrieved later
+  // NOTE: This is a workaround - ideally we'd have a way to tag LLVM values
+  // with metadata For now, the element type is stored in
+  // struct_info->field_element_types[field_index] and can be looked up when
+  // this value is used in indexing operations
+
+  return result;
 }
 
 // Handle struct member assignment (obj.field = value)

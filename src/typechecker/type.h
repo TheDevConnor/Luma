@@ -312,6 +312,12 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
 AstNode *typecheck_syscall_expr(AstNode *expr, Scope *scope,
                                 ArenaAllocator *arena);
 
+AstNode *typecheck_struct_expr_internal(AstNode *expr, Scope *scope,
+                                        ArenaAllocator *arena,
+                                        AstNode *expected_type);
+AstNode *typecheck_struct_expr(AstNode *expr, Scope *scope,
+                               ArenaAllocator *arena);
+
 AstNode *get_enclosing_function_return_type(Scope *scope);
 
 bool validate_array_type(AstNode *array_type, Scope *scope,

@@ -1169,7 +1169,20 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
 
   // Check all remaining elements match the first element's type
   for (size_t i = 1; i < element_count; i++) {
-    AstNode *element_type = typecheck_expression(elements[i], scope, arena);
+    AstNode *element_type = NULL;
+
+    // CRITICAL FIX: If this element is an anonymous struct expression,
+    // pass the first element's type as expected_type to ensure they match
+    if (elements[i]->type == AST_EXPR_STRUCT &&
+        !elements[i]->expr.struct_expr.name) {
+      // Anonymous struct - use internal function with expected type
+      element_type = typecheck_struct_expr_internal(elements[i], scope, arena,
+                                                    first_element_type);
+    } else {
+      // Regular expression - typecheck normally
+      element_type = typecheck_expression(elements[i], scope, arena);
+    }
+
     if (!element_type) {
       tc_error(expr, "Array Type Error",
                "Failed to determine type of array element %zu", i);
@@ -1197,4 +1210,240 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
   AstNode *array_type = create_array_type(arena, first_element_type, size_expr,
                                           expr->line, expr->column);
   return array_type;
+}
+
+AstNode *typecheck_struct_expr_internal(AstNode *expr, Scope *scope,
+                                        ArenaAllocator *arena,
+                                        AstNode *expected_type) {
+  if (expr->type != AST_EXPR_STRUCT) {
+    tc_error(expr, "Internal Error", "Expected struct expression node");
+    return NULL;
+  }
+
+  const char *struct_name = expr->expr.struct_expr.name;
+  char **field_names = expr->expr.struct_expr.field_names;
+  AstNode **field_values = expr->expr.struct_expr.field_value;
+  size_t field_count = expr->expr.struct_expr.field_count;
+
+  // Check for duplicate field names in the initializer
+  for (size_t i = 0; i < field_count; i++) {
+    for (size_t j = i + 1; j < field_count; j++) {
+      if (strcmp(field_names[i], field_names[j]) == 0) {
+        tc_error_help(expr, "Duplicate Field",
+                      "Each field can only be initialized once",
+                      "Field '%s' appears multiple times in struct initializer",
+                      field_names[i]);
+        return NULL;
+      }
+    }
+  }
+
+  if (struct_name) {
+    // Named struct initialization: Point { x: 10, y: 20 }
+
+    // Look up the struct type directly by name
+    Symbol *struct_symbol = scope_lookup(scope, struct_name);
+    if (!struct_symbol) {
+      tc_error_id(expr, struct_name, "Undefined Type",
+                  "Struct type '%s' not found", struct_name);
+      return NULL;
+    }
+
+    AstNode *struct_type = struct_symbol->type;
+    if (!struct_type) {
+      tc_error_id(expr, struct_name, "Type Error",
+                  "Type '%s' has no type information", struct_name);
+      return NULL;
+    }
+
+    if (struct_type->type != AST_TYPE_STRUCT) {
+      tc_error_id(expr, struct_name, "Type Error",
+                  "'%s' is not a struct type (it's a %s)", struct_name,
+                  struct_type->type == AST_TYPE_BASIC ? "basic type"
+                                                      : "other type");
+      return NULL;
+    }
+
+    // Validate each initialized field
+    for (size_t i = 0; i < field_count; i++) {
+      const char *field_name = field_names[i];
+      AstNode *field_value = field_values[i];
+
+      // Check if the field exists in the struct definition
+      AstNode *expected_field_type =
+          get_struct_member_type(struct_type, field_name);
+      if (!expected_field_type) {
+        tc_error_help(expr, "Unknown Field",
+                      "Check the struct definition for valid field names",
+                      "Struct '%s' has no field named '%s'", struct_name,
+                      field_name);
+        return NULL;
+      }
+
+      // Don't allow initializing methods
+      if (expected_field_type->type == AST_TYPE_FUNCTION) {
+        tc_error_help(expr, "Invalid Field Initialization",
+                      "Methods cannot be initialized in struct literals",
+                      "Cannot initialize method '%s' in struct '%s'",
+                      field_name, struct_name);
+        return NULL;
+      }
+
+      // Type check the field value
+      AstNode *actual_type = typecheck_expression(field_value, scope, arena);
+      if (!actual_type) {
+        tc_error(expr, "Type Error",
+                 "Failed to determine type of value for field '%s'",
+                 field_name);
+        return NULL;
+      }
+
+      // Check type compatibility
+      TypeMatchResult match = types_match(expected_field_type, actual_type);
+      if (match == TYPE_MATCH_NONE) {
+        tc_error_help(expr, "Field Type Mismatch",
+                      "The value type must match the struct field type",
+                      "Field '%s' expects type '%s', got '%s'", field_name,
+                      type_to_string(expected_field_type, arena),
+                      type_to_string(actual_type, arena));
+        return NULL;
+      }
+    }
+
+    // CRITICAL FIX: Return a basic type that references the struct name
+    // This matches how struct types are used in variable declarations
+    return create_basic_type(arena, struct_name, expr->line, expr->column);
+
+  } else {
+    // Anonymous struct initialization: { x: 10, y: 20 }
+
+    // If we have an expected type, try to match against it
+    if (expected_type) {
+      // Resolve the expected type to an actual struct type
+      AstNode *target_struct_type = expected_type;
+      const char *target_struct_name = NULL;
+
+      // If expected type is a basic type, resolve it to the struct
+      if (expected_type->type == AST_TYPE_BASIC) {
+        target_struct_name = expected_type->type_data.basic.name;
+        Symbol *struct_symbol = scope_lookup(scope, target_struct_name);
+
+        if (struct_symbol && struct_symbol->type &&
+            struct_symbol->type->type == AST_TYPE_STRUCT) {
+          target_struct_type = struct_symbol->type;
+        } else {
+          // Expected type is not a struct, fall through to create anonymous
+          target_struct_type = NULL;
+        }
+      } else if (expected_type->type != AST_TYPE_STRUCT) {
+        target_struct_type = NULL;
+      }
+
+      // If we successfully resolved to a struct type, validate against it
+      if (target_struct_type && target_struct_type->type == AST_TYPE_STRUCT) {
+        // Validate each field in the anonymous struct
+        for (size_t i = 0; i < field_count; i++) {
+          const char *field_name = field_names[i];
+          AstNode *field_value = field_values[i];
+
+          // Check if the field exists in the expected struct
+          AstNode *expected_field_type =
+              get_struct_member_type(target_struct_type, field_name);
+          if (!expected_field_type) {
+            tc_error_help(expr, "Unknown Field",
+                          "Anonymous struct field does not match expected type",
+                          "Type '%s' has no field named '%s'",
+                          target_struct_name ? target_struct_name : "struct",
+                          field_name);
+            return NULL;
+          }
+
+          // Don't allow initializing methods
+          if (expected_field_type->type == AST_TYPE_FUNCTION) {
+            tc_error_help(expr, "Invalid Field Initialization",
+                          "Methods cannot be initialized in struct literals",
+                          "Cannot initialize method '%s'", field_name);
+            return NULL;
+          }
+
+          // Type check the field value
+          AstNode *actual_type =
+              typecheck_expression(field_value, scope, arena);
+          if (!actual_type) {
+            tc_error(expr, "Type Error",
+                     "Failed to determine type of value for field '%s'",
+                     field_name);
+            return NULL;
+          }
+
+          // Check type compatibility
+          TypeMatchResult match = types_match(expected_field_type, actual_type);
+          if (match == TYPE_MATCH_NONE) {
+            tc_error_help(expr, "Field Type Mismatch",
+                          "The value type must match the struct field type",
+                          "Field '%s' expects type '%s', got '%s'", field_name,
+                          type_to_string(expected_field_type, arena),
+                          type_to_string(actual_type, arena));
+            return NULL;
+          }
+        }
+
+        // Return the expected type (as basic type reference)
+        if (target_struct_name) {
+          return create_basic_type(arena, target_struct_name, expr->line,
+                                   expr->column);
+        } else {
+          return expected_type;
+        }
+      }
+    }
+
+    // No expected type or couldn't resolve - create true anonymous struct
+    // Type check all field values
+    AstNode **field_types =
+        arena_alloc(arena, field_count * sizeof(AstNode *), alignof(AstNode *));
+    if (!field_types) {
+      tc_error(expr, "Memory Error",
+               "Failed to allocate memory for field types");
+      return NULL;
+    }
+
+    for (size_t i = 0; i < field_count; i++) {
+      AstNode *field_value = field_values[i];
+
+      AstNode *field_type = typecheck_expression(field_value, scope, arena);
+      if (!field_type) {
+        tc_error(expr, "Type Error",
+                 "Failed to determine type of value for field '%s'",
+                 field_names[i]);
+        return NULL;
+      }
+
+      field_types[i] = field_type;
+    }
+
+    // Create an anonymous struct type with the inferred field types
+    size_t anon_name_len = 50;
+    char *anon_name = arena_alloc(arena, anon_name_len, alignof(char));
+    snprintf(anon_name, anon_name_len, "__anon_struct_%zu_%zu", expr->line,
+             expr->column);
+
+    AstNode *anon_struct_type = create_struct_type(
+        arena, anon_name, field_types, (const char **)field_names, field_count,
+        expr->line, expr->column);
+
+    if (!anon_struct_type) {
+      tc_error(expr, "Type Creation Error",
+               "Failed to create anonymous struct type");
+      return NULL;
+    }
+
+    return anon_struct_type;
+  }
+}
+
+// Public wrapper that doesn't expose expected_type
+AstNode *typecheck_struct_expr(AstNode *expr, Scope *scope,
+                               ArenaAllocator *arena) {
+  return typecheck_struct_expr_internal(expr, scope, arena, NULL);
 }

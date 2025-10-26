@@ -369,6 +369,8 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
   case TOK_MINUSMINUS:
   case TOK_LBRACKET:
     return prefix_expr(parser, left, bp);
+  case TOK_LBRACE:
+    return named_struct_expr(parser, left, bp);
   default:
     p_advance(parser);
     return left;

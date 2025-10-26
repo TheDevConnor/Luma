@@ -144,6 +144,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_memcpy_expr(expr, scope, arena);
   case AST_EXPR_SIZEOF:
     return typecheck_sizeof_expr(expr, scope, arena);
+  case AST_EXPR_STRUCT:
+    return typecheck_struct_expr(expr, scope, arena);
   default:
     tc_error(expr, "Unsupported Expression", "Unsupported expression type %d",
              expr->type);

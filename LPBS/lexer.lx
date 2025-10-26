@@ -32,10 +32,11 @@ pub const Token -> struct {
   col: int,
 };
 
-// const s_symbol: [S_Symbol; 6] = [
-//   {value: "=", type: TOK_EQUALS}, {value: ";", type: TOK_SEMICOLON}, {value: "(", type: TOK_LPAREN},
-//   {value: ")", type: TOK_RPAREN}, {value: "{", type: TOK_LBRACE}, {value: "}", type: TOK_RBRACE}
-// ];
+const s_symbol: [S_Symbol_Map; 6] = [
+ S_Symbol_Map {value: '=', type: TokenType::TOK_EQUALS}, S_Symbol_Map {value: ';', type: TokenType::TOK_SEMICOLON}, 
+ S_Symbol_Map {value: '(', type: TokenType::TOK_LPAREN}, S_Symbol_Map {value: ')', type: TokenType::TOK_RPAREN}, 
+ S_Symbol_Map {value: '{', type: TokenType::TOK_LBRACE}, S_Symbol_Map {value: '}', type: TokenType::TOK_RBRACE}
+];
 
 #takes_ownership
 pub const free_tokens -> fn (tks: *Token) void {
@@ -171,12 +172,27 @@ pub const scan -> fn (path: *char) *Token {
       continue;
     }
     
-    // Handle single character symbols
-    let start_col: int = tks.col;
-    tks.list[tks.size] = make_token(TokenType::TOK_SYMBOL,  string::from_char(ch), tks.line, start_col);
-    tks.size = tks.size + 1;
-    tks.col = tks.col + 1;
-    i = i + 1;
+    let matched: int = 0;
+    loop [k: int = 0](k < 6) : (++k) {
+      if (ch == s_symbol[k].value) {
+        let start_col: int = tks.col;
+        tks.list[tks.size] = make_token(s_symbol[k].type,  string::from_char(ch), tks.line, start_col);
+        tks.size = tks.size + 1;
+        tks.col = tks.col + 1;
+        i = i + 1;
+        matched = 1;
+        break;
+      }
+    }
+
+    if (matched != 1) { 
+      // Handle single character symbols
+      let start_col: int = tks.col;
+      tks.list[tks.size] = make_token(TokenType::TOK_SYMBOL,  string::from_char(ch), tks.line, start_col);
+      tks.size = tks.size + 1;
+      tks.col = tks.col + 1;
+      i = i + 1;
+    }
   }
 
   return tks;

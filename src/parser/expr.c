@@ -273,9 +273,162 @@ Expr *array_expr(Parser *parser) {
                            elements.count, line, col);
 }
 
+// Anonymous struct initialization: { x: 20, y: 50 }
 Expr *struct_expr(Parser *parser) {
+  // When we get here from nud(), we're AT the '{' token
   int line = p_current(parser).line;
   int col = p_current(parser).col;
+
+  p_consume(parser, TOK_LBRACE, "Expected '{' for struct expression");
+
+  GrowableArray field_names, field_values;
+  if (!growable_array_init(&field_names, parser->arena, 4, sizeof(char *)) ||
+      !growable_array_init(&field_values, parser->arena, 4, sizeof(Expr *))) {
+    fprintf(stderr, "Failed to initialize struct field arrays\n");
+    return NULL;
+  }
+
+  // Parse field initializers: field_name: value, ...
+  while (p_has_tokens(parser) && p_current(parser).type_ != TOK_RBRACE) {
+    // Parse field name
+    if (p_current(parser).type_ != TOK_IDENTIFIER) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected field name in struct expression",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+
+    char *field_name = get_name(parser);
+    p_advance(parser); // Consume the field name
+
+    p_consume(parser, TOK_COLON, "Expected ':' after field name");
+
+    // Parse field value
+    Expr *field_value = parse_expr(parser, BP_LOWEST);
+    if (!field_value) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected expression for field value",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+
+    // Store field name and value
+    char **name_slot = (char **)growable_array_push(&field_names);
+    Expr **value_slot = (Expr **)growable_array_push(&field_values);
+
+    if (!name_slot || !value_slot) {
+      fprintf(stderr, "Out of memory while growing struct field arrays\n");
+      return NULL;
+    }
+
+    *name_slot = field_name;
+    *value_slot = field_value;
+
+    // Handle comma separator
+    if (p_current(parser).type_ == TOK_COMMA) {
+      p_advance(parser); // Consume the comma
+    } else if (p_current(parser).type_ != TOK_RBRACE) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected ',' or '}' after field value",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+  }
+
+  p_consume(parser, TOK_RBRACE, "Expected '}' to close struct expression");
+
+  // Anonymous struct (name is NULL)
+  return create_struct_expr(parser->arena, NULL, (char **)field_names.data,
+                            (AstNode **)field_values.data, field_names.count,
+                            line, col);
+}
+
+// Named struct initialization: Point { x: 20, y: 50 }
+// This is called from led() when we see '{' after an identifier
+Expr *named_struct_expr(Parser *parser, Expr *left, BindingPower bp) {
+  (void)bp; // Unused parameter
+
+  // left should be an identifier expression containing the struct name
+  if (left->type != AST_EXPR_IDENTIFIER) {
+    parser_error(parser, "SyntaxError", parser->file_path,
+                 "Expected identifier before '{' for named struct",
+                 p_current(parser).line, p_current(parser).col,
+                 p_current(parser).length);
+    return NULL;
+  }
+
+  char *struct_name = left->expr.identifier.name;
+  int line = p_current(parser).line;
+  int col = p_current(parser).col;
+
+  p_consume(parser, TOK_LBRACE, "Expected '{' for struct expression");
+
+  GrowableArray field_names, field_values;
+  if (!growable_array_init(&field_names, parser->arena, 4, sizeof(char *)) ||
+      !growable_array_init(&field_values, parser->arena, 4, sizeof(Expr *))) {
+    fprintf(stderr, "Failed to initialize struct field arrays\n");
+    return NULL;
+  }
+
+  // Parse field initializers: field_name: value, ...
+  while (p_has_tokens(parser) && p_current(parser).type_ != TOK_RBRACE) {
+    // Parse field name
+    if (p_current(parser).type_ != TOK_IDENTIFIER) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected field name in struct expression",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+
+    char *field_name = get_name(parser);
+    p_advance(parser); // Consume the field name
+
+    p_consume(parser, TOK_COLON, "Expected ':' after field name");
+
+    // Parse field value
+    Expr *field_value = parse_expr(parser, BP_LOWEST);
+    if (!field_value) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected expression for field value",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+
+    // Store field name and value
+    char **name_slot = (char **)growable_array_push(&field_names);
+    Expr **value_slot = (Expr **)growable_array_push(&field_values);
+
+    if (!name_slot || !value_slot) {
+      fprintf(stderr, "Out of memory while growing struct field arrays\n");
+      return NULL;
+    }
+
+    *name_slot = field_name;
+    *value_slot = field_value;
+
+    // Handle comma separator
+    if (p_current(parser).type_ == TOK_COMMA) {
+      p_advance(parser); // Consume the comma
+    } else if (p_current(parser).type_ != TOK_RBRACE) {
+      parser_error(parser, "SyntaxError", parser->file_path,
+                   "Expected ',' or '}' after field value",
+                   p_current(parser).line, p_current(parser).col,
+                   p_current(parser).length);
+      return NULL;
+    }
+  }
+
+  p_consume(parser, TOK_RBRACE, "Expected '}' to close struct expression");
+
+  // Named struct
+  return create_struct_expr(
+      parser->arena, struct_name, (char **)field_names.data,
+      (AstNode **)field_values.data, field_names.count, line, col);
 }
 
 Expr *deref_expr(Parser *parser) {

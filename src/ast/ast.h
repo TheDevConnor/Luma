@@ -38,6 +38,7 @@ typedef enum {
   AST_EXPR_SIZEOF,
   AST_EXPR_SYSTEM, // System Statement
   AST_EXPR_SYSCALL,
+  AST_EXPR_STRUCT,
 
   // Statement nodes
   AST_PROGRAM,             // Program root node
@@ -289,6 +290,13 @@ struct AstNode {
           AstNode *object;
           bool is_type;
         } size_of;
+
+        struct {
+          char *name;            // Struct type name (NULL for anonymous)
+          char **field_names;    // Array of field names
+          AstNode **field_value; // Array of field values (expressions)
+          size_t field_count;    // Number of fields
+        } struct_expr;
       };
     } expr;
 
@@ -564,6 +572,9 @@ AstNode *create_syscall_expr(ArenaAllocator *arena, Expr **args, size_t count,
                              size_t line, size_t col);
 AstNode *create_sizeof_expr(ArenaAllocator *arena, Expr *object, bool is_type,
                             size_t line, size_t col);
+Expr *create_struct_expr(ArenaAllocator *arena, char *name, char **field_names,
+                         AstNode **field_values, size_t field_count, int line,
+                         int col);
 
 // Statement creation macros
 AstNode *create_program_node(ArenaAllocator *arena, AstNode **statements,

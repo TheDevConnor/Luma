@@ -168,7 +168,19 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   if (initializer) {
-    AstNode *init_type = typecheck_expression(initializer, scope, arena);
+    AstNode *init_type = NULL;
+
+    // SPECIAL HANDLING: If initializer is an anonymous struct expression
+    // and we have a declared type, pass it for validation
+    if (initializer->type == AST_EXPR_STRUCT &&
+        !initializer->expr.struct_expr.name && declared_type) {
+      // Call the internal version with expected type for anonymous structs
+      init_type = typecheck_struct_expr_internal(initializer, scope, arena,
+                                                 declared_type);
+    } else {
+      init_type = typecheck_expression(initializer, scope, arena);
+    }
+
     if (!init_type) {
       tc_error(node, "Type Error",
                "Cannot determine type of initializer for variable '%s'", name);

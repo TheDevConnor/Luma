@@ -298,6 +298,7 @@ LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_free(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_addr(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_struct_literal(CodeGenContext *ctx, AstNode *node);
 
 // =============================================================================
 // AST NODE HANDLERS - STATEMENT TYPES
