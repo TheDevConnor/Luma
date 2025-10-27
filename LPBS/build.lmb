@@ -1,0 +1,20 @@
+CC = "luma"
+SRC = ["src/*.lx"]
+PLATFORM = system::name()
+
+app() {
+    out = "build/app.lx"
+
+    if PLATFORM == "windows" {
+        run "{CC}.exe build {SRC} -name {out}"
+    } else {
+        run "{CC} build {SRC} -name {out}"
+    }
+}
+
+clean() {
+    if exists("build") {
+        run "rm -rf build"
+    }
+}
+

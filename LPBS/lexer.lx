@@ -6,21 +6,50 @@ pub const TokenType -> enum {
   TOK_NUMBER,
   TOK_IDENT,
   TOK_STRING,
-  TOK_SYMBOL,
   TOK_WHITESPACE,
-
+  
+  // Symbols
   TOK_EQUALS,
   TOK_SEMICOLON,
   TOK_LPAREN,
   TOK_RPAREN,
   TOK_LBRACE,
   TOK_RBRACE,
+  TOK_LBRACKET,
+  TOK_RBRACKET,
+  TOK_EQEQ,
+  TOK_NOTEQ,
+  TOK_ARROW,
+  TOK_DCOLON,
+
+  // Keywords
+  TOK_TARGET,
+  TOK_IF,
+  TOK_ELSE,
+  TOK_LET,
+  
+  // Built-ins
+  TOK_RUN,
+  TOK_COPY,
+  TOK_MKDIR,
+  TOK_GLOB,
+  TOK_IMPORT,
+  TOK_EXISTS,
+  
+  // Defaults
+  TOK_SYMBOL,
   TOK_UNKNOWN,
 };
 
+// Keywords: target, if, else, let
+// Built-ins: run, copy, mkdir, glob, import, exists
 const K_Symbol_Map -> struct { value: *char, type: int };
 const D_Symbol_Map -> struct { value: *char, type: int };
 const S_Symbol_Map -> struct { value:  char, type: int };
+
+const K_Symbol_Size: int = 10;
+const D_Symbol_Size: int = 4;
+const S_Symbol_Size: int = 8;
 
 pub const Token -> struct {
   list: *Token,
@@ -32,10 +61,26 @@ pub const Token -> struct {
   col: int,
 };
 
-const s_symbol: [S_Symbol_Map; 6] = [
- S_Symbol_Map {value: '=', type: TokenType::TOK_EQUALS}, S_Symbol_Map {value: ';', type: TokenType::TOK_SEMICOLON}, 
- S_Symbol_Map {value: '(', type: TokenType::TOK_LPAREN}, S_Symbol_Map {value: ')', type: TokenType::TOK_RPAREN}, 
- S_Symbol_Map {value: '{', type: TokenType::TOK_LBRACE}, S_Symbol_Map {value: '}', type: TokenType::TOK_RBRACE}
+const k_symbol: [K_Symbol_Map; 10] = [
+  K_Symbol_Map{value: "target", type: TokenType::TOK_TARGET}, K_Symbol_Map{value: "if",     type: TokenType::TOK_IF},     
+  K_Symbol_Map{value: "else",   type: TokenType::TOK_ELSE},   K_Symbol_Map{value: "run",    type: TokenType::TOK_RUN},       
+  K_Symbol_Map{value: "copy",   type: TokenType::TOK_COPY},   K_Symbol_Map{value: "mkdir",  type: TokenType::TOK_MKDIR},
+  K_Symbol_Map{value: "glob",   type: TokenType::TOK_GLOB},   K_Symbol_Map{value: "import", type: TokenType::TOK_IMPORT}, 
+  K_Symbol_Map{value: "exists", type: TokenType::TOK_EXISTS}, K_Symbol_Map{value: "let",    type: TokenType::TOK_LET}
+];
+
+const d_symbol: [D_Symbol_Map; 4] = [
+  D_Symbol_Map{value: "==", type: TokenType::TOK_EQEQ},
+  D_Symbol_Map{value: "!=", type: TokenType::TOK_NOTEQ},
+  D_Symbol_Map{value: "->", type: TokenType::TOK_ARROW},
+  D_Symbol_Map{value: "::", type: TokenType::TOK_DCOLON}
+];
+
+const s_symbol: [S_Symbol_Map; 8]  = [
+  S_Symbol_Map{value: '=', type: TokenType::TOK_EQUALS},   S_Symbol_Map{value: ';', type: TokenType::TOK_SEMICOLON}, 
+  S_Symbol_Map{value: '(', type: TokenType::TOK_LPAREN},   S_Symbol_Map{value: ')', type: TokenType::TOK_RPAREN}, 
+  S_Symbol_Map{value: '{', type: TokenType::TOK_LBRACE},   S_Symbol_Map{value: '}', type: TokenType::TOK_RBRACE},
+  S_Symbol_Map{value: '[', type: TokenType::TOK_LBRACKET}, S_Symbol_Map{value: ']', type: TokenType::TOK_RBRACKET}
 ];
 
 #takes_ownership
@@ -93,16 +138,16 @@ pub const scan -> fn (path: *char) *Token {
     if (string::is_alpha(ch)) {
       let start_pos: int = i;
       let start_col: int = tks.col;
-      
+    
       // Scan to end of identifier
       loop ((i < src_len) && string::is_alnum(path[i])) {
         i = i + 1;
         tks.col = tks.col + 1;
       }
-      
+    
       let length: int = i - start_pos;
       let word: *char = cast<*char>(alloc(length + 1));
-      
+    
       // Copy the identifier
       let k: int = 0;
       loop (k < length) {
@@ -110,10 +155,23 @@ pub const scan -> fn (path: *char) *Token {
         k = k + 1;
       }
       word[length] = '\0';
-      
-      // Store token
-      tks.list[tks.size] = make_token(TokenType::TOK_IDENT, word, tks.line, start_col);
-      tks.size = tks.size + 1;
+    
+      // Check keywords
+      let matched: int = 0;
+      loop [j: int = 0](j < 10) : (++j) {
+        if (string::strcmp(word, k_symbol[j].value) == 0) {
+          tks.list[tks.size] = make_token(k_symbol[j].type, word, tks.line, start_col);
+          tks.size = tks.size + 1;
+          matched = 1;
+          break;
+        }
+      }
+    
+      if (matched == 0) {
+        tks.list[tks.size] = make_token(TokenType::TOK_IDENT, word, tks.line, start_col);
+        tks.size = tks.size + 1;
+      }
+    
       continue;
     }
     
@@ -171,9 +229,31 @@ pub const scan -> fn (path: *char) *Token {
       tks.col = tks.col + 1;
       continue;
     }
-    
+
     let matched: int = 0;
-    loop [k: int = 0](k < 6) : (++k) {
+    if (i + 1 < src_len) {
+      let two: *char = cast<*char>(alloc(3 * sizeof<char>));
+      two[0] = path[i];
+      two[1] = path[i + 1];
+      two[2] = '\0';
+    
+      loop [k: int = 0](k < 4) : (++k) {
+        if (string::strcmp(two, d_symbol[k].value) == 0) {
+          let start_col: int = tks.col;
+          tks.list[tks.size] = make_token(d_symbol[k].type, two, tks.line, start_col);
+          tks.size = tks.size + 1;
+          tks.col = tks.col + 2;
+          i = i + 2;
+          matched = 1;
+          break;
+        }
+      }
+
+      if (matched == 0) { free(two); }
+    }
+   
+    matched == 0;
+    loop [k: int = 0](k < 8) : (++k) {
       if (ch == s_symbol[k].value) {
         let start_col: int = tks.col;
         tks.list[tks.size] = make_token(s_symbol[k].type,  string::from_char(ch), tks.line, start_col);
@@ -184,18 +264,8 @@ pub const scan -> fn (path: *char) *Token {
         break;
       }
     }
-
-    if (matched != 1) { 
-      // Handle single character symbols
-      let start_col: int = tks.col;
-      tks.list[tks.size] = make_token(TokenType::TOK_SYMBOL,  string::from_char(ch), tks.line, start_col);
-      tks.size = tks.size + 1;
-      tks.col = tks.col + 1;
-      i = i + 1;
-    }
   }
 
   return tks;
 }
-
 
