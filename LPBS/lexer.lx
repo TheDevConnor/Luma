@@ -1,6 +1,7 @@
 @module "lexer"
 
 @use "string" as string
+@use "sys" as sys
 
 pub const TokenType -> enum {
   TOK_NUMBER,
@@ -83,14 +84,43 @@ const s_symbol: [S_Symbol_Map; 8]  = [
   S_Symbol_Map{value: '[', type: TokenType::TOK_LBRACKET}, S_Symbol_Map{value: ']', type: TokenType::TOK_RBRACKET}
 ];
 
+// Helper function to print error messages with line and column info
+const print_error -> fn (msg: *char, line: int, col: int) void {
+  sys::eprint("Lexer Error at line ");
+  
+  // Allocate buffer for line number
+  let line_buf: *char = cast<*char>(alloc(20));
+  string::int_to_str(line, line_buf, 20);
+  sys::eprint(line_buf);
+  free(line_buf);
+  
+  sys::eprint(", column ");
+  
+  // Allocate buffer for column number
+  let col_buf: *char = cast<*char>(alloc(20));
+  string::int_to_str(col, col_buf, 20);
+  sys::eprint(col_buf);
+  free(col_buf);
+  
+  sys::eprint(": ");
+  sys::eprint(msg);
+  sys::eprint("\n");
+}
+
 #takes_ownership
 pub const free_tokens -> fn (tks: *Token) void {
-  loop [i: int = 0](i < tks.size) : (++i) {
-    if (tks.list[i].value != cast<*char>(0)) {
-      free(tks.list[i].value);
-    }
+  if (tks == cast<*Token>(0)) {
+    return;
   }
-  free(tks.list);
+  
+  if (tks.list != cast<*Token>(0)) {
+    loop [i: int = 0](i < tks.size) : (++i) {
+      if (tks.list[i].value != cast<*char>(0)) {
+        free(tks.list[i].value);
+      }
+    }
+    free(tks.list);
+  }
   free(tks);
 }
 
@@ -109,11 +139,31 @@ const is_whitespace -> fn (ch: char) bool {
 
 #returns_ownership
 pub const scan -> fn (path: *char) *Token {
-  let src_len: int = string::strlen(path);
-  let tks: *Token = cast<*Token>(alloc(sizeof<Token>));
+  // Validate input
+  if (path == cast<*char>(0)) {
+    sys::eprint("Lexer Error: NULL input provided to scan()\n");
+    return cast<*Token>(0);
+  }
   
-  tks.capacity = src_len * 2;  // Increase capacity
+  let src_len: int = string::strlen(path);
+  if (src_len == 0) {
+    sys::eprint("Lexer Warning: Empty input provided to scan()\n");
+  }
+  
+  let tks: *Token = cast<*Token>(alloc(sizeof<Token>));
+  if (tks == cast<*Token>(0)) {
+    sys::eprint("Lexer Error: Failed to allocate memory for token structure\n");
+    return cast<*Token>(0);
+  }
+  
+  tks.capacity = src_len * 2;
   tks.list = cast<*Token>(alloc(tks.capacity * sizeof<Token>));
+  if (tks.list == cast<*Token>(0)) {
+    sys::eprint("Lexer Error: Failed to allocate memory for token list\n");
+    free(tks);
+    return cast<*Token>(0);
+  }
+  
   tks.size = 0; 
   tks.line = 1;
   tks.col  = 1;
@@ -134,6 +184,15 @@ pub const scan -> fn (path: *char) *Token {
       continue;
     }
     
+    // Handle comments (if they start with #)
+    if (ch == '#') {
+      // Skip until end of line
+      loop ((i < src_len) && (path[i] != '\n')) {
+        i = i + 1;
+      }
+      continue;
+    }
+    
     // Handle identifiers and keywords
     if (string::is_alpha(ch)) {
       let start_pos: int = i;
@@ -147,6 +206,12 @@ pub const scan -> fn (path: *char) *Token {
     
       let length: int = i - start_pos;
       let word: *char = cast<*char>(alloc(length + 1));
+      
+      if (word == cast<*char>(0)) {
+        print_error("Failed to allocate memory for identifier", tks.line, start_col);
+        free_tokens(tks);
+        return cast<*Token>(0);
+      }
     
       // Copy the identifier
       let k: int = 0;
@@ -188,6 +253,12 @@ pub const scan -> fn (path: *char) *Token {
       let length: int = i - start_pos;
       let num: *char = cast<*char>(alloc(length + 1));
       
+      if (num == cast<*char>(0)) {
+        print_error("Failed to allocate memory for number", tks.line, start_col);
+        free_tokens(tks);
+        return cast<*Token>(0);
+      }
+      
       let k: int = 0;
       loop (k < length) {
         num[k] = path[start_pos + k];
@@ -208,12 +279,30 @@ pub const scan -> fn (path: *char) *Token {
       let start_pos: int = i;
       
       loop ((i < src_len) && (path[i] != '"')) {
+        if (path[i] == '\n') {
+          print_error("Unterminated string literal (newline encountered)", tks.line, start_col);
+          free_tokens(tks);
+          return cast<*Token>(0);
+        }
         i = i + 1;
         tks.col = tks.col + 1;
       }
       
+      // Check if we reached end of file without closing quote
+      if (i >= src_len) {
+        print_error("Unterminated string literal (end of file)", tks.line, start_col);
+        free_tokens(tks);
+        return cast<*Token>(0);
+      }
+      
       let length: int = i - start_pos;
       let str_val: *char = cast<*char>(alloc(length + 1));
+      
+      if (str_val == cast<*char>(0)) {
+        print_error("Failed to allocate memory for string", tks.line, start_col);
+        free_tokens(tks);
+        return cast<*Token>(0);
+      }
       
       let k: int = 0;
       loop (k < length) {
@@ -230,9 +319,17 @@ pub const scan -> fn (path: *char) *Token {
       continue;
     }
 
+    // Handle double-character symbols
     let matched: int = 0;
     if (i + 1 < src_len) {
       let two: *char = cast<*char>(alloc(3 * sizeof<char>));
+      
+      if (two == cast<*char>(0)) {
+        print_error("Failed to allocate memory for symbol", tks.line, tks.col);
+        free_tokens(tks);
+        return cast<*Token>(0);
+      }
+      
       two[0] = path[i];
       two[1] = path[i + 1];
       two[2] = '\0';
@@ -249,23 +346,63 @@ pub const scan -> fn (path: *char) *Token {
         }
       }
 
-      if (matched == 0) { free(two); }
+      if (matched == 0) { 
+        free(two); 
+      }
     }
    
-    matched == 0;
-    loop [k: int = 0](k < 8) : (++k) {
-      if (ch == s_symbol[k].value) {
-        let start_col: int = tks.col;
-        tks.list[tks.size] = make_token(s_symbol[k].type,  string::from_char(ch), tks.line, start_col);
-        tks.size = tks.size + 1;
-        tks.col = tks.col + 1;
-        i = i + 1;
-        matched = 1;
-        break;
+    // Handle single-character symbols
+    if (matched == 0) {
+      matched = 0;
+      loop [k: int = 0](k < 8) : (++k) {
+        if (ch == s_symbol[k].value) {
+          let start_col: int = tks.col;
+          
+          if (ch == '\0') {
+            print_error("Failed to allocate memory for symbol", tks.line, start_col);
+            free_tokens(tks);
+            return cast<*Token>(0);
+          }
+          
+          // Ownership transferred to token - will be freed by free_tokens()
+          tks.list[tks.size] = make_token(s_symbol[k].type, string::from_char(ch), tks.line, start_col);
+          tks.size = tks.size + 1;
+          tks.col = tks.col + 1;
+          i = i + 1;
+          matched = 1;
+          break;
+        }
+      }
+      
+      // If still no match, we have an unknown character
+      if (matched == 0) {
+        sys::eprint("Lexer Error at line ");
+        
+        let line_buf: *char = cast<*char>(alloc(20));
+        string::int_to_str(tks.line, line_buf, 20);
+        sys::eprint(line_buf);
+        free(line_buf);
+        
+        sys::eprint(", column ");
+        
+        let col_buf: *char = cast<*char>(alloc(20));
+        string::int_to_str(tks.col, col_buf, 20);
+        sys::eprint(col_buf);
+        free(col_buf);
+        
+        sys::eprint(": Unknown character '");
+        let unknown: *char = cast<*char>(alloc(2));
+        unknown[0] = ch;
+        unknown[1] = '\0';
+        sys::eprint(unknown);
+        free(unknown);
+        sys::eprint("'\n");
+        
+        free_tokens(tks);
+        return cast<*Token>(0);
       }
     }
   }
 
   return tks;
 }
-

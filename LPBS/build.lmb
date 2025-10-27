@@ -17,4 +17,3 @@ clean() {
         run "rm -rf build"
     }
 }
-

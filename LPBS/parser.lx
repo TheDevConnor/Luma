@@ -1,0 +1,34 @@
+@module "parser"
+
+@use "lexer" as lexer
+
+const BindingPower -> enum {
+  BP_NONE,    /**< No binding power */
+  BP_LOWEST,      /**< Lowest binding power */
+  BP_ASSIGN,      /**< Assignment operators (=, +=, etc.) */
+  BP_TERNARY,     /**< Ternary conditional operator (? :) */
+  BP_LOGICAL_OR,  /**< Logical OR operator (||) */
+  BP_LOGICAL_AND, /**< Logical AND operator (&&) */
+  BP_BITWISE_OR,  /**< Bitwise OR operator (|) */
+  BP_BITWISE_XOR, /**< Bitwise XOR operator (^) */
+  BP_BITWISE_AND, /**< Bitwise AND operator (&) */
+  BP_EQUALITY,    /**< Equality operators (==, !=) */
+  BP_RELATIONAL,  /**< Relational operators (<, >, <=, >=) */
+  BP_RANGE,       /**< Range operations (..) */
+  BP_SHIFT,       /**< Shift operators (<<, >>) */
+  BP_SUM,         /**< Addition and subtraction (+, -) */
+  BP_PRODUCT,     /**< Multiplication, division, modulo (*, /, %) */
+  BP_EXPONENT,    /**< Exponentiation operator (**) */
+  BP_UNARY,       /**< Unary operators (!, ~, +, -, prefix ++/--) */
+  BP_POSTFIX,     /**< Postfix operators (++/-- postfix) */
+  BP_CALL,        /**< Function call or indexing */
+  BP_PRIMARY      /**< Primary expressions (literals, variables) */
+};
+
+pub const Parser -> struct {
+  path: *char,
+  tks: *Token,
+  tk_count: int,
+  capacity: int,
+  pos: int,
+};

@@ -45,6 +45,34 @@ pub const from_int -> fn (n: int) *char {
   return s;
 }
 
+pub const int_to_str -> fn (num: int, buf: *char, buf_size: int) void {
+  let idx: int = 0;
+  let temp: int = num;
+  
+  if (temp == 0) {
+    buf[0] = '0';
+    buf[1] = '\0';
+    return;
+  }
+  
+  loop (temp > 0 && idx < buf_size - 1) {
+    buf[idx] = cast<char>((temp % 10) + 48);
+    temp = temp / 10;
+    idx = idx + 1;
+  }
+  
+  // Reverse the digits
+  let j: int = 0;
+  loop (j < idx / 2) {
+    let tmp: char = buf[j];
+    buf[j] = buf[idx - 1 - j];
+    buf[idx - 1 - j] = tmp;
+    j = j + 1;
+  }
+  
+  buf[idx] = '\0';
+}
+
 pub const strlen -> fn (s: *char) int {
   let length: int = 0;
   loop (s[length] != cast<char>(0)) : (++length) {}
