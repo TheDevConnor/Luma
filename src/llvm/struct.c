@@ -478,6 +478,65 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
       }
     }
 
+  } else if (object->type == AST_EXPR_MEMBER) {
+    // **NEW: Handle chained member access like psr.tks.list**
+    // First, recursively resolve the base member access
+    LLVMValueRef base_value = codegen_expr_struct_access(ctx, object);
+    if (!base_value) {
+      fprintf(stderr, "Error: Failed to resolve chained member access\n");
+      return NULL;
+    }
+
+    LLVMTypeRef base_type = LLVMTypeOf(base_value);
+    LLVMTypeKind base_kind = LLVMGetTypeKind(base_type);
+
+    // Check if the result is a struct
+    if (base_kind == LLVMStructTypeKind) {
+      // Find which struct type this is
+      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+        if (info->llvm_type == base_type) {
+          struct_info = info;
+          break;
+        }
+      }
+
+      if (!struct_info) {
+        // Try to find by field name
+        for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+          int field_idx = get_field_index(info, field_name);
+          if (field_idx >= 0) {
+            struct_info = info;
+            break;
+          }
+        }
+      }
+
+      if (struct_info) {
+        // Allocate space to store the struct value so we can GEP into it
+        struct_ptr =
+            LLVMBuildAlloca(ctx->builder, base_type, "chained_struct_temp");
+        LLVMBuildStore(ctx->builder, base_value, struct_ptr);
+      }
+    } else if (base_kind == LLVMPointerTypeKind) {
+      // The chained access returned a pointer
+      struct_ptr = base_value;
+
+      // Try to find struct info by field name
+      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+        int field_idx = get_field_index(info, field_name);
+        if (field_idx >= 0) {
+          struct_info = info;
+          break;
+        }
+      }
+    } else {
+      fprintf(stderr,
+              "Error: Chained member access does not produce a struct (kind: "
+              "%d)\n",
+              base_kind);
+      return NULL;
+    }
+
   } else if (object->type == AST_EXPR_DEREF) {
     // Pointer dereference: (*struct_ptr).field
     LLVMValueRef ptr = codegen_expr(ctx, object->expr.deref.object);
@@ -497,7 +556,7 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
     }
 
   } else if (object->type == AST_EXPR_INDEX) {
-    // NEW: Handle indexed struct access like lex.list[i].value
+    // Handle indexed struct access like lex.list[i].value
 
     // First, generate the indexed expression (e.g., lex.list[i])
     LLVMValueRef indexed_value = codegen_expr_index(ctx, object);
@@ -634,18 +693,10 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
       LLVMBuildStructGEP2(ctx->builder, struct_info->llvm_type, struct_ptr,
                           field_index, "field_ptr");
 
-  // CRITICAL FIX: If this field is a pointer type, we need to preserve element
-  // type info This is done by checking
-  // struct_info->field_element_types[field_index]
+  // Load the element value
   LLVMValueRef result =
       LLVMBuildLoad2(ctx->builder, struct_info->field_types[field_index],
                      field_ptr, "field_val");
-
-  // Store element type information in a way that can be retrieved later
-  // NOTE: This is a workaround - ideally we'd have a way to tag LLVM values
-  // with metadata For now, the element type is stored in
-  // struct_info->field_element_types[field_index] and can be looked up when
-  // this value is used in indexing operations
 
   return result;
 }

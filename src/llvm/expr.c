@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "llvm.h"
@@ -719,8 +720,6 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       // Final fallback: use value type
       if (!element_type) {
         element_type = value_type;
-        fprintf(stderr, "Warning: Could not determine pointer element type, "
-                        "using value type\n");
       }
 
       // Convert value to match element type if needed
@@ -948,6 +947,165 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
     return NULL;
   }
 
+  // **NEW: Special handling for indexing member access (struct.field[index])**
+  if (node->expr.index.object->type == AST_EXPR_MEMBER) {
+    AstNode *member_expr = node->expr.index.object;
+    const char *field_name = member_expr->expr.member.member;
+
+    // Generate the member access to get the pointer
+    LLVMValueRef pointer = codegen_expr_struct_access(ctx, member_expr);
+    if (!pointer) {
+      fprintf(stderr, "Error: Failed to resolve member access for indexing\n");
+      return NULL;
+    }
+
+    // Generate the index expression
+    LLVMValueRef index = codegen_expr(ctx, node->expr.index.index);
+    if (!index) {
+      return NULL;
+    }
+
+    LLVMTypeRef pointer_type = LLVMTypeOf(pointer);
+    LLVMTypeKind pointer_kind = LLVMGetTypeKind(pointer_type);
+
+    // The member access should have returned a pointer
+    if (pointer_kind != LLVMPointerTypeKind) {
+      fprintf(stderr, "Error: Member '%s' is not a pointer type for indexing\n",
+              field_name);
+      return NULL;
+    }
+
+    // Find the struct that contains this field to get element type info
+    LLVMTypeRef element_type = NULL;
+
+    // Build a list of field names in the chain (in reverse order)
+    const char *field_chain[32];
+    int chain_length = 0;
+    AstNode *current_node = member_expr;
+
+    while (current_node && current_node->type == AST_EXPR_MEMBER &&
+           chain_length < 32) {
+      field_chain[chain_length++] = current_node->expr.member.member;
+      current_node = current_node->expr.member.object;
+    }
+
+    // Reverse the chain to get the correct order
+    for (int i = 0; i < chain_length / 2; i++) {
+      const char *temp = field_chain[i];
+      field_chain[i] = field_chain[chain_length - 1 - i];
+      field_chain[chain_length - 1 - i] = temp;
+    }
+
+    // Find the base identifier
+    AstNode *base_obj = member_expr->expr.member.object;
+    while (base_obj->type == AST_EXPR_MEMBER) {
+      base_obj = base_obj->expr.member.object;
+    }
+
+    if (base_obj->type == AST_EXPR_IDENTIFIER) {
+      const char *base_name = base_obj->expr.identifier.name;
+      LLVM_Symbol *base_sym = find_symbol(ctx, base_name);
+
+      if (base_sym) {
+        // Find the initial struct type
+        StructInfo *current_struct = NULL;
+        LLVMTypeRef sym_type = base_sym->type;
+        LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
+
+        if (sym_kind == LLVMPointerTypeKind && base_sym->element_type) {
+          // It's a pointer to struct
+          for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+            if (info->llvm_type == base_sym->element_type) {
+              current_struct = info;
+              break;
+            }
+          }
+        } else if (sym_kind == LLVMStructTypeKind) {
+          // Direct struct type
+          for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+            if (info->llvm_type == sym_type) {
+              current_struct = info;
+              break;
+            }
+          }
+        }
+
+        // Trace through the field chain
+        for (int i = 0; i < chain_length && current_struct; i++) {
+          const char *current_field_name = field_chain[i];
+          int field_idx = get_field_index(current_struct, current_field_name);
+
+          if (field_idx < 0) {
+            fprintf(stderr, "Error: Field '%s' not found in struct '%s'\n",
+                    current_field_name, current_struct->name);
+            break;
+          }
+
+          // If this is the last field in the chain, get its element type
+          if (i == chain_length - 1) {
+            element_type = current_struct->field_element_types[field_idx];
+            break;
+          }
+
+          // Otherwise, move to the next struct in the chain
+          LLVMTypeRef field_type = current_struct->field_types[field_idx];
+          LLVMTypeKind field_kind = LLVMGetTypeKind(field_type);
+
+          if (field_kind == LLVMStructTypeKind) {
+            // Field is a struct - find its info
+            StructInfo *next_struct = NULL;
+            for (StructInfo *info = ctx->struct_types; info;
+                 info = info->next) {
+              if (info->llvm_type == field_type) {
+                next_struct = info;
+                break;
+              }
+            }
+            current_struct = next_struct;
+          } else if (field_kind == LLVMPointerTypeKind) {
+            // Field is a pointer - get what it points to
+            LLVMTypeRef pointee =
+                current_struct->field_element_types[field_idx];
+            if (pointee && LLVMGetTypeKind(pointee) == LLVMStructTypeKind) {
+              // Find the struct info for the pointee
+              StructInfo *next_struct = NULL;
+              for (StructInfo *info = ctx->struct_types; info;
+                   info = info->next) {
+                if (info->llvm_type == pointee) {
+                  next_struct = info;
+                  break;
+                }
+              }
+              current_struct = next_struct;
+            } else {
+              // Not a struct pointer, can't continue
+              break;
+            }
+          } else {
+            // Field is not a struct or pointer, can't continue
+            break;
+          }
+        }
+      }
+    }
+
+    if (!element_type) {
+      fprintf(
+          stderr,
+          "Error: Could not determine pointer element type for indexing '%s'\n",
+          field_name);
+      return NULL;
+    }
+
+    // Build GEP for pointer arithmetic
+    LLVMValueRef element_ptr = LLVMBuildGEP2(
+        ctx->builder, element_type, pointer, &index, 1, "member_ptr_element");
+
+    // Load the actual value
+    return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
+                          "member_element_val");
+  }
+
   // Generate the object being indexed
   LLVMValueRef object = codegen_expr(ctx, node->expr.index.object);
   if (!object) {
@@ -1080,53 +1238,6 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
         AstNode *pointee_node =
             cast_node->expr.cast.type->type_data.pointer.pointee_type;
         pointee_type = codegen_type(ctx, pointee_node);
-      }
-    } else if (node->expr.index.object->type == AST_EXPR_MEMBER) {
-      AstNode *member_expr = node->expr.index.object;
-      const char *field_name = member_expr->expr.member.member;
-
-      // Need to get the base object to find which struct this field belongs to
-      AstNode *base_obj = member_expr->expr.member.object;
-
-      if (base_obj->type == AST_EXPR_IDENTIFIER) {
-        const char *base_name = base_obj->expr.identifier.name;
-        LLVM_Symbol *base_sym = find_symbol(ctx, base_name);
-
-        if (base_sym) {
-          // Determine the struct type
-          LLVMTypeRef base_type = base_sym->type;
-          StructInfo *struct_info = NULL;
-
-          // If base is a pointer to struct, get the pointee type
-          if (LLVMGetTypeKind(base_type) == LLVMPointerTypeKind &&
-              base_sym->element_type) {
-            // Find struct info by its LLVM type
-            for (StructInfo *info = ctx->struct_types; info;
-                 info = info->next) {
-              if (info->llvm_type == base_sym->element_type) {
-                struct_info = info;
-                break;
-              }
-            }
-          } else {
-            // Direct struct type
-            for (StructInfo *info = ctx->struct_types; info;
-                 info = info->next) {
-              if (info->llvm_type == base_type) {
-                struct_info = info;
-                break;
-              }
-            }
-          }
-
-          if (struct_info) {
-            int field_idx = get_field_index(struct_info, field_name);
-            if (field_idx >= 0) {
-              // Use the element type stored for this field
-              pointee_type = struct_info->field_element_types[field_idx];
-            }
-          }
-        }
       }
     }
 

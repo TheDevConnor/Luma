@@ -217,7 +217,8 @@ pub const scan -> fn (path: *char) *Token {
       let word: *char = cast<*char>(alloc(length + 1));
       
       if (word == cast<*char>(0)) {
-        print_error("Failed to allocate memory for identifier", tks.line, start_col);
+        print_error("Failed to allocate memory for identifier", 
+                    tks.line, start_col);
         free_tokens(tks);
         return cast<*Token>(0);
       }
@@ -234,7 +235,8 @@ pub const scan -> fn (path: *char) *Token {
       let matched: int = 0;
       loop [j: int = 0](j < 10) : (++j) {
         if (string::strcmp(word, k_symbol[j].value) == 0) {
-          tks.list[tks.size] = make_token(k_symbol[j].type, word, tks.line, start_col);
+          tks.list[tks.size] = make_token(k_symbol[j].type, word, 
+                                          tks.line, start_col);
           tks.size = tks.size + 1;
           matched = 1;
           break;
@@ -242,7 +244,8 @@ pub const scan -> fn (path: *char) *Token {
       }
     
       if (matched == 0) {
-        tks.list[tks.size] = make_token(TokenType::TOK_IDENT, word, tks.line, start_col);
+        tks.list[tks.size] = make_token(TokenType::TOK_IDENT, word, 
+                                        tks.line, start_col);
         tks.size = tks.size + 1;
       }
     
@@ -275,7 +278,8 @@ pub const scan -> fn (path: *char) *Token {
       }
       num[length] = '\0';
       
-      tks.list[tks.size] = make_token(TokenType::TOK_NUMBER, num, tks.line, start_col);
+      tks.list[tks.size] = make_token(TokenType::TOK_NUMBER, num, 
+                                      tks.line, start_col);
       tks.size = tks.size + 1;
       continue;
     }
@@ -300,7 +304,8 @@ pub const scan -> fn (path: *char) *Token {
       
       // Check if we reached end of file without closing quote
       if (i >= src_len) {
-        print_error("Unterminated string literal (end of file)", tks.line, start_col);
+        print_error("Unterminated string literal (end of file)", 
+                    tks.line, start_col);
         free_tokens(tks);
         return cast<*Token>(0);
       }
@@ -321,7 +326,8 @@ pub const scan -> fn (path: *char) *Token {
       }
       str_val[length] = '\0';
       
-      tks.list[tks.size] = make_token(TokenType::TOK_STRING, str_val, tks.line, start_col);
+      tks.list[tks.size] = make_token(TokenType::TOK_STRING, str_val, 
+                                      tks.line, start_col);
       tks.size = tks.size + 1;
       
       i = i + 1;  // Skip closing quote
@@ -347,7 +353,8 @@ pub const scan -> fn (path: *char) *Token {
       loop [k: int = 0](k < 4) : (++k) {
         if (string::strcmp(two, d_symbol[k].value) == 0) {
           let start_col: int = tks.col;
-          tks.list[tks.size] = make_token(d_symbol[k].type, two, tks.line, start_col);
+          tks.list[tks.size] = make_token(d_symbol[k].type, two, 
+                                          tks.line, start_col);
           tks.size = tks.size + 1;
           tks.col = tks.col + 2;
           i = i + 2;
@@ -369,14 +376,16 @@ pub const scan -> fn (path: *char) *Token {
           let start_col: int = tks.col;
           
           if (ch == '\0') {
-            print_error("Failed to allocate memory for symbol", tks.line, start_col);
+            print_error("Failed to allocate memory for symbol", tks.line, 
+                        start_col);
             free_tokens(tks);
             return cast<*Token>(0);
           }
           
           // Ownership transferred to token - will be freed by free_tokens()
           tks.list[tks.size] = 
-                make_token(s_symbol[k].type, string::from_char(ch), tks.line, start_col);
+                make_token(s_symbol[k].type, string::from_char(ch), 
+                           tks.line, start_col);
           tks.size = tks.size + 1;
           tks.col = tks.col + 1;
           i = i + 1;

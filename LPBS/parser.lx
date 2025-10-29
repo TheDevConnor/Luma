@@ -26,9 +26,21 @@ const BindingPower -> enum {
 };
 
 pub const Parser -> struct {
-  path: *char,
   tks: *Token,
-  tk_count: int,
-  capacity: int,
+  path: *char,
   pos: int,
 };
+
+pub const init_parser -> fn (psr: *Parser, tks: *Token) void {
+  psr.path = path;
+  psr.tks = tks;
+  psr.pos = 0;
+}
+
+pub const peek -> fn (psr: *Parser, index: int) Token {
+  return psr.tks.list[index];
+}
+
+pub const parse -> fn (tks: *Token, path: *char) void {
+  
+}

@@ -2,6 +2,7 @@
 
 @use "string" as string
 @use "lexer" as lexer
+@use "parser" as psr
 @use "io" as io
 
 #takes_ownership
@@ -12,22 +13,26 @@ const clean_up -> fn (path: *char, lex: *Token) void {
 
 pub const main -> fn () int {
   let path: *char = 
-        io::read_file("/home/TheDevConnor/Luma/LPBS/build.lmb");
+        io::read_file("/home/connor/Projects/Luma/LPBS/build.lmb");
   let lex: *Token = lexer::scan(path);
   
-  output("Token count: ");
-  output(lex.size);
-  output("\n");
-  
-  loop [i: int = 0](i < lex.size) : (++i) {
-    let tk: Token = lex.list[i];
-    output("Token ");
-    output(tk.type);
-    output(": ");
-    output(tk.value);
-    output("\tline: ", tk.line, " col: ", tk.col);
-    output("\n");
-  }
+  // output("Token count: ");
+  // output(lex.size);
+  // output("\n");
+  // 
+  // loop [i: int = 0](i < lex.size) : (++i) {
+  //   let tk: Token = lex.list[i];
+  //   output("i: ", i, " Token ");
+  //   output(tk.type);
+  //   output(": ");
+  //   output(tk.value);
+  //   output("\n");
+  // }
+
+  let parser: Parser;
+  psr::init_parser(&parser, lex);
+
+  output(psr::peek(&parser, 45).value, "\n");
  
   clean_up(path, lex);
   return 0;
