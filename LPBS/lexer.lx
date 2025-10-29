@@ -63,11 +63,16 @@ pub const Token -> struct {
 };
 
 const k_symbol: [K_Symbol_Map; 10] = [
-  K_Symbol_Map{value: "target", type: TokenType::TOK_TARGET}, K_Symbol_Map{value: "if",     type: TokenType::TOK_IF},     
-  K_Symbol_Map{value: "else",   type: TokenType::TOK_ELSE},   K_Symbol_Map{value: "run",    type: TokenType::TOK_RUN},       
-  K_Symbol_Map{value: "copy",   type: TokenType::TOK_COPY},   K_Symbol_Map{value: "mkdir",  type: TokenType::TOK_MKDIR},
-  K_Symbol_Map{value: "glob",   type: TokenType::TOK_GLOB},   K_Symbol_Map{value: "import", type: TokenType::TOK_IMPORT}, 
-  K_Symbol_Map{value: "exists", type: TokenType::TOK_EXISTS}, K_Symbol_Map{value: "let",    type: TokenType::TOK_LET}
+  K_Symbol_Map{value: "target", type: TokenType::TOK_TARGET}, 
+  K_Symbol_Map{value: "if",     type: TokenType::TOK_IF},     
+  K_Symbol_Map{value: "else",   type: TokenType::TOK_ELSE},   
+  K_Symbol_Map{value: "run",    type: TokenType::TOK_RUN},       
+  K_Symbol_Map{value: "copy",   type: TokenType::TOK_COPY},   
+  K_Symbol_Map{value: "mkdir",  type: TokenType::TOK_MKDIR},
+  K_Symbol_Map{value: "glob",   type: TokenType::TOK_GLOB},   
+  K_Symbol_Map{value: "import", type: TokenType::TOK_IMPORT}, 
+  K_Symbol_Map{value: "exists", type: TokenType::TOK_EXISTS}, 
+  K_Symbol_Map{value: "let",    type: TokenType::TOK_LET}
 ];
 
 const d_symbol: [D_Symbol_Map; 4] = [
@@ -78,10 +83,14 @@ const d_symbol: [D_Symbol_Map; 4] = [
 ];
 
 const s_symbol: [S_Symbol_Map; 8]  = [
-  S_Symbol_Map{value: '=', type: TokenType::TOK_EQUALS},   S_Symbol_Map{value: ';', type: TokenType::TOK_SEMICOLON}, 
-  S_Symbol_Map{value: '(', type: TokenType::TOK_LPAREN},   S_Symbol_Map{value: ')', type: TokenType::TOK_RPAREN}, 
-  S_Symbol_Map{value: '{', type: TokenType::TOK_LBRACE},   S_Symbol_Map{value: '}', type: TokenType::TOK_RBRACE},
-  S_Symbol_Map{value: '[', type: TokenType::TOK_LBRACKET}, S_Symbol_Map{value: ']', type: TokenType::TOK_RBRACKET}
+  S_Symbol_Map{value: '=', type: TokenType::TOK_EQUALS},   
+  S_Symbol_Map{value: ';', type: TokenType::TOK_SEMICOLON}, 
+  S_Symbol_Map{value: '(', type: TokenType::TOK_LPAREN},   
+  S_Symbol_Map{value: ')', type: TokenType::TOK_RPAREN}, 
+  S_Symbol_Map{value: '{', type: TokenType::TOK_LBRACE},   
+  S_Symbol_Map{value: '}', type: TokenType::TOK_RBRACE},
+  S_Symbol_Map{value: '[', type: TokenType::TOK_LBRACKET}, 
+  S_Symbol_Map{value: ']', type: TokenType::TOK_RBRACKET}
 ];
 
 // Helper function to print error messages with line and column info
@@ -280,7 +289,8 @@ pub const scan -> fn (path: *char) *Token {
       
       loop ((i < src_len) && (path[i] != '"')) {
         if (path[i] == '\n') {
-          print_error("Unterminated string literal (newline encountered)", tks.line, start_col);
+          print_error("Unterminated string literal (newline encountered)", 
+                  tks.line, start_col);
           free_tokens(tks);
           return cast<*Token>(0);
         }
@@ -365,7 +375,8 @@ pub const scan -> fn (path: *char) *Token {
           }
           
           // Ownership transferred to token - will be freed by free_tokens()
-          tks.list[tks.size] = make_token(s_symbol[k].type, string::from_char(ch), tks.line, start_col);
+          tks.list[tks.size] = 
+                make_token(s_symbol[k].type, string::from_char(ch), tks.line, start_col);
           tks.size = tks.size + 1;
           tks.col = tks.col + 1;
           i = i + 1;

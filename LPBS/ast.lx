@@ -1,1 +1,146 @@
 @module "ast"
+
+@use "string" as string
+
+pub const NodeKind -> enum {
+  NODE_NUMBER,
+  NODE_BINARY,
+  NODE_UNARY,
+  NODE_GROUP
+};
+
+pub const ASTNode -> struct { type: int };
+
+pub const Number -> struct {
+  base: ASTNode,
+  value: int
+};
+
+pub const Binary -> struct {
+  base: ASTNode,
+  op: char,       
+  left: *ASTNode,
+  right: *ASTNode
+};
+
+pub const Unary -> struct {
+  base: ASTNode,
+  op: char,       
+  operand: *ASTNode
+};
+
+pub const Group -> struct {
+  base: ASTNode,      
+  expr: *ASTNode
+};
+
+#takes_ownership
+pub const free_ast -> fn (node: *ASTNode) void {
+  if (node == cast<*ASTNode>(0)) { 
+      return; 
+  }
+
+  if (node.type == NodeKind::NODE_NUMBER) { 
+      // nothing inside to free
+  } elif (node.type == NodeKind::NODE_BINARY) {
+    let bin_node: *Binary = cast<*Binary>(node);
+    free_ast(bin_node.left);
+    free_ast(bin_node.right);
+  } elif (node.type == NodeKind::NODE_UNARY) {
+    let unary_node: *Unary = cast<*Unary>(node);
+    free_ast(unary_node.operand);
+  } elif (node.type == NodeKind::NODE_GROUP) {
+    let group_node: *Group = cast<*Group>(node);
+    free_ast(group_node.expr);
+  }
+
+  free(node);
+}
+
+#returns_ownership
+pub const create_number_node -> fn (value: int) *ASTNode {
+  let node: *Number = cast<*Number>(alloc(sizeof<Number>));
+  let base_node: *ASTNode = cast<*ASTNode>(node);  
+
+  base_node.type = NodeKind::NODE_NUMBER;
+  node.value = value;
+  return cast<*ASTNode>(node);
+}
+
+#returns_ownership
+pub const create_binary_node -> fn (op: char, left: *ASTNode, 
+                                right: *ASTNode) *ASTNode {
+  let node: *Binary = cast<*Binary>(alloc(sizeof<Binary> + sizeof<ASTNode> + 1));
+  let base_node: *ASTNode = cast<*ASTNode>(node);  
+
+  base_node.type = NodeKind::NODE_BINARY;
+  node.op = op;
+  node.left = left;
+  node.right = right;
+  return cast<*ASTNode>(node);
+}
+
+#returns_ownership
+pub const create_unary_node -> fn (op: char, operand: *ASTNode) *ASTNode {
+  let node: *Unary = cast<*Unary>(alloc(sizeof<Unary> + sizeof<ASTNode>));
+  let base_node: *ASTNode = cast<*ASTNode>(node);  
+
+  base_node.type = NodeKind::NODE_UNARY;
+  node.op = op;
+  node.operand = operand;
+  return cast<*ASTNode>(node);
+}
+
+#returns_ownership
+pub const create_group_node -> fn (expr: *ASTNode) *ASTNode {
+  let node: *Group = cast<*Group>(alloc(sizeof<Group> + sizeof<ASTNode>));
+  let base_node: *ASTNode = cast<*ASTNode>(node);  
+  base_node.type = NodeKind::NODE_GROUP;
+  node.expr = expr;
+  return cast<*ASTNode>(node);
+}
+
+pub const print_ast -> fn (node: *ASTNode) void {
+  if (node == cast<*ASTNode>(0)) { return; }
+  
+  if (node.type == NodeKind::NODE_NUMBER) { 
+    let num_node: *Number = cast<*Number>(node);
+    output(num_node.value);
+  } elif (node.type == NodeKind::NODE_BINARY) {
+    let bin_node: *Binary = cast<*Binary>(node);
+    let binop: *char = string::from_char(bin_node.op);
+    defer { free(binop); }
+
+    print_ast(bin_node.left);
+    output(" ", binop, " ");
+    print_ast(bin_node.right);
+  } elif (node.type == NodeKind::NODE_UNARY) {
+    let unary_node: *Unary = cast<*Unary>(node);
+    let unop: *char = string::from_char(unary_node.op);
+    defer { free(unop); }
+
+    output(unop);
+    print_ast(unary_node.operand);
+  } elif (node.type == NodeKind::NODE_GROUP) {
+    let group_node: *Group = cast<*Group>(node);
+
+    output("(");
+    print_ast(group_node.expr);
+    output(")");
+  }
+}
+
+pub const main -> fn () int {
+  let node: *ASTNode = create_unary_node('-', 
+                       create_group_node(
+                          create_binary_node('*', 
+                          create_binary_node('+', 
+                              create_number_node(5), 
+                              create_number_node(3)), 
+                          create_number_node(2))));
+  print_ast(node);
+  output("\n");
+  free_ast(node);
+    
+  return 0;
+}

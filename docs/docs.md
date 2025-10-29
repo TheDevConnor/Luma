@@ -46,24 +46,24 @@ Here's a complete Luma program that demonstrates the core language features:
 ```luma
 @module "main"
 
-const Point = struct {
+const Point -> struct {
     x: int,
     y: int,
     
-    distance_to = fn (other: Point) float {
+    distance_to -> fn (other: Point) float {
         let dx: int = other.x - x;
         let dy: int = other.y - y;
         return sqrt(cast(dx * dx + dy * dy));
     }
 };
 
-const Status = enum {
+const Status -> enum {
     Active,
     Inactive,
     Pending,
 };
 
-const main = fn () int {
+const main -> fn () int {
     let origin: Point = Point { x: 0, y: 0 };
     let destination: Point = Point { x: 3, y: 4 };
     let current_status: Status = Status::Active;
@@ -112,7 +112,7 @@ Luma provides a straightforward type system with both primitive and compound typ
 Enums provide type-safe constants with clean syntax:
 
 ```luma
-const Direction = enum {
+const Direction -> enum {
     North,
     South,
     East,
@@ -127,13 +127,13 @@ const current_direction: Direction = Direction::North;
 Structures group related data with optional access control:
 
 ```luma
-const Point = struct {
+const Point -> struct {
     x: int,
     y: int
 };
 
 // With explicit access modifiers
-const Player = struct {
+const Player -> struct {
 pub:
     name: str,
     score: int,
@@ -141,7 +141,7 @@ priv:
     internal_id: uint,
     
     // Methods can be defined inside structs
-    get_display_name = fn () str {
+    get_display_name -> fn () str {
         return name + " (" + str(score) + " pts)";
     }
 };
@@ -218,7 +218,7 @@ const main = fn() int {
 Structs can also be generic, allowing you to create container types and data structures that work with any type:
 
 ```luma
-const Box = struct<T> {
+const Box -> struct<T> {
     value: T,
     
     get = fn() T {
@@ -230,7 +230,7 @@ const Box = struct<T> {
     }
 };
 
-const Pair = struct<T, U> {
+const Pair -> struct<T, U> {
     first: T,
     second: U
 };
@@ -287,10 +287,10 @@ Luma uses the `const` keyword as a **unified declaration mechanism** for all top
 
 ```luma
 const NUM: int = 42;                                  // Immutable variable
-const Direction = enum { North, South, East, West };  // Enum definition
-const Point = struct { x: int, y: int };              // Struct definition
-const Box = struct<T> { value: T };                   // Generic struct
-const add = fn (a: int, b: int) int {                 // Function definition
+const Direction -> enum { North, South, East, West };  // Enum definition
+const Point -> struct { x: int, y: int };              // Struct definition
+const Box -> struct<T> { value: T };                   // Generic struct
+const add -> fn (a: int, b: int) int {                 // Function definition
     return a + b; 
 };
 const max = fn<T>(a: T, b: T) T {                     // Generic function
@@ -315,7 +315,7 @@ const max = fn<T>(a: T, b: T) T {                     // Generic function
 const x: int = 5;
 x = 10; // ❌ Error: `x` is immutable
 
-const add = fn (a: int, b: int) int { return a + b; };
+const add -> fn (a: int, b: int) int { return a + b; };
 add = something_else; // ❌ Error: cannot reassign function binding
 ```
 
@@ -326,7 +326,7 @@ add = something_else; // ❌ Error: cannot reassign function binding
 Inside functions, use `let` to declare local variables:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let x: int = 10;        // Mutable local variable
     x = 20;                 // ✅ Can be reassigned
     
@@ -356,17 +356,17 @@ Functions are first-class values in Luma.
 
 ```luma
 // Basic function
-const add = fn (a: int, b: int) int {
+const add -> fn (a: int, b: int) int {
     return a + b;
 };
 
 // Function with no parameters
-const greet = fn () void {
+const greet -> fn () void {
     outputln("Hello!");
 };
 
 // Function with no return value
-const print_number = fn (n: int) void {
+const print_number -> fn (n: int) void {
     outputln("Number: ", n);
 };
 ```
@@ -374,7 +374,7 @@ const print_number = fn (n: int) void {
 ### Function Calls
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let result: int = add(5, 3);
     outputln("5 + 3 = ", result);
     
@@ -390,11 +390,11 @@ const main = fn () int {
 Parameters are passed by value by default:
 
 ```luma
-const modify = fn (x: int) void {
+const modify -> fn (x: int) void {
     x = 100;  // Modifies local copy only
 };
 
-const main = fn () int {
+const main -> fn () int {
     let num: int = 10;
     modify(num);
     outputln(num);  // Still 10
@@ -405,11 +405,11 @@ const main = fn () int {
 To modify the caller's variable, use pointers:
 
 ```luma
-const modify_ptr = fn (x: *int) void {
+const modify_ptr -> fn (x: *int) void {
     *x = 100;  // Modifies original value
 };
 
-const main = fn () int {
+const main -> fn () int {
     let num: int = 10;
     modify_ptr(&num);  // Pass address
     outputln(num);     // Now 100
@@ -421,24 +421,24 @@ const main = fn () int {
 
 ```luma
 // Single return value
-const square = fn (x: int) int {
+const square -> fn (x: int) int {
     return x * x;
 };
 
 // Multiple return values via struct
-const DivResult = struct {
+const DivResult -> struct {
     quotient: int,
     remainder: int
 };
 
-const divide = fn (a: int, b: int) DivResult {
+const divide -> fn (a: int, b: int) DivResult {
     return DivResult {
         quotient: a / b,
         remainder: a % b
     };
 };
 
-const main = fn () int {
+const main -> fn () int {
     let result: DivResult = divide(17, 5);
     outputln("17 / 5 = ", result.quotient, " R ", result.remainder);
     return 0;
@@ -448,7 +448,7 @@ const main = fn () int {
 ### Early Returns
 
 ```luma
-const find_positive = fn (numbers: *int, size: int) int {
+const find_positive -> fn (numbers: *int, size: int) int {
     loop [i: int = 0](i < size) : (++i) {
         if (numbers[i] > 0) {
             return numbers[i];  // Early return
@@ -610,7 +610,7 @@ Luma provides powerful pattern matching through `switch` statements that work wi
 ```luma
 @module "main"
 
-const WeekDay = enum {
+const WeekDay -> enum {
     Sunday,
     Monday,
     Tuesday,
@@ -620,7 +620,7 @@ const WeekDay = enum {
     Saturday,
 };
 
-const classify_day = fn (day: WeekDay) void {
+const classify_day -> fn (day: WeekDay) void {
     switch (day) {
         WeekDay::Monday, WeekDay::Tuesday, WeekDay::Wednesday, 
         WeekDay::Thursday, WeekDay::Friday =>
@@ -630,7 +630,7 @@ const classify_day = fn (day: WeekDay) void {
     }
 }
 
-pub const main = fn () int {
+pub const main -> fn () int {
     classify_day(WeekDay::Monday);   // Output: Weekday => 1
     classify_day(WeekDay::Saturday); // Output: Weekend => 6
     return 0;
@@ -642,7 +642,7 @@ pub const main = fn () int {
 When you need to handle unexpected values or want a catch-all case, use the default wildcard pattern `_`:
 
 ```luma
-const handle_status_code = fn (code: int) void {
+const handle_status_code -> fn (code: int) void {
     switch (code) {
         200 => outputln("OK");
         404 => outputln("Not Found");
@@ -685,7 +685,7 @@ Use the `@use` directive to import other modules:
 @use "math" as math
 @use "string" as str
 
-const main = fn () int {
+const main -> fn () int {
     // Access imported functions with namespace
     let result: double = math::sqrt(25.0);
     let len: int = str::strlen("hello");
@@ -719,7 +719,7 @@ outputln(...)    // Print values with newline
 Both functions are **variadic** - they accept any number of arguments of any type:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     output("Hello", " ", "World");           // Hello World
     outputln("The answer is:", 42);          // The answer is: 42\n
     
@@ -740,7 +740,7 @@ input<T>(prompt: *char) -> T    // Read typed input
 The `input` function is generic and reads a value of the specified type:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let name: *char = input<*char>("Enter your name: ");
     let age: int = input<int>("Enter your age: ");
     let height: double = input<double>("Enter height (meters): ");
@@ -762,7 +762,7 @@ system(command: *char) -> int    // Execute system command
 Execute shell commands from your program:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     system("clear");  // Clear terminal (Linux/Mac)
     system("stty -icanon -echo");  // Configure terminal
     return 0;
@@ -778,7 +778,7 @@ sizeof<T> -> int    // Size of type in bytes
 Get the size of any type at compile time:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     outputln("int: ", sizeof<int>);           // 8
     outputln("char: ", sizeof<char>);         // 1
     outputln("double: ", sizeof<double>);     // 8
@@ -806,7 +806,7 @@ cast<TargetType>(expression)
 ### Numeric Conversions
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     // Integer to float
     let i: int = 42;
     let f: float = cast<float>(i);        // 42.0
@@ -826,7 +826,7 @@ const main = fn () int {
 ### Pointer Casting
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     // void* to typed pointer
     let raw: *void = alloc(sizeof<int>);
     let typed: *int = cast<*int>(raw);
@@ -845,7 +845,7 @@ const main = fn () int {
 ### Pointer to Integer (and back)
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let ptr: *char = cast<*char>(alloc(10));
     defer free(ptr);
     
@@ -883,7 +883,7 @@ const PRIMES: [int; 5] = [2, 3, 5, 7, 11];
 ### Array Initialization
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     // Uninitialized (contains garbage)
     let data: [int; 5];
     
@@ -903,7 +903,7 @@ const main = fn () int {
 ### Array Access
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let numbers: [int; 5] = [10, 20, 30, 40, 50];
     
     // Read elements
@@ -931,7 +931,7 @@ const main = fn () int {
 String literals are null-terminated character arrays:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     // String literal - type is *char
     let message: *char = "Hello, World!";
     outputln(message);
@@ -945,7 +945,7 @@ const main = fn () int {
 Single characters use single quotes:
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let letter: char = 'A';           // Character literal
     let newline: char = '\n';         // Escape sequence
     let tab: char = '\t';             // Tab character
@@ -976,7 +976,7 @@ Luma supports pointer arithmetic for low-level memory manipulation.
 ### Basic Pattern
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     let arr: *int = cast<*int>(alloc(5 * sizeof<int>));
     defer free(arr);
     
@@ -1010,7 +1010,7 @@ Use `pub` to export items from a module:
 // Public - accessible from other modules
 pub const PI: double = 3.14159265359;
 
-pub const sqrt = fn (x: double) double {
+pub const sqrt -> fn (x: double) double {
     return x;
 }
 
@@ -1021,7 +1021,7 @@ const INTERNAL_CONSTANT: int = 42;
 ### Struct Access Control
 
 ```luma
-const Person = struct {
+const Person -> struct {
 pub:
     name: *char,
     age: int,
@@ -1049,7 +1049,7 @@ sizeof<T> -> int             // Size of type
 ### Example Usage
 
 ```luma
-const main = fn () int {
+const main -> fn () int {
     // Allocate memory
     let ptr: *int = cast<*int>(alloc(sizeof<int>));
     
@@ -1068,7 +1068,7 @@ const main = fn () int {
 Ensure cleanup with `defer` statements that execute when leaving scope:
 
 ```luma
-const process_data = fn () void {
+const process_data -> fn () void {
     let buffer: *int = cast<*int>(alloc(100 * sizeof<int>));
     defer free(buffer);  // Guaranteed to run when function exits
     
@@ -1111,12 +1111,12 @@ Marks functions that allocate and return pointers:
 
 ```luma
 #returns_ownership
-const create_buffer = fn (size: int) *int {
+const create_buffer -> fn (size: int) *int {
     let buffer: *int = cast<*int>(alloc(size * sizeof<int>));
     return buffer;  // Caller now owns this memory
 }
 
-const main = fn () int {
+const main -> fn () int {
     let data: *int = create_buffer(100);
     defer free(data);  // Caller must free
     return 0;
@@ -1129,12 +1129,12 @@ Marks functions that take ownership of pointer arguments:
 
 ```luma
 #takes_ownership
-const consume_buffer = fn (buffer: *int) void {
+const consume_buffer -> fn (buffer: *int) void {
     outputln("Processing: ", *buffer);
     free(buffer);  // Function owns and frees the buffer
 }
 
-const main = fn () int {
+const main -> fn () int {
     let data: *int = cast<*int>(alloc(sizeof<int>));
     *data = 42;
     
@@ -1158,13 +1158,13 @@ Luma's compiler includes a static analyzer that tracks memory at compile time:
 **Example:**
 
 ```luma
-const good_memory_usage = fn () void {
+const good_memory_usage -> fn () void {
     let ptr: *int = cast<*int>(alloc(sizeof<int>));
     defer free(ptr);  // ✅ Analyzer confirms cleanup
     *ptr = 42;
 }
 
-const bad_memory_usage = fn () void {
+const bad_memory_usage -> fn () void {
     let ptr: *int = cast<*int>(alloc(sizeof<int>));
     *ptr = 42;
     // ❌ Compiler error: memory leak - ptr never freed
@@ -1184,7 +1184,7 @@ const SUCCESS: int = 0;
 const ERROR_NULL_PTR: int = -1;
 const ERROR_OUT_OF_BOUNDS: int = -2;
 
-const safe_divide = fn (a: int, b: int, result: *int) int {
+const safe_divide -> fn (a: int, b: int, result: *int) int {
     if (b == 0) {
         return ERROR_OUT_OF_BOUNDS;
     }
@@ -1197,7 +1197,7 @@ const safe_divide = fn (a: int, b: int, result: *int) int {
     return SUCCESS;
 }
 
-const main = fn () int {
+const main -> fn () int {
     let quotient: int;
     let status: int = safe_divide(10, 2, &quotient);
     
@@ -1214,7 +1214,7 @@ const main = fn () int {
 ### Pattern 2: Nullable Pointers
 
 ```luma
-const find_element = fn (arr: *int, size: int, value: int) *int {
+const find_element -> fn (arr: *int, size: int, value: int) *int {
     loop [i: int = 0](i < size) : (++i) {
         if (arr[i] == value) {
             let addr: int = cast<int>(arr) + (i * sizeof<int>);
@@ -1224,7 +1224,7 @@ const find_element = fn (arr: *int, size: int, value: int) *int {
     return cast<*int>(0);  // Not found - return null
 }
 
-const main = fn () int {
+const main -> fn () int {
     let numbers: [int; 5] = [10, 20, 30, 40, 50];
     let found: *int = find_element(cast<*int>(&numbers), 5, 30);
     
@@ -1241,13 +1241,13 @@ const main = fn () int {
 ### Pattern 3: Result Struct
 
 ```luma
-const Result = struct {
+const Result -> struct {
     success: bool,
     value: int,
     error_code: int
 };
 
-const safe_operation = fn (x: int) Result {
+const safe_operation -> fn (x: int) Result {
     if (x < 0) {
         return Result {
             success: false,
@@ -1263,7 +1263,7 @@ const safe_operation = fn (x: int) Result {
     };
 }
 
-const main = fn () int {
+const main -> fn () int {
     let result: Result = safe_operation(-5);
     
     if (!result.success) {
@@ -1352,7 +1352,7 @@ const max = fn<T>(a: T, b: T) T {
 
 **Struct layout is predictable:**
 ```luma
-const Point = struct {
+const Point -> struct {
     x: int,    // Offset 0, 8 bytes
     y: int     // Offset 8, 8 bytes
 };  // Total: 16 bytes
@@ -1368,7 +1368,7 @@ let arr: [int; 10];  // 80 contiguous bytes
 
 **Stack allocation is fast:**
 ```luma
-const fast_function = fn () void {
+const fast_function -> fn () void {
     let buffer: [int; 1024];  // Stack allocated - instant
     // Use buffer...
 }  // Automatically cleaned up
@@ -1376,7 +1376,7 @@ const fast_function = fn () void {
 
 **Heap allocation has overhead:**
 ```luma
-const slower_function = fn () void {
+const slower_function -> fn () void {
     let buffer: *int = cast<*int>(alloc(1024 * sizeof<int>));
     defer free(buffer);
     // Use buffer...
@@ -1413,10 +1413,10 @@ free(buffer);
 **4. Avoid unnecessary copying:**
 ```luma
 // Bad: pass large struct by value
-const process = fn (data: LargeStruct) void { }
+const process -> fn (data: LargeStruct) void { }
 
 // Good: pass by pointer
-const process_fast = fn (data: *LargeStruct) void { }
+const process_fast -> fn (data: *LargeStruct) void { }
 ```
 
 ### Performance Summary
@@ -1478,7 +1478,7 @@ math::fib(n, a, b)  // Fibonacci
 ```luma
 @use "math" as math
 
-const main = fn () int {
+const main -> fn () int {
     let angle: double = math::PI / 4.0;
     let sine: double = math::sin(angle);
     outputln("sin(π/4) = ", sine);
@@ -1519,7 +1519,7 @@ mem::memeq(a, b, n)             // Check equality
 ```luma
 @use "memory" as mem
 
-const main = fn () int {
+const main -> fn () int {
     let buffer: *void = mem::calloc(10, sizeof<char>);
     defer free(buffer);
     
@@ -1560,7 +1560,7 @@ string::cat(dest, s1, s2)       // Concatenate
 ```luma
 @use "string" as string
 
-const main = fn () int {
+const main -> fn () int {
     let name: *char = "Alice";
     let len: int = string::strlen(name);
     outputln("Length: ", len);
@@ -1613,7 +1613,7 @@ fx::RESET
 ```luma
 @use "termfx" as fx
 
-const main = fn () int {
+const main -> fn () int {
     output(fx::CLEAR_SCREEN, fx::CURSOR_HOME);
     output(fx::BOLD, fx::RED, "ERROR: ", fx::RESET);
     outputln("Something went wrong!");
@@ -1643,7 +1643,7 @@ term::getpass(prompt)      // Get password (hidden input)
 @use "terminal" as term
 @use "string" as string
 
-const main = fn () int {
+const main -> fn () int {
     outputln("Press any key...");
     let key: char = term::getch();
     outputln("You pressed: ", string::from_char(key));
@@ -1664,12 +1664,12 @@ const main = fn () int {
 @module "mymodule"
 
 // Private helper
-const helper = fn (x: int) int {
+const helper -> fn (x: int) int {
     return x * 2;
 }
 
 // Public function
-pub const process = fn (data: *int, size: int) void {
+pub const process -> fn (data: *int, size: int) void {
     loop [i: int = 0](i < size) : (++i) {
         data[i] = helper(data[i]);
     }
@@ -1686,7 +1686,7 @@ pub const VERSION: int = 1;
 
 @use "mymodule" as mm
 
-const main = fn () int {
+const main -> fn () int {
     let data: [int; 5] = [1, 2, 3, 4, 5];
     mm::process(cast<*int>(&data), 5);
     outputln("Version: ", mm::VERSION);

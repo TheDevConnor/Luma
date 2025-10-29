@@ -892,6 +892,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                              arena)) {
       return false;
     }
+
+    if (then_branch->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(then_branch);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+        for (size_t i = 0; i < then_branch->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)then_branch->deferred_frees.data +
+                             i * sizeof(const char *));
+          if (*var_ptr) {
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
+      }
+    }
   }
 
   // Typecheck elif branches
@@ -934,6 +949,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                                  arena)) {
           return false;
         }
+
+        if (elif_scope->deferred_frees.count > 0) {
+          StaticMemoryAnalyzer *analyzer = get_static_analyzer(elif_scope);
+          if (analyzer) {
+            const char *func_name = get_current_function_name(scope);
+            for (size_t i = 0; i < elif_scope->deferred_frees.count; i++) {
+              const char **var_ptr =
+                  (const char **)((char *)elif_scope->deferred_frees.data +
+                                 i * sizeof(const char *));
+              if (*var_ptr) {
+                static_memory_track_free(analyzer, *var_ptr, func_name);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -943,6 +973,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     if (!typecheck_statement(node->stmt.if_stmt.else_stmt, else_branch,
                              arena)) {
       return false;
+    }
+
+    if (else_branch->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(else_branch);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+        for (size_t i = 0; i < else_branch->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)else_branch->deferred_frees.data +
+                             i * sizeof(const char *));
+          if (*var_ptr) {
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
+      }
     }
   }
 

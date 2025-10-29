@@ -897,15 +897,14 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
         }
       }
     }
-  } else if (var_name) {
-    // Normal free (not in defer) - track immediately
+  } else if (analyzer && var_name) {
+    // Normal free - always track it
     const char *func_name = get_current_function_name(scope);
     static_memory_track_free(analyzer, var_name, func_name);
   }
 
   return create_basic_type(arena, "void", expr->line, expr->column);
 }
-
 AstNode *typecheck_memcpy_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   (void)expr;

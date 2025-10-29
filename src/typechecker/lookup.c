@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 
 #include "type.h"
@@ -28,6 +29,23 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
       if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena,
                      scope->config)) {
         return false;
+      }
+    }
+
+    if (block_scope->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(block_scope);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+
+        for (size_t i = 0; i < block_scope->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)block_scope->deferred_frees.data +
+                              i * sizeof(const char *));
+          if (*var_ptr) {
+            // Mark as freed when exiting this block
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
       }
     }
 

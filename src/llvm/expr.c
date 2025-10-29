@@ -1653,37 +1653,61 @@ LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
   case LLVMPointerTypeKind:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   case LLVMStructTypeKind: {
-    // Calculate struct size by summing field sizes
     unsigned field_count = LLVMCountStructElementTypes(type);
     LLVMTypeRef *field_types = malloc(field_count * sizeof(LLVMTypeRef));
     LLVMGetStructElementTypes(type, field_types);
 
     uint64_t total_size = 0;
+    uint64_t max_align = 1;
+
     for (unsigned i = 0; i < field_count; i++) {
-      LLVMTypeKind field_kind = LLVMGetTypeKind(field_types[i]);
-      switch (field_kind) {
+      LLVMTypeRef ftype = field_types[i];
+      uint64_t fsize = 0;
+      uint64_t falign = 1;
+
+      LLVMTypeKind fkind = LLVMGetTypeKind(ftype);
+      switch (fkind) {
       case LLVMIntegerTypeKind:
-        total_size += LLVMGetIntTypeWidth(field_types[i]) / 8;
+        fsize = LLVMGetIntTypeWidth(ftype) / 8;
+        falign = fsize > 8 ? 8 : fsize; // int64 align=8
         break;
       case LLVMFloatTypeKind:
-        total_size += 4;
+        fsize = 4;
+        falign = 4;
         break;
       case LLVMDoubleTypeKind:
-        total_size += 8;
+        fsize = 8;
+        falign = 8;
         break;
       case LLVMPointerTypeKind:
-        total_size += 8;
+        fsize = 8;
+        falign = 8;
         break;
       default:
-        total_size += 8; // fallback
+        fsize = 8;
+        falign = 8;
         break;
       }
+
+      // align current offset
+      if (total_size % falign != 0)
+        total_size += falign - (total_size % falign);
+
+      total_size += fsize;
+      if (falign > max_align)
+        max_align = falign;
     }
 
+    // align final struct size to max_align
+    if (total_size % max_align != 0)
+      total_size += max_align - (total_size % max_align);
+
     free(field_types);
+
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), total_size,
                         false);
   }
+
   default:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   }

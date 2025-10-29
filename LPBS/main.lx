@@ -4,8 +4,15 @@
 @use "lexer" as lexer
 @use "io" as io
 
+#takes_ownership
+const clean_up -> fn (path: *char, lex: *Token) void {
+  free(path);
+  lexer::free_tokens(lex);
+}
+
 pub const main -> fn () int {
-  let path: *char = io::read_file("/home/thedevconnor/Projects/Luma/LPBS/build.lmb");
+  let path: *char = 
+        io::read_file("/home/TheDevConnor/Luma/LPBS/build.lmb");
   let lex: *Token = lexer::scan(path);
   
   output("Token count: ");
@@ -22,7 +29,6 @@ pub const main -> fn () int {
     output("\n");
   }
  
-  free(path);
-  lexer::free_tokens(lex);
+  clean_up(path, lex);
   return 0;
 }

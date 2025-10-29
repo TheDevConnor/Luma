@@ -56,11 +56,10 @@ static StaticAllocation *find_allocation_by_name(StaticMemoryAnalyzer *analyzer,
       // If we're tracking function names, ensure they match
       if (alloc->function_name && current_function) {
         if (strcmp(alloc->function_name, current_function) == 0) {
-          return alloc;
+          return alloc; // Return first match in this function
         }
-      } else {
-        // Legacy behavior: match by name only
-        return alloc;
+      } else if (!alloc->function_name && !current_function) {
+        return alloc; // Global scope match
       }
     }
 
@@ -74,7 +73,7 @@ static StaticAllocation *find_allocation_by_name(StaticMemoryAnalyzer *analyzer,
             if (strcmp(alloc->function_name, current_function) == 0) {
               return alloc;
             }
-          } else {
+          } else if (!alloc->function_name && !current_function) {
             return alloc;
           }
         }

@@ -3,7 +3,7 @@
 @use "lexer" as lexer
 
 const BindingPower -> enum {
-  BP_NONE,    /**< No binding power */
+  BP_NONE,        /**< No binding power */
   BP_LOWEST,      /**< Lowest binding power */
   BP_ASSIGN,      /**< Assignment operators (=, +=, etc.) */
   BP_TERNARY,     /**< Ternary conditional operator (? :) */
