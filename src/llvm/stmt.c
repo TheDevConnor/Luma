@@ -391,33 +391,42 @@ LLVMValueRef codegen_stmt_return(CodeGenContext *ctx, AstNode *node) {
 }
 
 LLVMValueRef codegen_stmt_block(CodeGenContext *ctx, AstNode *node) {
-  // Save the current defer context
-  DeferredStatement *saved_defers = ctx->deferred_statements;
-  size_t saved_count = ctx->deferred_count;
+    // Save the current defer context
+    DeferredStatement *saved_defers = ctx->deferred_statements;
+    size_t saved_count = ctx->deferred_count;
 
-  // Create new defer scope for this block
-  ctx->deferred_statements = NULL;
-  ctx->deferred_count = 0;
+    // Create new defer scope for this block
+    ctx->deferred_statements = NULL;
+    ctx->deferred_count = 0;
 
-  // Process all statements in the block
-  for (size_t i = 0; i < node->stmt.block.stmt_count; i++) {
-    // Stop processing if we hit a terminator
-    if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-      break;
+    // Process all statements in the block
+    for (size_t i = 0; i < node->stmt.block.stmt_count; i++) {
+        AstNode *stmt = node->stmt.block.statements[i];
+        
+        // ADD THESE CHECKS:
+        if (!stmt) {
+            fprintf(stderr, "ERROR: Statement %zu is NULL!\n", i);
+            continue;
+        }
+        
+        // Stop processing if we hit a terminator
+        if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+            break;
+        }
+        
+        codegen_stmt(ctx, stmt);   
     }
-    codegen_stmt(ctx, node->stmt.block.statements[i]);
-  }
 
-  // Execute any deferred statements from this block scope (in reverse order)
-  if (ctx->deferred_statements) {
-    execute_deferred_statements_inline(ctx, ctx->deferred_statements);
-  }
+    // Execute any deferred statements from this block scope (in reverse order)
+    if (ctx->deferred_statements) {
+        execute_deferred_statements_inline(ctx, ctx->deferred_statements);
+    }
 
-  // Restore the previous defer context
-  ctx->deferred_statements = saved_defers;
-  ctx->deferred_count = saved_count;
+    // Restore the previous defer context
+    ctx->deferred_statements = saved_defers;
+    ctx->deferred_count = saved_count;
 
-  return NULL;
+    return NULL;
 }
 
 LLVMValueRef codegen_stmt_if(CodeGenContext *ctx, AstNode *node) {

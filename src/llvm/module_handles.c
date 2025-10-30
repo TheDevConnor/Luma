@@ -664,7 +664,6 @@ void print_module_info(CodeGenContext *ctx) {
 // Also add this debug function to help diagnose linking issues:
 void debug_object_files(const char *output_dir) {
   printf("\n=== OBJECT FILE DEBUG INFO ===\n");
-
   char command[512];
   snprintf(command, sizeof(command), "ls -la %s/*.o", output_dir);
   printf("Object files in %s:\n", output_dir);

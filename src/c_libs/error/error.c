@@ -210,6 +210,7 @@ static void print_indicator(int col, int length, int line,
                             const char *line_text, const char *token_text,
                             int token_length, int max_width,
                             const char *label) {
+  (void)line;
   print_gutter(max_width);
 
   // Calculate actual column position

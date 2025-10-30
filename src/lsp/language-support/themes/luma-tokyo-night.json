@@ -1,5 +1,5 @@
 {
-  "name": "Lux Tokyo Night",
+  "name": "Luma Tokyo Night",
   "type": "dark",
   "colors": {
     "editor.background": "#1a1b26",
@@ -12,8 +12,8 @@
     {
       "name": "Comment",
       "scope": [
-        "comment.line.double-slash.lux",
-        "comment.block.lux"
+        "comment.line.double-slash.luma",
+        "comment.block.luma"
       ],
       "settings": {
         "foreground": "#565f89",
@@ -23,9 +23,9 @@
     {
       "name": "Preprocessor Directives",
       "scope": [
-        "meta.preprocessor.lux",
-        "punctuation.definition.directive.lux",
-        "keyword.control.directive.lux"
+        "meta.preprocessor.luma",
+        "punctuation.definition.directive.luma",
+        "keyword.control.directive.luma"
       ],
       "settings": {
         "foreground": "#bb9af7"
@@ -33,7 +33,7 @@
     },
     {
       "name": "Function Attributes",
-      "scope": "storage.modifier.attribute.lux",
+      "scope": "storage.modifier.attribute.luma",
       "settings": {
         "foreground": "#7aa2f7",
         "fontStyle": "bold italic"
@@ -42,9 +42,9 @@
     {
       "name": "Keywords",
       "scope": [
-        "keyword.control.lux",
-        "storage.type.lux",
-        "keyword.other.lux"
+        "keyword.control.luma",
+        "storage.type.luma",
+        "keyword.other.luma"
       ],
       "settings": {
         "foreground": "#bb9af7",
@@ -53,35 +53,35 @@
     },
     {
       "name": "Storage Modifiers",
-      "scope": "storage.modifier.lux",
+      "scope": "storage.modifier.luma",
       "settings": {
         "foreground": "#f7768e"
       }
     },
     {
       "name": "Primitive Types",
-      "scope": "support.type.primitive.lux",
+      "scope": "support.type.primitive.luma",
       "settings": {
         "foreground": "#2ac3de"
       }
     },
     {
       "name": "User-defined Types",
-      "scope": "entity.name.type.lux",
+      "scope": "entity.name.type.luma",
       "settings": {
         "foreground": "#9ece6a"
       }
     },
     {
       "name": "Function Names",
-      "scope": "entity.name.function.lux",
+      "scope": "entity.name.function.luma",
       "settings": {
         "foreground": "#7aa2f7"
       }
     },
     {
       "name": "Function Parameters",
-      "scope": "variable.parameter.lux",
+      "scope": "variable.parameter.luma",
       "settings": {
         "foreground": "#e0af68"
       }
@@ -89,8 +89,8 @@
     {
       "name": "Strings",
       "scope": [
-        "string.quoted.double.lux",
-        "string.quoted.single.lux"
+        "string.quoted.double.luma",
+        "string.quoted.single.luma"
       ],
       "settings": {
         "foreground": "#9ece6a"
@@ -98,7 +98,7 @@
     },
     {
       "name": "String Escape Characters",
-      "scope": "constant.character.escape.lux",
+      "scope": "constant.character.escape.luma",
       "settings": {
         "foreground": "#ff9e64"
       }
@@ -106,8 +106,8 @@
     {
       "name": "Numbers",
       "scope": [
-        "constant.numeric.integer.lux",
-        "constant.numeric.float.lux"
+        "constant.numeric.integer.luma",
+        "constant.numeric.float.luma"
       ],
       "settings": {
         "foreground": "#ff9e64"
@@ -116,13 +116,13 @@
     {
       "name": "Operators",
       "scope": [
-        "keyword.operator.arithmetic.lux",
-        "keyword.operator.comparison.lux",
-        "keyword.operator.logical.lux",
-        "keyword.operator.assignment.lux",
-        "keyword.operator.bitwise.lux",
-        "keyword.operator.pointer.lux",
-        "keyword.operator.member.lux"
+        "keyword.operator.arithmetic.luma",
+        "keyword.operator.comparison.luma",
+        "keyword.operator.logical.luma",
+        "keyword.operator.assignment.luma",
+        "keyword.operator.bitwise.luma",
+        "keyword.operator.pointer.luma",
+        "keyword.operator.member.luma"
       ],
       "settings": {
         "foreground": "#89ddff"
@@ -130,14 +130,14 @@
     },
     {
       "name": "Variables",
-      "scope": "variable.other.lux",
+      "scope": "variable.other.luma",
       "settings": {
         "foreground": "#a9b1d6"
       }
     },
     {
       "name": "Namespaces",
-      "scope": "entity.name.namespace.lux",
+      "scope": "entity.name.namespace.luma",
       "settings": {
         "foreground": "#73daca"
       }
@@ -145,8 +145,8 @@
     {
       "name": "Punctuation",
       "scope": [
-        "punctuation.definition.parameters.begin.lux",
-        "punctuation.definition.parameters.end.lux"
+        "punctuation.definition.parameters.begin.luma",
+        "punctuation.definition.parameters.end.luma"
       ],
       "settings": {
         "foreground": "#a9b1d6"

@@ -51,6 +51,8 @@ LLVMValueRef convert_value_to_type(CodeGenContext *ctx, LLVMValueRef value,
 bool check_array_bounds_runtime(CodeGenContext *ctx, LLVMValueRef array_ptr,
                                 LLVMTypeRef array_type, LLVMValueRef index,
                                 const char *var_name) {
+  (void)ctx;
+  (void)array_ptr;
   if (LLVMGetTypeKind(array_type) != LLVMArrayTypeKind) {
     return true; // Can't check bounds for non-arrays
   }

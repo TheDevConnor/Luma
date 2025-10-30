@@ -65,7 +65,7 @@ void format_function_definition(FormatterContext *ctx, Stmt *stmt) {
   // Format parameters
   write_string(ctx, "(");
   if (stmt->stmt.func_decl.param_count > 0) {
-    for (int i = 0; i < stmt->stmt.func_decl.param_count; i++) {
+    for (size_t i = 0; i < stmt->stmt.func_decl.param_count; i++) {
       if (i > 0) {
         write_string(ctx, ",");
         if (ctx->config.space_after_comma) {
@@ -159,7 +159,7 @@ void format_struct_definition(FormatterContext *ctx, Stmt *stmt) {
     increase_indent(ctx);
   }
 
-  for (int i = 0; i < stmt->stmt.struct_decl.public_count; i++) {
+  for (size_t i = 0; i < stmt->stmt.struct_decl.public_count; i++) {
     format_stmt(ctx, stmt->stmt.struct_decl.public_members[i]);
   }
 
@@ -169,7 +169,7 @@ void format_struct_definition(FormatterContext *ctx, Stmt *stmt) {
     increase_indent(ctx);
   }
 
-  for (int i = 0; i < stmt->stmt.struct_decl.private_count; i++) {
+  for (size_t i = 0; i < stmt->stmt.struct_decl.private_count; i++) {
     format_stmt(ctx, stmt->stmt.struct_decl.private_members[i]);
   }
 
@@ -188,7 +188,7 @@ void format_enum_definition(FormatterContext *ctx, Stmt *stmt) {
 
   increase_indent(ctx);
 
-  for (int i = 0; i < stmt->stmt.enum_decl.member_count; i++) {
+  for (size_t i = 0; i < stmt->stmt.enum_decl.member_count; i++) {
     write_string(ctx, stmt->stmt.enum_decl.members[i]);
     if (i < stmt->stmt.enum_decl.member_count - 1) {
       write_string(ctx, ",");

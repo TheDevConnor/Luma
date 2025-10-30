@@ -69,10 +69,26 @@ LLVMValueRef range_length(CodeGenContext *ctx, LLVMValueRef range_struct) {
 }
 
 LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
+  if (!ctx) {
+    fprintf(stderr, "FATAL: ctx is NULL in codegen_expr_literal!\n");
+    abort();
+  }
+  if (!ctx->context) {
+    fprintf(stderr, "FATAL: ctx->context is NULL in codegen_expr_literal!\n");
+    fprintf(stderr, "LLVM context was not initialized properly!\n");
+    abort();
+  }
+  if (!ctx->builder) {
+    fprintf(stderr, "FATAL: ctx->builder is NULL in codegen_expr_literal!\n");
+    fprintf(stderr, "LLVM builder was not initialized properly!\n");
+    abort();
+  }
+
   switch (node->expr.literal.lit_type) {
   case LITERAL_INT:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context),
                         node->expr.literal.value.int_val, false);
+                        
   case LITERAL_FLOAT:
     return LLVMConstReal(LLVMDoubleTypeInContext(ctx->context),
                          node->expr.literal.value.float_val);
@@ -80,18 +96,20 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_BOOL:
     return LLVMConstInt(LLVMInt1TypeInContext(ctx->context),
                         node->expr.literal.value.bool_val ? 1 : 0, false);
+                        
   case LITERAL_CHAR:
     return LLVMConstInt(LLVMInt8TypeInContext(ctx->context),
                         (unsigned char)node->expr.literal.value.char_val,
                         false);
+                        
   case LITERAL_STRING: {
     char *processed_str =
         process_escape_sequences(node->expr.literal.value.string_val);
-
+    
     // String literals must be created in the current module
     LLVMModuleRef current_llvm_module =
         ctx->current_module ? ctx->current_module->module : ctx->module;
-
+    
     // Create the global string in the current module
     LLVMValueRef global_str =
         LLVMAddGlobal(current_llvm_module,
@@ -127,7 +145,9 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_NULL:
     return LLVMConstNull(
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0));
+        
   default:
+    fprintf(stderr, "ERROR: Unknown literal type: %d\n", node->expr.literal.lit_type);
     return NULL;
   }
 }

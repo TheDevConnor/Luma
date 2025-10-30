@@ -33,7 +33,7 @@
  */
 bool check_argc(int argc, int expected) {
   if (argc < expected) {
-    fprintf(stderr, "Usage: %s <source_file>\n", "lux");
+    fprintf(stderr, "Usage: %s <source_file>\n", "luma");
     return false;
   }
   return true;
@@ -118,7 +118,7 @@ int print_help() {
  * @return Always returns 0.
  */
 int print_version() {
-  printf("Lux Compiler v1.0\n");
+  printf("Luma Compiler v1.0\n");
   return 0;
 }
 
@@ -128,7 +128,7 @@ int print_version() {
  * @return Always returns 0.
  */
 int print_license() {
-  printf("Lux Compiler is licensed under the MIT License.\n");
+  printf("Luma Compiler is licensed under the MIT License.\n");
   return 0;
 }
 

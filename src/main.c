@@ -1,6 +1,6 @@
 /**
  * @file main.c
- * @brief Entry point for the Lux compiler/interpreter build process.
+ * @brief Entry point for the Luma compiler/interpreter build process.
  *
  * This program parses command-line arguments, sets up a memory arena,
  * and runs the build process on a provided source file.
@@ -13,12 +13,12 @@
  *
  * ## Usage
  * ```bash
- * lux build <source_file>
+ * luma build <source_file>
  * ```
  *
  * Example:
  * ```bash
- * lux build hello.lx
+ * luma build hello.lx
  * ```
  */
 

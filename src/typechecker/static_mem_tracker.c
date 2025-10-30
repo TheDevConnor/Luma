@@ -15,6 +15,8 @@ void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                size_t column, const char *var_name,
                                const char *function_name, Token *tokens,
                                size_t token_count, const char *file_path) {
+  (void)tokens;
+  (void)token_count;
   if (!var_name || strcmp(var_name, "anonymous") == 0) {
     return;
   }
@@ -113,6 +115,8 @@ bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
                                         Token *tokens, int token_count,
                                         const char *file_path,
                                         const char *function_name) {
+  (void)tokens;
+  (void)token_count;
   if (!var_name)
     return true;
 

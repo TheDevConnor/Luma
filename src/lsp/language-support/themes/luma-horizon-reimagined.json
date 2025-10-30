@@ -1,6 +1,6 @@
 {
   "$schema": "vscode://schemas/color-theme",
-  "name": "Lux Horizon Reimagined",
+  "name": "Luma Horizon Reimagined",
   "type": "dark",
   "colors": {
     "editor.background": "#1C1E26",
@@ -20,85 +20,85 @@
   "tokenColors": [
     {
       "scope": [
-        "comment.line.double-colon.lux",
-        "comment.block.lux",
+        "comment.line.double-colon.luma",
+        "comment.block.luma",
         "punctuation.definition.comment"
       ],
       "settings": { "foreground": "#6C6F93", "fontStyle": "italic" }
     },
     {
       "scope": [
-        "keyword.control.lux",
-        "keyword.other.lux", 
-        "storage.type.lux",
-        "storage.modifier.lux"
+        "keyword.control.luma",
+        "keyword.other.luma", 
+        "storage.type.luma",
+        "storage.modifier.luma"
       ],
       "settings": { "foreground": "#FAB795", "fontStyle": "bold" }
     },
     {
-      "scope": "storage.modifier.attribute.lux",
+      "scope": "storage.modifier.attribute.luma",
       "settings": { "foreground": "#25B2BC", "fontStyle": "bold italic" }
     },
     {
       "scope": [
-        "variable.other.lux",
-        "variable.parameter.lux",
+        "variable.other.luma",
+        "variable.parameter.luma",
         "entity.name.variable"
       ],
       "settings": { "foreground": "#E0DEF4" }
     },
     {
       "scope": [
-        "entity.name.function.lux",
+        "entity.name.function.luma",
         "support.function"
       ],
       "settings": { "foreground": "#25B2BC" }
     },
     {
       "scope": [
-        "string.quoted.double.lux",
-        "string.quoted.single.lux",
-        "constant.character.escape.lux"
+        "string.quoted.double.luma",
+        "string.quoted.single.luma",
+        "constant.character.escape.luma"
       ],
       "settings": { "foreground": "#B877DB" }
     },
     {
       "scope": [
-        "constant.numeric.integer.lux",
-        "constant.numeric.float.lux",
+        "constant.numeric.integer.luma",
+        "constant.numeric.float.luma",
         "constant.language"
       ],
       "settings": { "foreground": "#F09383" }
     },
     {
       "scope": [
-        "entity.name.type.lux",
-        "support.type.primitive.lux"
+        "entity.name.type.luma",
+        "support.type.primitive.luma"
       ],
       "settings": { "foreground": "#F6C177" }
     },
     {
       "scope": [
-        "keyword.operator.arithmetic.lux",
-        "keyword.operator.comparison.lux",
-        "keyword.operator.logical.lux",
-        "keyword.operator.assignment.lux",
-        "keyword.operator.bitwise.lux",
-        "keyword.operator.pointer.lux",
-        "keyword.operator.member.lux"
+        "keyword.operator.arithmetic.luma",
+        "keyword.operator.comparison.luma",
+        "keyword.operator.logical.luma",
+        "keyword.operator.assignment.luma",
+        "keyword.operator.bitwise.luma",
+        "keyword.operator.pointer.luma",
+        "keyword.operator.member.luma"
       ],
       "settings": { "foreground": "#89ddff" }
     },
     {
       "scope": [
-        "meta.preprocessor.lux",
-        "punctuation.definition.directive.lux",
-        "keyword.control.directive.lux"
+        "meta.preprocessor.luma",
+        "punctuation.definition.directive.luma",
+        "keyword.control.directive.luma"
       ],
       "settings": { "foreground": "#bb9af7" }
     },
     {
-      "scope": "entity.name.namespace.lux",
+      "scope": "entity.name.namespace.luma",
       "settings": { "foreground": "#73daca" }
     }
   ]
