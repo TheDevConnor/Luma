@@ -3,6 +3,8 @@
 @use "string" as string
 @use "lexer" as lexer
 @use "parser" as psr
+@use "time" as time
+@use "ast" as ast
 @use "io" as io
 
 #takes_ownership
@@ -12,28 +14,17 @@ const clean_up -> fn (path: *char, lex: *Token) void {
 }
 
 pub const main -> fn () int {
-  let path: *char = 
-        io::read_file("/home/connor/Projects/Luma/LPBS/build.lmb");
-  let lex: *Token = lexer::scan(path);
-  
-  // output("Token count: ");
-  // output(lex.size);
-  // output("\n");
-  // 
-  // loop [i: int = 0](i < lex.size) : (++i) {
-  //   let tk: Token = lex.list[i];
-  //   output("i: ", i, " Token ");
-  //   output(tk.type);
-  //   output(": ");
-  //   output(tk.value);
-  //   output("\n");
-  // }
+  let speed: Timer = time::timer_start();
 
-  let parser: Parser;
-  psr::init_parser(&parser, lex);
+  let path: *char = "/home/TheDevConnor/Luma/LPBS/build.lmb";
+  let file: *char = io::read_file(path);
+  let lex: *Token = lexer::scan(file);
 
-  output(psr::peek(&parser, 45).value, "\n");
+  let parser: *ASTNode = psr::parse(lex, path);
  
-  clean_up(path, lex);
+  clean_up(file, lex);
+
+  let elapsed: int = time::timer_elapsed_ms(speed);
+  output("Took ", elapsed, "ms\n");
   return 0;
 }

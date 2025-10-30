@@ -1,6 +1,7 @@
 @module "parser"
 
 @use "lexer" as lexer
+@use "ast" as ast
 
 const BindingPower -> enum {
   BP_NONE,        /**< No binding power */
@@ -31,7 +32,7 @@ pub const Parser -> struct {
   pos: int,
 };
 
-pub const init_parser -> fn (psr: *Parser, tks: *Token) void {
+pub const init_parser -> fn (psr: *Parser, tks: *Token, path: *char) void {
   psr.path = path;
   psr.tks = tks;
   psr.pos = 0;
@@ -41,6 +42,11 @@ pub const peek -> fn (psr: *Parser, index: int) Token {
   return psr.tks.list[index];
 }
 
-pub const parse -> fn (tks: *Token, path: *char) void {
-  
+pub const parse -> fn (tks: *Token, path: *char) *ASTNode {
+  let psr: Parser;
+  init_parser(&psr, tks, path);
+
+  output(peek(&psr, 10).value, "\n");
+
+  return cast<*ASTNode>(0); 
 }
