@@ -22,6 +22,9 @@ docs/xml/
 *.o
 *.s
 
+# Ignore IDE directories
+.vscode
+
 # ignore the lsp-client server node modules
 node_modules
 package-lock.json

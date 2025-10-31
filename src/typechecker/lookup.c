@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 
 #include "type.h"
@@ -22,11 +23,29 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
     return typecheck_if_decl(stmt, scope, arena);
   case AST_STMT_BLOCK: {
     Scope *block_scope = create_child_scope(scope, "block", arena);
+    stmt->stmt.block.scope = (void *)block_scope;
 
     for (size_t i = 0; i < stmt->stmt.block.stmt_count; i++) {
       if (!typecheck(stmt->stmt.block.statements[i], block_scope, arena,
                      scope->config)) {
         return false;
+      }
+    }
+
+    if (block_scope->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(block_scope);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+
+        for (size_t i = 0; i < block_scope->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)block_scope->deferred_frees.data +
+                              i * sizeof(const char *));
+          if (*var_ptr) {
+            // Mark as freed when exiting this block
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
       }
     }
 
@@ -48,14 +67,16 @@ bool typecheck_statement(AstNode *stmt, Scope *scope, ArenaAllocator *arena) {
 
     if (analyzer) {
       old_skip_state = analyzer->skip_memory_tracking;
-      analyzer->skip_memory_tracking = true;
+      analyzer->skip_memory_tracking = true; // Enable defer mode
     }
 
+    // IMPORTANT: Don't create a new scope for defer - use the SAME scope
+    // so that deferred_frees goes to the correct function scope
     bool result =
         typecheck_statement(stmt->stmt.defer_stmt.statement, scope, arena);
 
     if (analyzer) {
-      analyzer->skip_memory_tracking = old_skip_state;
+      analyzer->skip_memory_tracking = old_skip_state; // Restore state
     }
 
     return result;
@@ -131,6 +152,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_input_expr(expr, scope, arena);
   case AST_EXPR_SYSTEM:
     return typecheck_system_expr(expr, scope, arena);
+  case AST_EXPR_SYSCALL:
+    return typecheck_syscall_expr(expr, scope, arena);
   case AST_EXPR_ALLOC:
     return typecheck_alloc_expr(expr, scope, arena);
   case AST_EXPR_FREE:
@@ -139,6 +162,8 @@ AstNode *typecheck_expression(AstNode *expr, Scope *scope,
     return typecheck_memcpy_expr(expr, scope, arena);
   case AST_EXPR_SIZEOF:
     return typecheck_sizeof_expr(expr, scope, arena);
+  case AST_EXPR_STRUCT:
+    return typecheck_struct_expr(expr, scope, arena);
   default:
     tc_error(expr, "Unsupported Expression", "Unsupported expression type %d",
              expr->type);

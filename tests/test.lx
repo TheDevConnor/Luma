@@ -1,27 +1,9 @@
 @module "main"
 
-const randomStruct -> struct {
-   x: int,
-   y: int,
-   z: int
-};
+const Point -> struct { x: int, y: int };
 
-pub const main -> fn () int {
-
-    impl [func1: int] -> [randomStruct] {
-         const func1 -> fn() int {
-               self.x = 10;
-               self.y = 20;
-               self.z = 30;
-
-               if (self.x < self.y &&  self.y < self.z) {
-                  return 1;
-               }
-               return 0;
-         }
-    }
-
-    randomStruct.func1();
-
-    return 0;
+pub const main -> fn () int { 
+  let y: Point = Point { x: 50, y: 10 };
+  output(y.x, " ", y.y, "\n");
+  return 0; 
 }

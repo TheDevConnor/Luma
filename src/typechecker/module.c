@@ -178,7 +178,7 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     return false;
   }
 
-  // UPDATE ERROR CONTEXT FOR THIS MODULE - ADD THIS BLOCK
+  // UPDATE ERROR CONTEXT FOR THIS MODULE
   g_tokens = module->preprocessor.module.tokens;
   g_token_count = module->preprocessor.module.token_count;
   g_file_path = module->preprocessor.module.file_path;
@@ -194,13 +194,39 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
   AstNode **body = module->preprocessor.module.body;
   int body_count = module->preprocessor.module.body_count;
 
-  // Process all non-@use statements
+  // ===== PASS 1: Process forward declarations (prototypes) =====
   for (int j = 0; j < body_count; j++) {
     if (!body[j])
       continue;
     if (body[j]->type == AST_PREPROCESSOR_USE)
-      continue;
+      continue; // Already processed
 
+    // Process function prototypes
+    if (body[j]->type == AST_STMT_FUNCTION && 
+        body[j]->stmt.func_decl.forward_declared) {
+      if (!typecheck_func_decl(body[j], module_scope, arena)) {
+        tc_error(body[j], "Prototype Error",
+                 "Failed to typecheck function prototype in module '%s'",
+                 module_name);
+        return false;
+      }
+    }
+  }
+
+  // ===== PASS 2: Process all other declarations =====
+  for (int j = 0; j < body_count; j++) {
+    if (!body[j])
+      continue;
+    if (body[j]->type == AST_PREPROCESSOR_USE)
+      continue; // Already processed
+
+    // Skip prototypes (already processed)
+    if (body[j]->type == AST_STMT_FUNCTION &&
+        body[j]->stmt.func_decl.forward_declared) {
+      continue;
+    }
+
+    // Process everything else (including function implementations)
     if (!typecheck(body[j], module_scope, arena, global_scope->config)) {
       tc_error(body[j], "Module Error",
                "Failed to typecheck statement in module '%s'", module_name);
@@ -208,14 +234,13 @@ bool process_module_in_order(const char *module_name, GrowableArray *dep_graph,
     }
   }
 
-  // NEW: Store the module scope in the AST node so LSP can access it later
-  module->preprocessor.module.scope = (void *)module_scope;  // Cast to void*
-  
-  // fprintf(stderr, "[LSP] Stored scope with %zu symbols in module '%s'\n",
-  //         module_scope->symbols.count, module_name);
+  // Store the module scope in the AST node for LSP
+  module->preprocessor.module.scope = (void *)module_scope;
 
+  // Run memory analysis if enabled
   StaticMemoryAnalyzer *analyzer = get_static_analyzer(module_scope);
-  if (analyzer && g_tokens && g_token_count > 0 && g_file_path && global_scope->config->check_mem) {
+  if (analyzer && g_tokens && g_token_count > 0 && g_file_path && 
+      global_scope->config->check_mem) {
     static_memory_check_and_report(analyzer, arena);
   }
 

@@ -1,7 +1,7 @@
 {
-  "name": "language-support",
-  "displayName": "Lux Language Support",
-  "description": "Syntax highlighting and language support for Lux programming language",
+  "name": "luma-language-support",
+  "displayName": "Luma Language Support",
+  "description": "Syntax highlighting and language support for Luma programming language",
   "version": "0.1.0",
   "publisher": "TheDevConnor",
   "engines": {
@@ -13,9 +13,9 @@
   "contributes": {
     "languages": [
       {
-        "id": "lux",
+        "id": "luma",
         "aliases": [
-          "Lux",
+          "luma",
           "lux"
         ],
         "extensions": [
@@ -26,21 +26,21 @@
     ],
     "grammars": [
       {
-        "language": "lux",
-        "scopeName": "source.lux",
-        "path": "./syntaxes/lux.tmLanguage.json"
+        "language": "luma",
+        "scopeName": "source.luma",
+        "path": "./syntaxes/luma.tmLanguage.json"
       }
     ],
     "themes": [
       {
-        "label": "Lux Tokyo Night",
+        "label": "Luma Tokyo Night",
         "uiTheme": "vs-dark",
-        "path": "./themes/lux-tokyo-night.json"
+        "path": "./themes/luma-tokyo-night.json"
       },
       {
-        "label": "Lux Horizon Reimagined",
+        "label": "Luma Horizon Reimagined",
         "uiTheme": "vs-dark",
-        "path": "./themes/lux-horizon-reimagined.json"
+        "path": "./themes/luma-horizon-reimagined.json"
       }
     ]
   },

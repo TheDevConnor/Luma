@@ -12,17 +12,16 @@
 #include <sys/types.h>
 
 // Helper function to create directory if it doesn't exist
-bool create_directory(const char *path) {
+// NOTE Replaced with macro
 #ifdef _WIN32
-  return mkdir(path) == 0 || errno == EEXIST;
+  #define create_directory(path) (mkdir((path)) == 0 || errno == EEXIST)
 #else
-  return mkdir(path, 0755) == 0 || errno == EEXIST;
+  #define create_directory(path) (mkdir((path), 0755) == 0 || errno == EEXIST)
 #endif
-}
 
 void handle_segfault(int sig) {
   (void)sig;
-  fprintf(stderr, "\nSegmentation fault caught during LLVM operations!\n");
+  fprintf(stderr, "\nSegmentation fault!\n");
   fprintf(stderr, "This likely indicates a problem in LLVM IR generation.\n");
   exit(1);
 }
@@ -95,6 +94,7 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   signal(SIGILL, handle_illegal_instruction);
 
   bool success = generate_program_modules(ctx, root, output_dir);
+
   if (!success) {
     fprintf(stderr, "Failed to generate LLVM modules\n");
     cleanup_codegen_context(ctx);
@@ -347,7 +347,10 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (tc) {
     // Stage 6: LLVM IR
     print_progress_with_time(++step, total_stages, "LLVM IR", &timer);
-
+    if (!combined_program || combined_program->type != AST_PROGRAM) {
+      fprintf(stderr, "ERROR: Invalid program node before codegen\n");
+      goto cleanup;
+    }
     success = generate_llvm_code_modules(combined_program, config, allocator,
                                          &step, &timer);
   }

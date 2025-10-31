@@ -1,18 +1,18 @@
 /**
- * @mainpage Lux
+ * @mainpage Luma
  *
- * @image html assets/lux.png width=120
+ * @image html assets/luma.png width=120
  *
  * @section tagline A low-level compiled alternative to C, C++, and more!
  *
  * @section intro Introduction
- * Lux is a modern systems programming language designed to provide the performance
+ * Luma is a modern systems programming language designed to provide the performance
  * and control of low-level languages while maintaining developer productivity and
  * code clarity. Built from the ground up to address common pain points in systems programming.
  *
  * @section why Why?
  * Modern systems programming often involves a trade-off between performance,
- * safety, and developer experience. Lux aims to bridge this gap by providing:
+ * safety, and developer experience. Luma aims to bridge this gap by providing:
  * - **Direct hardware access** without sacrificing code readability
  * - **Predictable performance** characteristics for systems-critical applications
  * - **Developer-friendly tooling** that doesn't compromise on compile speed
@@ -27,7 +27,7 @@
  *
  * @section status Project Status
  * **Current Phase:** Early Development  
- * Lux is currently in active development. Core language features are being implemented
+ * Luma is currently in active development. Core language features are being implemented
  * and the compiler architecture is being established.
  *
  * **What's Working:**
@@ -49,7 +49,7 @@
  *   rankdir=LR;
  *   node [shape=box, style=rounded, fontsize=12, fontname="Helvetica"];
  * 
- *   SourceCode [label="Lux Source Code (.lx)"];
+ *   SourceCode [label="Luma Source Code (.lx)"];
  *   Lexer [label="Lexer"];
  *   Parser [label="Pratt Parser"];
  *   TypeChecker [label="Type Checker"];
@@ -65,9 +65,9 @@
  * *(usage instructions coming soon)*
  *
  * @section join_us Join Us
- * Interested in contributing to Lux? We'd love to have you!  
+ * Interested in contributing to Luma? We'd love to have you!  
  * *(links coming soon)*
  *
  * ---
- * **Built with ❤️ by the Lux community**
+ * **Built with ❤️ by the Luma community**
  */
