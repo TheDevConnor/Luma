@@ -2,152 +2,177 @@
 
 @use "string" as string
 
-pub const NodeKind -> enum {
-  NODE_PROGRAM,
-  NODE_NUMBER,
-  NODE_BINARY,
-  NODE_UNARY,
-  NODE_GROUP
+pub const ExprKind -> enum {
+  EXPR_NUMBER,
+  EXPR_BINARY,
+  EXPR_UNARY,
+  EXPR_GROUP
 };
 
-pub const ASTNode -> struct { type: int };
+pub const StmtKind -> enum {
+  STMT_PROGRAM
+};
+
+pub const Expr -> struct { type: int };
+pub const Stmt -> struct { type: int };
 
 pub const Program -> struct {
-  base: ASTNode,
-  nodes: *ASTNode,
+  base: Stmt,
+  nodes: *Expr,
 };
 
 pub const Number -> struct {
-  base: ASTNode,
+  base: Expr,
   value: int
 };
 
 pub const Binary -> struct {
-  base: ASTNode,
+  base: Expr,
   op: char,       
-  left: *ASTNode,
-  right: *ASTNode
+  left: *Expr,
+  right: *Expr
 };
 
 pub const Unary -> struct {
-  base: ASTNode,
+  base: Expr,
   op: char,       
-  operand: *ASTNode
+  operand: *Expr
 };
 
 pub const Group -> struct {
-  base: ASTNode,      
-  expr: *ASTNode
+  base: Expr,      
+  expr: *Expr
 };
 
 #returns_ownership
-pub const create_program_node -> fn (nodes: *ASTNode) *ASTNode {
+pub const create_program_node -> fn (nodes: *Expr) *Stmt {
   let node: *Program = cast<*Program>(alloc(sizeof<Program>));
-  let base_node: *ASTNode = cast<*ASTNode>(node);  
+  let base_node: *Stmt = cast<*Stmt>(node);  
 
-  base_node.type = NodeKind::NODE_PROGRAM;
+  base_node.type = StmtKind::STMT_PROGRAM;
   node.nodes = nodes;
-  return cast<*ASTNode>(node);
+  return cast<*Stmt>(node);
 }
 
 #returns_ownership
-pub const create_number_node -> fn (value: int) *ASTNode {
+pub const create_number_node -> fn (value: int) *Expr {
   let node: *Number = cast<*Number>(alloc(sizeof<Number>));
-  let base_node: *ASTNode = cast<*ASTNode>(node);  
+  let base_node: *Expr = cast<*Expr>(node);  
 
-  base_node.type = NodeKind::NODE_NUMBER;
+  base_node.type = ExprKind::EXPR_NUMBER;
   node.value = value;
-  return cast<*ASTNode>(node);
+  return cast<*Expr>(node);
 }
 
 #returns_ownership
-pub const create_binary_node -> fn (op: char, left: *ASTNode, 
-                                right: *ASTNode) *ASTNode {
-  let node: *Binary = cast<*Binary>(alloc(sizeof<Binary> + sizeof<ASTNode> + 1));
-  let base_node: *ASTNode = cast<*ASTNode>(node);  
+pub const create_binary_node -> fn (op: char, left: *Expr, 
+                                right: *Expr) *Expr {
+  let node: *Binary = cast<*Binary>(alloc(sizeof<Binary>));
+  let base_node: *Expr = cast<*Expr>(node);  
 
-  base_node.type = NodeKind::NODE_BINARY;
+  base_node.type = ExprKind::EXPR_BINARY;
   node.op = op;
   node.left = left;
   node.right = right;
-  return cast<*ASTNode>(node);
+  return cast<*Expr>(node);
 }
 
 #returns_ownership
-pub const create_unary_node -> fn (op: char, operand: *ASTNode) *ASTNode {
-  let node: *Unary = cast<*Unary>(alloc(sizeof<Unary> + sizeof<ASTNode>));
-  let base_node: *ASTNode = cast<*ASTNode>(node);  
+pub const create_unary_node -> fn (op: char, operand: *Expr) *Expr {
+  let node: *Unary = cast<*Unary>(alloc(sizeof<Unary>));
+  let base_node: *Expr = cast<*Expr>(node);  
 
-  base_node.type = NodeKind::NODE_UNARY;
+  base_node.type = ExprKind::EXPR_UNARY;
   node.op = op;
   node.operand = operand;
-  return cast<*ASTNode>(node);
+  return cast<*Expr>(node);
 }
 
 #returns_ownership
-pub const create_group_node -> fn (expr: *ASTNode) *ASTNode {
-  let node: *Group = cast<*Group>(alloc(sizeof<Group> + sizeof<ASTNode>));
-  let base_node: *ASTNode = cast<*ASTNode>(node);  
-  base_node.type = NodeKind::NODE_GROUP;
+pub const create_group_node -> fn (expr: *Expr) *Expr {
+  let node: *Group = cast<*Group>(alloc(sizeof<Group>));
+  let base_node: *Expr = cast<*Expr>(node);  
+  base_node.type = ExprKind::EXPR_GROUP;
   node.expr = expr;
-  return cast<*ASTNode>(node);
+  return cast<*Expr>(node);
 }
 
 #takes_ownership
-pub const free_ast -> fn (node: *ASTNode) void {
-  if (node == cast<*ASTNode>(0)) { 
+pub const free_expr -> fn (node: *Expr) void {
+  if (node == cast<*Expr>(0)) { 
       return; 
   }
 
-  if (node.type == NodeKind::NODE_PROGRAM) {
-    let program_node: *Program = cast<*Program>(node);
-    free_ast(program_node.nodes);
-  } elif (node.type == NodeKind::NODE_NUMBER) { 
+  if (node.type == ExprKind::EXPR_NUMBER) { 
       // nothing inside to free
-  } elif (node.type == NodeKind::NODE_BINARY) {
+  } elif (node.type == ExprKind::EXPR_BINARY) {
     let bin_node: *Binary = cast<*Binary>(node);
-    free_ast(bin_node.left);
-    free_ast(bin_node.right);
-  } elif (node.type == NodeKind::NODE_UNARY) {
+    free_expr(bin_node.left);
+    free_expr(bin_node.right);
+  } elif (node.type == ExprKind::EXPR_UNARY) {
     let unary_node: *Unary = cast<*Unary>(node);
-    free_ast(unary_node.operand);
-  } elif (node.type == NodeKind::NODE_GROUP) {
+    free_expr(unary_node.operand);
+  } elif (node.type == ExprKind::EXPR_GROUP) {
     let group_node: *Group = cast<*Group>(node);
-    free_ast(group_node.expr);
+    free_expr(group_node.expr);
   }
 
   free(node);
 }
 
-pub const print_ast -> fn (node: *ASTNode) void {
-  if (node == cast<*ASTNode>(0)) { return; }
-  
-  if (node.type == NodeKind::NODE_PROGRAM) {
+#takes_ownership
+pub const free_stmt -> fn (node: *Stmt) void {
+  if (node == cast<*Stmt>(0)) { 
+      return; 
+  }
+
+  if (node.type == StmtKind::STMT_PROGRAM) {
     let program_node: *Program = cast<*Program>(node);
-    print_ast(program_node.nodes);
-  } elif (node.type == NodeKind::NODE_NUMBER) { 
+    free_expr(program_node.nodes);
+  }
+
+  free(node);
+}
+
+pub const print_expr -> fn (node: *Expr) void {
+  if (node == cast<*Expr>(0)) { return; }
+  
+  if (node.type == ExprKind::EXPR_NUMBER) { 
     let num_node: *Number = cast<*Number>(node);
     output(num_node.value);
-  } elif (node.type == NodeKind::NODE_BINARY) {
+  } elif (node.type == ExprKind::EXPR_BINARY) {
     let bin_node: *Binary = cast<*Binary>(node);
     let binop: *char = string::from_char(bin_node.op);
     defer { free(binop); }
 
-    print_ast(bin_node.left);
+    output("(");
+    print_expr(bin_node.left);
     output(" ", binop, " ");
-    print_ast(bin_node.right);
-  } elif (node.type == NodeKind::NODE_UNARY) {
+    print_expr(bin_node.right);
+    output(")");
+  } elif (node.type == ExprKind::EXPR_UNARY) {
     let unary_node: *Unary = cast<*Unary>(node);
     let unop: *char = string::from_char(unary_node.op);
     defer { free(unop); }
 
     output(unop);
-    print_ast(unary_node.operand);
-  } elif (node.type == NodeKind::NODE_GROUP) {
+    print_expr(unary_node.operand);
+  } elif (node.type == ExprKind::EXPR_GROUP) {
     let group_node: *Group = cast<*Group>(node);
 
     output("(");
-    print_ast(group_node.expr);
+    print_expr(group_node.expr);
     output(")");
   }
+}
+
+pub const print_stmt -> fn (node: *Stmt) void {
+  if (node == cast<*Stmt>(0)) { return; }
+  
+  if (node.type == StmtKind::STMT_PROGRAM) {
+    let program_node: *Program = cast<*Program>(node);
+    print_expr(program_node.nodes);
+  }
+
+  output("\n");
 }
