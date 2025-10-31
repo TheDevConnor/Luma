@@ -4,6 +4,8 @@
 
 pub const ExprKind -> enum {
   EXPR_NUMBER,
+  EXPR_IDENT,
+  EXPR_STRING,
   EXPR_BINARY,
   EXPR_UNARY,
   EXPR_GROUP
@@ -24,6 +26,16 @@ pub const Program -> struct {
 pub const Number -> struct {
   base: Expr,
   value: int
+};
+
+pub const Ident -> struct {
+  base: Expr, 
+  name: *char
+};
+
+pub const StringLit -> struct {
+  base: Expr,
+  value: *char
 };
 
 pub const Binary -> struct {
@@ -60,6 +72,26 @@ pub const create_number_node -> fn (value: int) *Expr {
   let base_node: *Expr = cast<*Expr>(node);  
 
   base_node.type = ExprKind::EXPR_NUMBER;
+  node.value = value;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_ident_node -> fn (name: *char) *Expr {
+  let node: *Ident = cast<*Ident>(alloc(sizeof<Ident>));
+  let base_node: *Expr = cast<*Expr>(node);  
+
+  base_node.type = ExprKind::EXPR_IDENT;
+  node.name = name;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_string_node -> fn (value: *char) *Expr {
+  let node: *StringLit = cast<*StringLit>(alloc(sizeof<StringLit>));
+  let base_node: *Expr = cast<*Expr>(node);
+
+  base_node.type = ExprKind::EXPR_STRING;
   node.value = value;
   return cast<*Expr>(node);
 }
@@ -105,6 +137,10 @@ pub const free_expr -> fn (node: *Expr) void {
 
   if (node.type == ExprKind::EXPR_NUMBER) { 
       // nothing inside to free
+  } elif (node.type == ExprKind::EXPR_IDENT) {
+      // nothing inside to free
+  } elif (node.type == ExprKind::EXPR_STRING) {
+      // nothing inside to free
   } elif (node.type == ExprKind::EXPR_BINARY) {
     let bin_node: *Binary = cast<*Binary>(node);
     free_expr(bin_node.left);
@@ -140,6 +176,12 @@ pub const print_expr -> fn (node: *Expr) void {
   if (node.type == ExprKind::EXPR_NUMBER) { 
     let num_node: *Number = cast<*Number>(node);
     output(num_node.value);
+  } elif (node.type == ExprKind::EXPR_IDENT) {
+    let ident_node: *Ident = cast<*Ident>(node);
+    output(ident_node.name);
+  } elif (node.type == ExprKind::EXPR_STRING) {
+    let str_node: *StringLit = cast<*StringLit>(node);
+    output("''", str_node.value, "''");
   } elif (node.type == ExprKind::EXPR_BINARY) {
     let bin_node: *Binary = cast<*Binary>(node);
     let binop: *char = string::from_char(bin_node.op);

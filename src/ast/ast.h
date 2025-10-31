@@ -368,6 +368,7 @@ struct AstNode {
           AstNode *body; // Changed from Stmt* to AstNode*
           bool returns_ownership;
           bool takes_ownership;
+          bool forward_declared;
           void *scope;
         } func_decl;
 
@@ -589,8 +590,8 @@ AstNode *create_func_decl_stmt(ArenaAllocator *arena, const char *name,
                                char **param_names, AstNode **param_types,
                                size_t param_count, AstNode *return_type,
                                bool is_public, bool returns_ownership,
-                               bool takes_ownership, AstNode *body, size_t line,
-                               size_t column);
+                               bool takes_ownership, bool forward_declared,
+                               AstNode *body, size_t line, size_t column);
 AstNode *create_struct_decl_stmt(ArenaAllocator *arena, const char *name,
                                  AstNode **public_members, size_t public_count,
                                  AstNode **private_members,

@@ -215,12 +215,20 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
   Type *return_type = parse_type(parser);
   p_advance(parser); // Advance past the return type token
 
+  if (p_current(parser).type_ == TOK_SEMICOLON) {
+    p_consume(parser, TOK_SEMICOLON, "Expected semicolon after function prototype");
+    return create_func_decl_stmt(parser->arena, name, (char **)param_names.data,
+                                 (AstNode **)param_types.data, param_names.count,
+                                 return_type, is_public, returns_ownership,
+                                 takes_ownership, true, NULL, line, col);
+  }
+
   Stmt *body = block_stmt(parser);
 
   return create_func_decl_stmt(parser->arena, name, (char **)param_names.data,
                                (AstNode **)param_types.data, param_names.count,
                                return_type, is_public, returns_ownership,
-                               takes_ownership, body, line, col);
+                               takes_ownership, false, body, line, col);
 }
 
 /**

@@ -16,7 +16,7 @@ const clean_up -> fn (path: *char, lex: *Token) void {
 pub const main -> fn () int {
   let speed: Timer = time::timer_start();
 
-  let path: *char = "/home/connor/Projects/Luma/LPBS/build.lmb";
+  let path: *char = "/home/TheDevConnor/Luma/LPBS/build.lmb";
   let file: *char = io::read_file(path);
   let lex: *Token = lexer::scan(file);
 
@@ -24,6 +24,7 @@ pub const main -> fn () int {
   ast::print_stmt(parser);
  
   clean_up(file, lex);
+  ast::free_stmt(parser);
 
   let elapsed: int = time::timer_elapsed_ms(speed);
   output("Took ", elapsed, "ms\n");

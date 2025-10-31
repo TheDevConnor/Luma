@@ -87,6 +87,42 @@ bool is_pointer_assignment(AstNode *assignment) {
           value->type == AST_EXPR_IDENTIFIER);
 }
 
+static bool function_signatures_match(AstNode *proto_type, AstNode *impl_type,
+                                      ArenaAllocator *arena) {
+  if (!proto_type || !impl_type) return false;
+  if (proto_type->type != AST_TYPE_FUNCTION || 
+      impl_type->type != AST_TYPE_FUNCTION) return false;
+
+  // Check return types match
+  TypeMatchResult return_match = types_match(
+      proto_type->type_data.function.return_type,
+      impl_type->type_data.function.return_type);
+  
+  if (return_match == TYPE_MATCH_NONE) {
+    return false;
+  }
+
+  // Check parameter counts match
+  if (proto_type->type_data.function.param_count != 
+      impl_type->type_data.function.param_count) {
+    return false;
+  }
+
+  // Check each parameter type matches
+  size_t param_count = proto_type->type_data.function.param_count;
+  for (size_t i = 0; i < param_count; i++) {
+    TypeMatchResult param_match = types_match(
+        proto_type->type_data.function.param_types[i],
+        impl_type->type_data.function.param_types[i]);
+    
+    if (param_match == TYPE_MATCH_NONE) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *name = node->stmt.var_decl.name;
   AstNode *declared_type = node->stmt.var_decl.var_type;
@@ -243,6 +279,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   bool is_public = node->stmt.func_decl.is_public;
   bool returns_ownership = node->stmt.func_decl.returns_ownership;
   bool takes_ownership = node->stmt.func_decl.takes_ownership;
+  bool forward_declared = node->stmt.func_decl.forward_declared;
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {
@@ -269,6 +306,13 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       node->stmt.func_decl.is_public = true;
       is_public = true;
     }
+
+    // Main cannot be forward declared
+    if (forward_declared) {
+      tc_error(node, "Main Function Error",
+               "The 'main' function cannot be forward declared");
+      return false;
+    }
   }
 
   // Validate parameters
@@ -285,12 +329,74 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   AstNode *func_type = create_function_type(
       arena, param_types, param_count, return_type, node->line, node->column);
 
-  // Add function to scope WITH ownership flags
-  if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public, false,
-                                       returns_ownership, takes_ownership,
-                                       arena)) {
-    tc_error_id(node, name, "Duplicate Symbol",
-                "Function '%s' is already declared in this scope", name);
+  // Check if function already exists in scope
+  Symbol *existing = scope_lookup_current_only(scope, name);
+
+  if (existing) {
+    // Function already declared - check if this is valid
+    
+    if (forward_declared) {
+      // Trying to add another prototype - error
+      tc_error_id(node, name, "Duplicate Prototype",
+                  "Function '%s' already has a prototype in this scope", name);
+      return false;
+    }
+
+    // This is an implementation - check if it matches the prototype
+    if (!existing->type || existing->type->type != AST_TYPE_FUNCTION) {
+      tc_error_id(node, name, "Symbol Conflict",
+                  "Symbol '%s' already exists but is not a function", name);
+      return false;
+    }
+
+    // Validate signature matches prototype
+    if (!function_signatures_match(existing->type, func_type, arena)) {
+      tc_error_help(node, "Signature Mismatch",
+                    "Function implementation must match its prototype",
+                    "Function '%s' implementation signature does not match "
+                    "prototype declaration", name);
+      return false;
+    }
+
+    // Check ownership flags match
+    if (existing->returns_ownership != returns_ownership ||
+        existing->takes_ownership != takes_ownership) {
+      tc_error_help(node, "Ownership Mismatch",
+                    "Function implementation ownership flags must match "
+                    "prototype",
+                    "Function '%s' has mismatched ownership annotations", name);
+      return false;
+    }
+
+    // Signature matches - this is a valid implementation
+    // Update the symbol to mark it as implemented (not forward declared)
+    // We'll update the symbol's type node if needed
+    
+  } else {
+    // First declaration of this function
+    if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public, 
+                                         false, returns_ownership, 
+                                         takes_ownership, arena)) {
+      tc_error_id(node, name, "Symbol Error",
+                  "Failed to add function '%s' to scope", name);
+      return false;
+    }
+  }
+
+  // If this is just a forward declaration (prototype), we're done
+  if (forward_declared) {
+    if (body) {
+      tc_error(node, "Forward Declaration Error",
+               "Forward declared function '%s' should not have a body", name);
+      return false;
+    }
+    return true;
+  }
+
+  // This is an implementation - must have a body
+  if (!body) {
+    tc_error(node, "Function Implementation Error",
+             "Function '%s' implementation must have a body", name);
     return false;
   }
 
@@ -324,24 +430,22 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   // Typecheck function body
-  if (body) {
-    if (!typecheck_statement(body, func_scope, arena)) {
-      tc_error(node, "Function Body Error",
-               "Function '%s' body failed typechecking", name);
-      return false;
-    }
+  if (!typecheck_statement(body, func_scope, arena)) {
+    tc_error(node, "Function Body Error",
+             "Function '%s' body failed typechecking", name);
+    return false;
+  }
 
-    // Process deferred frees - these represent cleanup at function exit
-    StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
-    if (analyzer && func_scope->deferred_frees.count > 0) {
-      for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
-        const char **var_ptr =
-            (const char **)((char *)func_scope->deferred_frees.data +
-                            i * sizeof(const char *));
-        if (*var_ptr) {
-          // Mark as freed at function exit
-          static_memory_track_free(analyzer, *var_ptr, name);
-        }
+  // Process deferred frees - these represent cleanup at function exit
+  StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
+  if (analyzer && func_scope->deferred_frees.count > 0) {
+    for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
+      const char **var_ptr =
+          (const char **)((char *)func_scope->deferred_frees.data +
+                          i * sizeof(const char *));
+      if (*var_ptr) {
+        // Mark as freed at function exit
+        static_memory_track_free(analyzer, *var_ptr, name);
       }
     }
   }

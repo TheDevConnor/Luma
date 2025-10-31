@@ -175,3 +175,15 @@ pub const is_alpha -> fn (ch: char) bool {
 pub const is_alnum -> fn (ch: char) bool {
   return (is_alpha(ch) || is_digit(ch));
 }
+
+pub const atio -> fn (value: *char) int {
+  let num: int = 0;
+  loop [i: int = 0](value[i] != '\0') : (++i) { 
+    if (cast<int>(value[i]) >= 48 && cast<int>(value[i]) <= 57) { 
+      num = num * 10 + (cast<int>(value[i]) - 48); 
+    } else { 
+      break; 
+    }
+  }
+  return num;
+}

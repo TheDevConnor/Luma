@@ -138,112 +138,213 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
 }
 
 LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
+  const char *func_name = node->stmt.func_decl.name;
+  bool forward_declared = node->stmt.func_decl.forward_declared;
+  
+  // Generate parameter types
   LLVMTypeRef *param_types = (LLVMTypeRef *)arena_alloc(
       ctx->arena, sizeof(LLVMTypeRef) * node->stmt.func_decl.param_count,
       alignof(LLVMTypeRef));
 
   for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
     param_types[i] = codegen_type(ctx, node->stmt.func_decl.param_types[i]);
-    if (!param_types[i])
+    if (!param_types[i]) {
+      fprintf(stderr, "Error: Failed to generate parameter type %zu for function '%s'\n", 
+              i, func_name);
       return NULL;
+    }
   }
 
+  // Generate return type
   LLVMTypeRef return_type = codegen_type(ctx, node->stmt.func_decl.return_type);
-  if (!return_type)
+  if (!return_type) {
+    fprintf(stderr, "Error: Failed to generate return type for function '%s'\n", func_name);
     return NULL;
+  }
 
+  // Create function type
   LLVMTypeRef func_type = LLVMFunctionType(
       return_type, param_types, node->stmt.func_decl.param_count, false);
 
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
-  LLVMValueRef function = LLVMAddFunction(current_llvm_module,
-                                          node->stmt.func_decl.name, func_type);
+  // Check if function already exists
+  LLVMValueRef existing_function = LLVMGetNamedFunction(current_llvm_module, func_name);
 
-  LLVMSetLinkage(function, get_function_linkage(node));
-  add_symbol(ctx, node->stmt.func_decl.name, function, func_type, true);
-
-  // Set parameter names
-  for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
-    LLVMValueRef param = LLVMGetParam(function, i);
-    LLVMSetValueName2(param, node->stmt.func_decl.param_names[i],
-                      strlen(node->stmt.func_decl.param_names[i]));
-  }
-
-  // Create entry block
-  LLVMBasicBlockRef entry_block =
-      LLVMAppendBasicBlockInContext(ctx->context, function, "entry");
-  LLVMPositionBuilderAtEnd(ctx->builder, entry_block);
-
-  // Save old function context
-  LLVMValueRef old_function = ctx->current_function;
-  DeferredStatement *old_deferred = ctx->deferred_statements;
-  size_t old_defer_count = ctx->deferred_count;
-
-  // Set new function context
-  ctx->current_function = function;
-  init_defer_stack(ctx);
-
-  // Add parameters to symbol table as allocas
-  for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
-    LLVMValueRef param = LLVMGetParam(function, i);
-    LLVMValueRef alloca = LLVMBuildAlloca(ctx->builder, param_types[i],
-                                          node->stmt.func_decl.param_names[i]);
-    LLVMBuildStore(ctx->builder, param, alloca);
-
-    // Extract element type for the pointer
-    LLVMTypeRef element_type =
-        extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
-    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i],
-                                 alloca, param_types[i], element_type, false);
-  }
-
-  // Create blocks for normal return and cleanup
-  LLVMBasicBlockRef normal_return =
-      LLVMAppendBasicBlockInContext(ctx->context, function, "normal_return");
-  LLVMBasicBlockRef cleanup_entry =
-      LLVMAppendBasicBlockInContext(ctx->context, function, "cleanup_entry");
-
-  // Generate function body
-  codegen_stmt(ctx, node->stmt.func_decl.body);
-
-  // If we reach the end without an explicit return, branch to cleanup
-  if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-    LLVMBuildBr(ctx->builder, cleanup_entry);
-  }
-
-  // Generate cleanup blocks for deferred statements
-  generate_cleanup_blocks(ctx);
-
-  // Set up cleanup entry point
-  LLVMPositionBuilderAtEnd(ctx->builder, cleanup_entry);
-
-  if (ctx->deferred_statements) {
-    // Branch to the first cleanup block
-    LLVMBuildBr(ctx->builder, ctx->deferred_statements->cleanup_block);
+  if (existing_function) {
+    // Function already declared - validate signature matches
+    LLVMTypeRef existing_type = LLVMGlobalGetValueType(existing_function);
+    
+    // Compare return types
+    if (LLVMGetReturnType(existing_type) != return_type) {
+      fprintf(stderr, "Error: Function '%s' redeclared with different return type\n", 
+              func_name);
+      return NULL;
+    }
+    
+    // Compare parameter counts
+    if (LLVMCountParamTypes(existing_type) != node->stmt.func_decl.param_count) {
+      fprintf(stderr, "Error: Function '%s' redeclared with different parameter count\n", 
+              func_name);
+      return NULL;
+    }
+    
+    // Compare parameter types
+    LLVMTypeRef *existing_param_types = (LLVMTypeRef *)arena_alloc(
+        ctx->arena, sizeof(LLVMTypeRef) * node->stmt.func_decl.param_count,
+        alignof(LLVMTypeRef));
+    LLVMGetParamTypes(existing_type, existing_param_types);
+    
+    for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
+      if (existing_param_types[i] != param_types[i]) {
+        fprintf(stderr, "Error: Function '%s' redeclared with different parameter %zu type\n",
+                func_name, i);
+        return NULL;
+      }
+    }
+    
+    // Signatures match
+    if (forward_declared) {
+      // This is another prototype - already exists, just return it
+      return existing_function;
+    }
+    
+    // This is the implementation - check if it already has a body
+    if (LLVMCountBasicBlocks(existing_function) > 0) {
+      fprintf(stderr, "Error: Function '%s' already has an implementation\n", func_name);
+      return NULL;
+    }
+    
+    // Use the existing declaration for the implementation
+    LLVMValueRef function = existing_function;
+    
+    // Update symbol table if needed (it should already be there)
+    // Just proceed to generate the body
+    goto generate_body;
+    
   } else {
-    // No deferred statements, go straight to normal return
-    LLVMBuildBr(ctx->builder, normal_return);
+    // First declaration - create new function
+    LLVMValueRef function = LLVMAddFunction(current_llvm_module, func_name, func_type);
+    
+    if (!function) {
+      fprintf(stderr, "Error: Failed to create LLVM function '%s'\n", func_name);
+      return NULL;
+    }
+
+    // Set linkage
+    LLVMSetLinkage(function, get_function_linkage(node));
+    
+    // Add to symbol table
+    add_symbol(ctx, func_name, function, func_type, true);
+
+    // Set parameter names
+    for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
+      LLVMValueRef param = LLVMGetParam(function, i);
+      LLVMSetValueName2(param, node->stmt.func_decl.param_names[i],
+                        strlen(node->stmt.func_decl.param_names[i]));
+    }
+
+    // If this is just a forward declaration (prototype), we're done
+    if (forward_declared) {
+      return function;
+    }
+    
+    // Otherwise, proceed to generate the body
+    goto generate_body;
   }
 
-  // Set up normal return block
-  LLVMPositionBuilderAtEnd(ctx->builder, normal_return);
+generate_body:
+  {
+    // At this point, 'function' or 'existing_function' is set
+    LLVMValueRef function = existing_function ? existing_function : 
+                            LLVMGetNamedFunction(current_llvm_module, func_name);
+    
+    if (!function) {
+      fprintf(stderr, "Error: Function reference lost for '%s'\n", func_name);
+      return NULL;
+    }
 
-  if (LLVMGetTypeKind(return_type) == LLVMVoidTypeKind) {
-    LLVMBuildRetVoid(ctx->builder);
-  } else {
-    // Return default value for the type
-    LLVMValueRef default_val = LLVMConstNull(return_type);
-    LLVMBuildRet(ctx->builder, default_val);
+    // Function must have a body at this point
+    if (!node->stmt.func_decl.body) {
+      fprintf(stderr, "Error: Function '%s' implementation missing body\n", func_name);
+      return NULL;
+    }
+
+    // Create entry block
+    LLVMBasicBlockRef entry_block =
+        LLVMAppendBasicBlockInContext(ctx->context, function, "entry");
+    LLVMPositionBuilderAtEnd(ctx->builder, entry_block);
+
+    // Save old function context
+    LLVMValueRef old_function = ctx->current_function;
+    DeferredStatement *old_deferred = ctx->deferred_statements;
+    size_t old_defer_count = ctx->deferred_count;
+
+    // Set new function context
+    ctx->current_function = function;
+    init_defer_stack(ctx);
+
+    // Add parameters to symbol table as allocas
+    for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
+      LLVMValueRef param = LLVMGetParam(function, i);
+      LLVMValueRef alloca = LLVMBuildAlloca(ctx->builder, param_types[i],
+                                            node->stmt.func_decl.param_names[i]);
+      LLVMBuildStore(ctx->builder, param, alloca);
+
+      // Extract element type for the pointer
+      LLVMTypeRef element_type =
+          extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
+      add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i],
+                                   alloca, param_types[i], element_type, false);
+    }
+
+    // Create blocks for normal return and cleanup
+    LLVMBasicBlockRef normal_return =
+        LLVMAppendBasicBlockInContext(ctx->context, function, "normal_return");
+    LLVMBasicBlockRef cleanup_entry =
+        LLVMAppendBasicBlockInContext(ctx->context, function, "cleanup_entry");
+
+    // Generate function body
+    codegen_stmt(ctx, node->stmt.func_decl.body);
+
+    // If we reach the end without an explicit return, branch to cleanup
+    if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
+      LLVMBuildBr(ctx->builder, cleanup_entry);
+    }
+
+    // Generate cleanup blocks for deferred statements
+    generate_cleanup_blocks(ctx);
+
+    // Set up cleanup entry point
+    LLVMPositionBuilderAtEnd(ctx->builder, cleanup_entry);
+
+    if (ctx->deferred_statements) {
+      // Branch to the first cleanup block
+      LLVMBuildBr(ctx->builder, ctx->deferred_statements->cleanup_block);
+    } else {
+      // No deferred statements, go straight to normal return
+      LLVMBuildBr(ctx->builder, normal_return);
+    }
+
+    // Set up normal return block
+    LLVMPositionBuilderAtEnd(ctx->builder, normal_return);
+
+    if (LLVMGetTypeKind(return_type) == LLVMVoidTypeKind) {
+      LLVMBuildRetVoid(ctx->builder);
+    } else {
+      // Return default value for the type
+      LLVMValueRef default_val = LLVMConstNull(return_type);
+      LLVMBuildRet(ctx->builder, default_val);
+    }
+
+    // Restore old function context
+    ctx->current_function = old_function;
+    ctx->deferred_statements = old_deferred;
+    ctx->deferred_count = old_defer_count;
+
+    return function;
   }
-
-  // Restore old function context
-  ctx->current_function = old_function;
-  ctx->deferred_statements = old_deferred;
-  ctx->deferred_count = old_defer_count;
-
-  return function;
 }
 
 bool is_enum_constant(LLVM_Symbol *sym) {

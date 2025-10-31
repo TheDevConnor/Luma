@@ -1,5 +1,6 @@
 @module "parser"
 
+@use "string" as string
 @use "lexer" as lexer
 @use "ast" as ast
 @use "sys" as sys
@@ -39,32 +40,14 @@ pub const Parser -> struct {
   },
 };
 
-const peek -> fn (psr: *Parser) Token { 
-  return psr.tks.list[psr.pos]; 
-}
+// TODO: Add in resolution types for namespaces/modules ex: *ast::Expr, ast::NodeType,
+// TODO: and fix the types for the module system for enums and structs with it.
 
-const advance -> fn (psr: *Parser) void {
-  psr.pos = psr.pos + 1;
-}
+const at_end  -> fn (psr: *Parser) int { return cast<int>(psr.pos >= psr.tks.size); }
+const peek    -> fn (psr: *Parser) Token {  return psr.tks.list[psr.pos]; }
+const advance -> fn (psr: *Parser) void { psr.pos = psr.pos + 1; }
 
-const at_end -> fn (psr: *Parser) int {
-  if (psr.pos >= psr.tks.size) {
-    return 1;
-  }
-  return 0;
-}
-
-const parse_int -> fn (value: *char) int {
-  let num: int = 0;
-  loop [i: int = 0](value[i] != '\0') : (++i) { 
-    if (cast<int>(value[i]) >= 48 && cast<int>(value[i]) <= 57) { 
-      num = num * 10 + (cast<int>(value[i]) - 48); 
-    } else { 
-      break; 
-    }
-  }
-  return num;
-}
+const parse_expr -> fn (psr: *Parser, bp: int) *Expr;
 
 const get_infix_bp -> fn (token_type: int) int {
   switch (token_type) {
@@ -74,17 +57,71 @@ const get_infix_bp -> fn (token_type: int) int {
   }
 }
 
+const parse_literal -> fn (psr: *Parser) *Expr {
+  let tok: Token = peek(psr);
+  
+  switch (tok.type) {
+    0 -> { //number
+      let value: int = string::atio(tok.value);
+      advance(psr);
+      return ast::create_number_node(value);
+    }
+    1 -> { //ident
+      let name: *char = tok.value;
+      advance(psr);
+      return ast::create_ident_node(name);
+    }
+    2 -> { //string
+      let value: *char = tok.value;
+      advance(psr);
+      return ast::create_string_node(value);
+    }
+    _ -> {
+      output("Unexpected token in literal parsing\n");
+      return cast<*Expr>(0);
+    }
+  }
+}
+
 const nud -> fn (psr: *Parser) *Expr {
   let tok: Token = peek(psr);
   
   switch (tok.type) {
-    0 -> {  // Number literal
-      let num: int = parse_int(tok.value);
+    0, 1, 2 -> { return parse_literal(psr); } //number, ident, string
+    6 -> { //(
       advance(psr);
-      return ast::create_number_node(num);
+      let expr: *Expr = parse_expr(psr, BindingPower::BP_NONE);
+      let next_tok: Token = peek(psr);
+      if (next_tok.type != 7) { //)
+        output("Expected closing parenthesis\n");
+        return cast<*Expr>(0);
+      }
+      advance(psr); //consume )
+      return ast::create_group_node(expr);
+    }
+    16, 17 -> { //+, -
+      let op: *char = tok.value;
+      advance(psr);
+      let right: *Expr = parse_expr(psr, BindingPower::BP_UNARY);
+      return ast::create_unary_node(op[0], right);
     }
     _ -> {
       output("Unexpected token in prefix position\n");
+      return cast<*Expr>(0);
+    }
+  }
+}
+
+const led -> fn (psr: *Parser, left: *Expr, token: Token) *Expr {
+  switch (token.type) {
+    12, 13, 16, 17, 18, 19 -> { //==, !=, +, -, *, / 
+      let op: *char = psr.tks.list[psr.pos].value; 
+      advance(psr);
+      let right: *Expr = parse_expr(psr, get_infix_bp(token.type));
+      return ast::create_binary_node(op[0], left, right);
+    }
+    _ -> {
+      output("Unexpected token in infix position\n");
       return cast<*Expr>(0);
     }
   }
@@ -98,15 +135,7 @@ const parse_expr -> fn (psr: *Parser, bp: int) *Expr {
     let tok: Token = peek(psr);
     let next_bp: int = get_infix_bp(tok.type);
     
-    switch (tok.type) {
-      16, 17, 18, 19 -> { // +, -, *, / 
-        let op: *char = psr.tks.list[psr.pos].value; 
-        advance(psr);
-        let right: *Expr = parse_expr(psr, next_bp);
-        left = ast::create_binary_node(op[0], left, right);
-      }
-      _ -> { }  // Do nothing, exit loop
-    }
+    left = led(psr, left, tok);
   }
   
   return left;
