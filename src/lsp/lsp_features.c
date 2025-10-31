@@ -43,6 +43,7 @@ LSPLocation *lsp_definition(LSPDocument *doc, LSPPosition position,
 LSPCompletionItem *lsp_completion(LSPDocument *doc, LSPPosition position,
                                   size_t *completion_count,
                                   ArenaAllocator *arena) {
+  (void)position;
   if (!doc || !completion_count) {
     return NULL;
   }

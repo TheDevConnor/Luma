@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Luma",
-  "scopeName": "source.lux",
+  "scopeName": "source.luma",
   "patterns": [
     {
       "include": "#comments"
@@ -38,12 +38,12 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.double-colon.lux",
+          "name": "comment.line.double-colon.luma",
           "begin": "//",
           "end": "$"
         },
         {
-          "name": "comment.block.lux",
+          "name": "comment.block.luma",
           "begin": "/\\*",
           "end": "\\*/",
           "patterns": [
@@ -57,7 +57,7 @@
     "attributes": {
       "patterns": [
         {
-          "name": "storage.modifier.attribute.lux",
+          "name": "storage.modifier.attribute.luma",
           "match": "#(returns_ownership|takes_ownership)\\b"
         }
       ]
@@ -65,23 +65,23 @@
     "preprocessor": {
       "patterns": [
         {
-          "name": "meta.preprocessor.lux",
+          "name": "meta.preprocessor.luma",
           "match": "(@)(module|use)\\s+(\"[^\"]*\")(\\s+as\\s+([a-zA-Z_][a-zA-Z0-9_]*))?",
           "captures": {
             "1": {
-              "name": "punctuation.definition.directive.lux"
+              "name": "punctuation.definition.directive.luma"
             },
             "2": {
-              "name": "keyword.control.directive.lux"
+              "name": "keyword.control.directive.luma"
             },
             "3": {
-              "name": "string.quoted.double.lux"
+              "name": "string.quoted.double.luma"
             },
             "4": {
-              "name": "keyword.control.as.lux"
+              "name": "keyword.control.as.luma"
             },
             "5": {
-              "name": "entity.name.namespace.lux"
+              "name": "entity.name.namespace.luma"
             }
           }
         }
@@ -90,23 +90,23 @@
     "strings": {
       "patterns": [
         {
-          "name": "string.quoted.double.lux",
+          "name": "string.quoted.double.luma",
           "begin": "\"",
           "end": "\"",
           "patterns": [
             {
-              "name": "constant.character.escape.lux",
+              "name": "constant.character.escape.luma",
               "match": "\\\\."
             }
           ]
         },
         {
-          "name": "string.quoted.single.lux",
+          "name": "string.quoted.single.luma",
           "begin": "'",
           "end": "'",
           "patterns": [
             {
-              "name": "constant.character.escape.lux",
+              "name": "constant.character.escape.luma",
               "match": "\\\\."
             }
           ]
@@ -116,11 +116,11 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.float.lux",
+          "name": "constant.numeric.float.luma",
           "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
         },
         {
-          "name": "constant.numeric.integer.lux",
+          "name": "constant.numeric.integer.luma",
           "match": "\\b\\d+\\b"
         }
       ]
@@ -128,19 +128,19 @@
     "keywords": {
       "patterns": [
         {
-          "name": "keyword.control.lux",
+          "name": "keyword.control.luma",
           "match": "\\b(if|elif|else|loop|break|continue|return|defer)\\b"
         },
         {
-          "name": "storage.type.lux",
+          "name": "storage.type.luma",
           "match": "\\b(const|let)\\b"
         },
         {
-          "name": "keyword.other.lux",
+          "name": "keyword.other.luma",
           "match": "\\b(fn|struct|enum)\\b"
         },
         {
-          "name": "storage.modifier.lux",
+          "name": "storage.modifier.luma",
           "match": "\\b(pub|priv|public|private)\\b"
         }
       ]
@@ -148,11 +148,11 @@
     "types": {
       "patterns": [
         {
-          "name": "support.type.primitive.lux",
+          "name": "support.type.primitive.luma",
           "match": "\\b(int|uint|float|double|bool|str|void|char|short|long|nil)\\b"
         },
         {
-          "name": "entity.name.type.lux",
+          "name": "entity.name.type.luma",
           "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
         }
       ]
@@ -160,29 +160,29 @@
     "functions": {
       "patterns": [
         {
-          "name": "meta.function.definition.lux",
+          "name": "meta.function.definition.luma",
           "begin": "\\b(const)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=)\\s*(fn)\\s*(\\()",
           "beginCaptures": {
             "1": {
-              "name": "storage.type.lux"
+              "name": "storage.type.luma"
             },
             "2": {
-              "name": "entity.name.function.lux"
+              "name": "entity.name.function.luma"
             },
             "3": {
-              "name": "keyword.operator.assignment.lux"
+              "name": "keyword.operator.assignment.luma"
             },
             "4": {
-              "name": "keyword.other.lux"
+              "name": "keyword.other.luma"
             },
             "5": {
-              "name": "punctuation.definition.parameters.begin.lux"
+              "name": "punctuation.definition.parameters.begin.luma"
             }
           },
           "end": "\\)",
           "endCaptures": {
             "0": {
-              "name": "punctuation.definition.parameters.end.lux"
+              "name": "punctuation.definition.parameters.end.luma"
             }
           },
           "patterns": [
@@ -192,11 +192,11 @@
           ]
         },
         {
-          "name": "meta.function.call.lux",
+          "name": "meta.function.call.luma",
           "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
             "1": {
-              "name": "entity.name.function.lux"
+              "name": "entity.name.function.luma"
             }
           }
         }
@@ -205,7 +205,7 @@
     "function-parameters": {
       "patterns": [
         {
-          "name": "variable.parameter.lux",
+          "name": "variable.parameter.luma",
           "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*:)"
         },
         {
@@ -219,35 +219,35 @@
     "operators": {
       "patterns": [
         {
-          "name": "keyword.operator.arithmetic.lux",
+          "name": "keyword.operator.arithmetic.luma",
           "match": "\\+\\+|--|\\+|\\-|\\*|/|%"
         },
         {
-          "name": "keyword.operator.comparison.lux",
+          "name": "keyword.operator.comparison.luma",
           "match": "==|!=|<|>|<=|>="
         },
         {
-          "name": "keyword.operator.logical.lux",
+          "name": "keyword.operator.logical.luma",
           "match": "&&|\\|\\||!"
         },
         {
-          "name": "keyword.operator.assignment.lux",
+          "name": "keyword.operator.assignment.luma",
           "match": "="
         },
         {
-          "name": "keyword.operator.bitwise.lux",
+          "name": "keyword.operator.bitwise.luma",
           "match": "&|\\||\\^|~|<<|>>"
         },
         {
-          "name": "keyword.operator.pointer.lux",
+          "name": "keyword.operator.pointer.luma",
           "match": "\\*|&"
         },
         {
-          "name": "keyword.operator.runtime-member.lux",
+          "name": "keyword.operator.runtime-member.luma",
           "match": "\\."
         },
         {
-          "name": "keyword.operator.compiletime-const.lux",
+          "name": "keyword.operator.compiletime-const.luma",
           "match": "::"
         }
       ]
@@ -255,7 +255,7 @@
     "identifiers": {
       "patterns": [
         {
-          "name": "variable.other.lux",
+          "name": "variable.other.luma",
           "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
         }
       ]

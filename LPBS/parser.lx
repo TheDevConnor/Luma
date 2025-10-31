@@ -2,6 +2,7 @@
 
 @use "lexer" as lexer
 @use "ast" as ast
+@use "sys" as sys
 
 const BindingPower -> enum {
   BP_NONE,        /**< No binding power */
@@ -46,7 +47,7 @@ pub const parse -> fn (tks: *Token, path: *char) *ASTNode {
   let psr: Parser;
   init_parser(&psr, tks, path);
 
-  output(peek(&psr, 10).value, "\n");
+  sys::print(peek(&psr, 10).value);
 
   return cast<*ASTNode>(0); 
 }
