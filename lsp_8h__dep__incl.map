@@ -1,0 +1,21 @@
+<map id="src/lsp/lsp.h" name="src/lsp/lsp.h">
+<area shape="rect" id="Node000001" title="Language Server Protocol implementation for Luma language." alt="" coords="757,5,855,31"/>
+<area shape="rect" id="Node000002" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="5,79,135,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="743,27,483,47,148,81,135,83,135,78,147,76,482,42,742,21"/>
+<area shape="rect" id="Node000003" href="$lsp__diagnostics_8c.html" title=" " alt="" coords="159,79,338,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="744,30,339,81,338,76,743,25"/>
+<area shape="rect" id="Node000004" href="$lsp__document_8c.html" title=" " alt="" coords="362,79,533,104"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="744,34,506,81,505,76,743,29"/>
+<area shape="rect" id="Node000005" href="$lsp__features_8c.html" title=" " alt="" coords="557,79,716,104"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="767,38,665,81,663,76,765,34"/>
+<area shape="rect" id="Node000006" href="$lsp__json_8c.html" title=" " alt="" coords="740,79,872,104"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="809,44,809,79,803,79,803,44"/>
+<area shape="rect" id="Node000007" href="$lsp__message_8c.html" title=" " alt="" coords="896,79,1060,104"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="847,33,951,76,949,81,845,38"/>
+<area shape="rect" id="Node000008" href="$lsp__module_8c.html" title=" " alt="" coords="1085,79,1239,104"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="869,29,1105,76,1104,81,868,34"/>
+<area shape="rect" id="Node000009" href="$lsp__server_8c.html" title="Language Server Protocol implementation with type error diagnostics." alt="" coords="1264,79,1409,104"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="869,25,1264,78,1263,83,868,30"/>
+<area shape="rect" id="Node000010" href="$main_8c.html" title="Entry point for the Luma compiler/interpreter build process." alt="" coords="1433,79,1523,104"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="869,21,1112,40,1267,56,1422,76,1433,78,1432,83,1422,81,1266,61,1112,45,869,26"/>
+</map>
