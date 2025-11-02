@@ -112,7 +112,6 @@ Stmt *const_stmt(Parser *parser, bool is_public, bool returns_ownership,
     p_consume(parser, TOK_COLON, "Expected ':' after const name");
 
     Type *type = parse_type(parser);
-    p_advance(parser); // Advance past the type token
 
     p_consume(parser, TOK_EQUAL, "Expected '=' after const type");
     Expr *value = parse_expr(parser, BP_LOWEST);
@@ -192,7 +191,6 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
       fprintf(stderr, "Failed to parse type for parameter '%s'\n", param_name);
       return NULL;
     }
-    p_advance(parser); // Advance past the type token
 
     // Store parameter name and type
     char **name_slot = (char **)growable_array_push(&param_names);
@@ -213,7 +211,6 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
   p_consume(parser, TOK_RPAREN, "Expected ')' after function parameters");
 
   Type *return_type = parse_type(parser);
-  p_advance(parser); // Advance past the return type token
 
   if (p_current(parser).type_ == TOK_SEMICOLON) {
     p_consume(parser, TOK_SEMICOLON, "Expected semicolon after function prototype");
@@ -394,8 +391,6 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
             field_line, field_col, 1);
         return NULL;
       }
-
-      p_advance(parser);
     }
 
     // Handle field separators
@@ -461,7 +456,6 @@ Stmt *var_stmt(Parser *parser, bool is_public) {
 
   p_consume(parser, TOK_COLON, "Expected ':' after variable name");
   Type *type = parse_type(parser);
-  p_advance(parser); // Advance past the type token
 
   if (p_current(parser).type_ != TOK_EQUAL) {
     p_consume(parser, TOK_SEMICOLON,
@@ -693,7 +687,6 @@ Stmt *loop_init(Parser *parser, int line, int col) {
 
   p_consume(parser, TOK_COLON, "Expected ':' after loop initializer");
   Type *type = parse_type(parser);
-  p_advance(parser); // Advance past the type token
 
   p_consume(parser, TOK_EQUAL, "Expected '=' after loop initializer");
   Expr *initializer = parse_expr(parser, BP_LOWEST);
@@ -1103,7 +1096,6 @@ Stmt *impl_stmt(Parser *parser) {
               function_list_name);
       return NULL;
     }
-    p_advance(parser);
 
     char **name_identifier = (char **)growable_array_push(&function_name_list);
     Type **type_specifier = (Type **)growable_array_push(&function_name_types);

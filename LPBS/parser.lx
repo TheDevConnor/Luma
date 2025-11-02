@@ -29,11 +29,11 @@ const BindingPower -> enum {
 };
 
 pub const Parser -> struct {
-  tks: *Token,
+  tks: *lexer::Token,
   path: *char,
   pos: int,
 
-  init_parser -> fn (tks: *Token, path: *char) void {
+  init_parser -> fn (tks: *lexer::Token, path: *char) void {
     self.path = path;
     self.tks = tks;
     self.pos = 0;
@@ -44,10 +44,10 @@ pub const Parser -> struct {
 // TODO: and fix the types for the module system for enums and structs with it.
 
 const at_end  -> fn (psr: *Parser) int { return cast<int>(psr.pos >= psr.tks.size); }
-const peek    -> fn (psr: *Parser) Token {  return psr.tks.list[psr.pos]; }
+const peek    -> fn (psr: *Parser) lexer::Token {  return psr.tks.list[psr.pos]; }
 const advance -> fn (psr: *Parser) void { psr.pos = psr.pos + 1; }
 
-const parse_expr -> fn (psr: *Parser, bp: int) *Expr;
+const parse_expr -> fn (psr: *Parser, bp: int) *ast::Expr;
 
 const get_infix_bp -> fn (token_type: int) int {
   switch (token_type) {
@@ -57,8 +57,8 @@ const get_infix_bp -> fn (token_type: int) int {
   }
 }
 
-const parse_literal -> fn (psr: *Parser) *Expr {
-  let tok: Token = peek(psr);
+const parse_literal -> fn (psr: *Parser) *ast::Expr {
+  let tok: lexer::Token = peek(psr);
   
   switch (tok.type) {
     0 -> { //number
@@ -83,15 +83,15 @@ const parse_literal -> fn (psr: *Parser) *Expr {
   }
 }
 
-const nud -> fn (psr: *Parser) *Expr {
-  let tok: Token = peek(psr);
+const nud -> fn (psr: *Parser) *ast::Expr {
+  let tok: lexer::Token = peek(psr);
   
   switch (tok.type) {
     0, 1, 2 -> { return parse_literal(psr); } //number, ident, string
     6 -> { //(
       advance(psr);
-      let expr: *Expr = parse_expr(psr, BindingPower::BP_NONE);
-      let next_tok: Token = peek(psr);
+      let expr: *ast::Expr = parse_expr(psr, BindingPower::BP_NONE);
+      let next_tok: lexer::Token = peek(psr);
       if (next_tok.type != 7) { //)
         output("Expected closing parenthesis\n");
         return cast<*Expr>(0);
@@ -102,37 +102,37 @@ const nud -> fn (psr: *Parser) *Expr {
     16, 17 -> { //+, -
       let op: *char = tok.value;
       advance(psr);
-      let right: *Expr = parse_expr(psr, BindingPower::BP_UNARY);
+      let right: *ast::Expr = parse_expr(psr, BindingPower::BP_UNARY);
       return ast::create_unary_node(op[0], right);
     }
     _ -> {
       output("Unexpected token in prefix position\n");
-      return cast<*Expr>(0);
+      return cast<*ast::Expr>(0);
     }
   }
 }
 
-const led -> fn (psr: *Parser, left: *Expr, token: Token) *Expr {
+const led -> fn (psr: *Parser, left: *ast::Expr, token: lexer::Token) *ast::Expr {
   switch (token.type) {
     12, 13, 16, 17, 18, 19 -> { //==, !=, +, -, *, / 
       let op: *char = psr.tks.list[psr.pos].value; 
       advance(psr);
-      let right: *Expr = parse_expr(psr, get_infix_bp(token.type));
+      let right: *ast::Expr = parse_expr(psr, get_infix_bp(token.type));
       return ast::create_binary_node(op[0], left, right);
     }
     _ -> {
       output("Unexpected token in infix position\n");
-      return cast<*Expr>(0);
+      return cast<*ast::Expr>(0);
     }
   }
 }
 
-const parse_expr -> fn (psr: *Parser, bp: int) *Expr {
-  let left: *Expr = nud(psr);
+const parse_expr -> fn (psr: *Parser, bp: int) *ast::Expr {
+  let left: *ast::Expr = nud(psr);
   
   // Inline the led logic here
   loop (at_end(psr) == 0 && bp < get_infix_bp(peek(psr).type)) {
-    let tok: Token = peek(psr);
+    let tok: lexer::Token = peek(psr);
     let next_bp: int = get_infix_bp(tok.type);
     
     left = led(psr, left, tok);
@@ -141,11 +141,11 @@ const parse_expr -> fn (psr: *Parser, bp: int) *Expr {
   return left;
 }
 
-pub const parse -> fn (tks: *Token, path: *char) *Stmt {
+pub const parse -> fn (tks: *lexer::Token, path: *char) *ast::Stmt {
   let psr: Parser;
   psr.init_parser(tks, path);
   
-  let node: *Expr = parse_expr(&psr, BindingPower::BP_NONE);
+  let node: *ast::Expr = parse_expr(&psr, BindingPower::BP_NONE);
   
   return ast::create_program_node(node); 
 }

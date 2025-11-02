@@ -63,12 +63,13 @@ typedef enum {
   AST_STMT_DEFAULT,
 
   // Type nodes
-  AST_TYPE_BASIC,    // Basic types (int, float, string, etc.)
-  AST_TYPE_POINTER,  // Pointer types
-  AST_TYPE_ARRAY,    // Array types
-  AST_TYPE_FUNCTION, // Function types
-  AST_TYPE_STRUCT,   // Struct types
-  AST_TYPE_ENUM,     // Enum types
+  AST_TYPE_RESOLUTION, // Namespace::Type resolution
+  AST_TYPE_BASIC,      // Basic types (int, float, string, etc.)
+  AST_TYPE_POINTER,    // Pointer types
+  AST_TYPE_ARRAY,      // Array types
+  AST_TYPE_FUNCTION,   // Function types
+  AST_TYPE_STRUCT,     // Struct types
+  AST_TYPE_ENUM,       // Enum types
 } NodeType;
 
 // Literal types
@@ -478,6 +479,11 @@ struct AstNode {
           AstNode *return_type; // Changed from Type* to AstNode*
         } function;
 
+        struct {
+          char **parts;      // Array of namespace/type parts
+          size_t part_count; // Number of parts
+        } resolution;
+
         // AST_TYPE_STRUCT - ADD THIS STRUCT
         struct {
           const char *name;          // Name of the struct type
@@ -654,3 +660,5 @@ AstNode *create_array_type(ArenaAllocator *arena, AstNode *element_type,
 AstNode *create_function_type(ArenaAllocator *arena, AstNode **param_types,
                               size_t param_count, AstNode *return_type,
                               size_t line, size_t column);
+AstNode *create_resolution_type(ArenaAllocator *arena, char **parts,
+                                size_t part_count, size_t line, size_t column);

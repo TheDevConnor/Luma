@@ -28,3 +28,10 @@ AstNode *create_function_type(ArenaAllocator *arena, AstNode **param_types, size
   node->type_data.function.return_type = return_type;
   return node;
 }
+
+AstNode *create_resolution_type(ArenaAllocator *arena, char **parts, size_t part_count, size_t line, size_t column) {
+  AstNode *node = create_type_node(arena, AST_TYPE_RESOLUTION, line, column);
+  node->type_data.resolution.parts = parts;
+  node->type_data.resolution.part_count = part_count;
+  return node;
+}

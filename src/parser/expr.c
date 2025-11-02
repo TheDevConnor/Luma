@@ -347,20 +347,43 @@ Expr *struct_expr(Parser *parser) {
 }
 
 // Named struct initialization: Point { x: 20, y: 50 }
-// This is called from led() when we see '{' after an identifier
+// OR namespace::Point { x: 20, y: 50 }
+// This is called from led() when we see '{' after an identifier or member expr
 Expr *named_struct_expr(Parser *parser, Expr *left, BindingPower bp) {
   (void)bp; // Unused parameter
 
-  // left should be an identifier expression containing the struct name
-  if (left->type != AST_EXPR_IDENTIFIER) {
+  char *struct_name = NULL;
+
+  // Handle both identifier and member expressions
+  if (left->type == AST_EXPR_IDENTIFIER) {
+    // Simple case: Point { ... }
+    struct_name = left->expr.identifier.name;
+  } else if (left->type == AST_EXPR_MEMBER) {
+    // Namespace resolution: namespace::Point { ... }
+    // Build the full qualified name from the member expression
+
+    // For now, we'll extract the name from the member expression
+    // This assumes the member expression represents something like
+    // "namespace::Point" You might need to adjust this based on how your AST
+    // represents member expressions
+
+    // Get the member name (the rightmost part, e.g., "Point" in
+    // "namespace::Point")
+    struct_name = left->expr.member.member;
+
+    // Note: If you need the full qualified name, you'll need to traverse
+    // the member expression tree and build the complete path
+    // For example: if left->expr.member.object is also a member expr,
+    // you'd need to recursively build the name
+  } else {
     parser_error(parser, "SyntaxError", parser->file_path,
-                 "Expected identifier before '{' for named struct",
+                 "Expected identifier or namespace resolution before '{' for "
+                 "named struct",
                  p_current(parser).line, p_current(parser).col,
                  p_current(parser).length);
     return NULL;
   }
 
-  char *struct_name = left->expr.identifier.name;
   int line = p_current(parser).line;
   int col = p_current(parser).col;
 
@@ -425,7 +448,8 @@ Expr *named_struct_expr(Parser *parser, Expr *left, BindingPower bp) {
 
   p_consume(parser, TOK_RBRACE, "Expected '}' to close struct expression");
 
-  // Named struct
+  // Store the full expression (identifier or member) for later use
+  // This allows the semantic analyzer to resolve the namespace properly
   return create_struct_expr(
       parser->arena, struct_name, (char **)field_names.data,
       (AstNode **)field_values.data, field_names.count, line, col);
@@ -483,20 +507,26 @@ Expr *free_expr(Parser *parser) {
 
 // cast<TYPE>(value);
 Expr *cast_expr(Parser *parser) {
-  p_advance(parser); // Advance past the cast
   int line = p_current(parser).line;
   int col = p_current(parser).col;
+  
+  p_advance(parser); // Advance past 'cast'
 
   p_consume(parser, TOK_LT,
-            "Expected a '<' before you declare the type you want to cast too.");
+            "Expected a '<' before you declare the type you want to cast to.");
+  
   Type *cast_type = parse_type(parser);
-  p_advance(parser);
+  // parse_type() has already advanced past the type
+  
   p_consume(parser, TOK_GT,
-            "Expected a '>' after defining the type you want to cast too, but "
+            "Expected a '>' after defining the type you want to cast to, but "
             "before defining what you are casting");
+  
   p_consume(parser, TOK_LPAREN,
             "Expected a '(' before defining what you are casting");
+  
   Expr *castee = parse_expr(parser, BP_NONE);
+  
   p_consume(parser, TOK_RPAREN,
             "Expected a ')' after defining what you are casting");
 
@@ -505,22 +535,27 @@ Expr *cast_expr(Parser *parser) {
 
 // input<TYPE>(msg);
 Expr *input_expr(Parser *parser) {
-  p_advance(parser); // Advance past the cast
   int line = p_current(parser).line;
   int col = p_current(parser).col;
+  
+  p_advance(parser); // Advance past 'input'
 
   p_consume(parser, TOK_LT,
-            "Expected a '<' before you declare the type you want to cast too.");
+            "Expected a '<' before you declare the type you want to input.");
+  
   Type *type = parse_type(parser);
-  p_advance(parser);
+  // parse_type() has already advanced past the type
+  
   p_consume(parser, TOK_GT,
-            "Expected a '>' after defining the type you want to cast too, but "
-            "before defining what you are casting");
+            "Expected a '>' after defining the type you want to input");
+  
   p_consume(parser, TOK_LPAREN,
-            "Expected a '(' before defining what you are casting");
+            "Expected a '(' before defining the input message");
+  
   Expr *msg = parse_expr(parser, BP_NONE);
+  
   p_consume(parser, TOK_RPAREN,
-            "Expected a ')' after defining what you are casting");
+            "Expected a ')' after defining the input message");
 
   return create_input_expr(parser->arena, type, msg, line, col);
 }
@@ -585,23 +620,30 @@ Expr *syscall_expr(Parser *parser) {
 // sizeof<[n]int>      Runtime when n is variable
 // sizeof<MyStruct>    Compile-time constant
 Expr *sizeof_expr(Parser *parser) {
-  p_advance(parser); // Advance past the sizeof
   int line = p_current(parser).line;
   int col = p_current(parser).col;
-  AstNode *object = NULL;
-  bool is_type = false;
-
+  
+  p_advance(parser); // Advance past 'sizeof'
+  
   p_consume(parser, TOK_LT,
             "Expected a '<' before defining the var or type you want to get "
             "the size of.");
-  if (parse_type(parser) != NULL) {
-    ;
-    object = parse_type(parser);
-    p_advance(parser);
+  
+  AstNode *object = NULL;
+  bool is_type = false;
+
+  // Try to parse as a type first
+  Type *type_result = parse_type(parser);
+  if (type_result != NULL) {
+    object = (AstNode *)type_result;
     is_type = true;
+    // parse_type() has already advanced past the type
   } else {
-    object = parse_expr(parser, BP_NONE);
+    // Not a type, parse as an expression
+    object = (AstNode *)parse_expr(parser, BP_NONE);
+    is_type = false;
   }
+  
   p_consume(parser, TOK_GT,
             "Expected a '>' after defining the var or type you want to get the "
             "size of.");

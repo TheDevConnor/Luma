@@ -18,9 +18,9 @@ pub const main -> fn () int {
 
   let path: *char = "/home/TheDevConnor/Luma/LPBS/build.lmb";
   let file: *char = io::read_file(path);
-  let lex: *Token = lexer::scan(file);
+  let lex: *lexer::Token = lexer::scan(file);
 
-  let parser: *Stmt = psr::parse(lex, path);
+  let parser: *ast::Stmt = psr::parse(lex, path);
   ast::print_stmt(parser);
  
   clean_up(file, lex);

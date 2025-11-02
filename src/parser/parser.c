@@ -402,7 +402,8 @@ Expr *parse_expr(Parser *parser, BindingPower bp) {
   Expr *left = nud(parser);
 
   while (p_has_tokens(parser) && get_bp(p_current(parser).type_) > bp) {
-    left = led(parser, left, get_bp(p_current(parser).type_));
+    BindingPower current_bp = get_bp(p_current(parser).type_);
+    left = led(parser, left, current_bp);
   }
 
   return left;
@@ -525,12 +526,8 @@ Type *parse_type(Parser *parser) {
   case TOK_CHAR:
   case TOK_STAR:     // Pointer type
   case TOK_LBRACKET: // Array type
+  case TOK_IDENTIFIER: // Could be simple type or namespace::Type
     return tnud(parser);
-
-  // Optionally: handle identifiers like 'MyStruct' or user-defined types
-  case TOK_IDENTIFIER:
-    return create_basic_type(parser->arena, get_name(parser), parser->tks->line,
-                             parser->tks->col);
 
   default:
     fprintf(stderr, "[parse_type] Unexpected token for type: %d\n", tok);
