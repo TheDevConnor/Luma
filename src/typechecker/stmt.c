@@ -89,21 +89,23 @@ bool is_pointer_assignment(AstNode *assignment) {
 
 static bool function_signatures_match(AstNode *proto_type, AstNode *impl_type,
                                       ArenaAllocator *arena) {
-  if (!proto_type || !impl_type) return false;
-  if (proto_type->type != AST_TYPE_FUNCTION || 
-      impl_type->type != AST_TYPE_FUNCTION) return false;
+  if (!proto_type || !impl_type)
+    return false;
+  if (proto_type->type != AST_TYPE_FUNCTION ||
+      impl_type->type != AST_TYPE_FUNCTION)
+    return false;
 
   // Check return types match
-  TypeMatchResult return_match = types_match(
-      proto_type->type_data.function.return_type,
-      impl_type->type_data.function.return_type);
-  
+  TypeMatchResult return_match =
+      types_match(proto_type->type_data.function.return_type,
+                  impl_type->type_data.function.return_type);
+
   if (return_match == TYPE_MATCH_NONE) {
     return false;
   }
 
   // Check parameter counts match
-  if (proto_type->type_data.function.param_count != 
+  if (proto_type->type_data.function.param_count !=
       impl_type->type_data.function.param_count) {
     return false;
   }
@@ -111,10 +113,10 @@ static bool function_signatures_match(AstNode *proto_type, AstNode *impl_type,
   // Check each parameter type matches
   size_t param_count = proto_type->type_data.function.param_count;
   for (size_t i = 0; i < param_count; i++) {
-    TypeMatchResult param_match = types_match(
-        proto_type->type_data.function.param_types[i],
-        impl_type->type_data.function.param_types[i]);
-    
+    TypeMatchResult param_match =
+        types_match(proto_type->type_data.function.param_types[i],
+                    impl_type->type_data.function.param_types[i]);
+
     if (param_match == TYPE_MATCH_NONE) {
       return false;
     }
@@ -334,7 +336,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   if (existing) {
     // Function already declared - check if this is valid
-    
+
     if (forward_declared) {
       // Trying to add another prototype - error
       tc_error_id(node, name, "Duplicate Prototype",
@@ -354,7 +356,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       tc_error_help(node, "Signature Mismatch",
                     "Function implementation must match its prototype",
                     "Function '%s' implementation signature does not match "
-                    "prototype declaration", name);
+                    "prototype declaration",
+                    name);
       return false;
     }
 
@@ -371,11 +374,11 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     // Signature matches - this is a valid implementation
     // Update the symbol to mark it as implemented (not forward declared)
     // We'll update the symbol's type node if needed
-    
+
   } else {
     // First declaration of this function
-    if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public, 
-                                         false, returns_ownership, 
+    if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public,
+                                         false, returns_ownership,
                                          takes_ownership, arena)) {
       tc_error_id(node, name, "Symbol Error",
                   "Failed to add function '%s' to scope", name);
@@ -1004,7 +1007,7 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         for (size_t i = 0; i < then_branch->deferred_frees.count; i++) {
           const char **var_ptr =
               (const char **)((char *)then_branch->deferred_frees.data +
-                             i * sizeof(const char *));
+                              i * sizeof(const char *));
           if (*var_ptr) {
             static_memory_track_free(analyzer, *var_ptr, func_name);
           }
@@ -1061,7 +1064,7 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
             for (size_t i = 0; i < elif_scope->deferred_frees.count; i++) {
               const char **var_ptr =
                   (const char **)((char *)elif_scope->deferred_frees.data +
-                                 i * sizeof(const char *));
+                                  i * sizeof(const char *));
               if (*var_ptr) {
                 static_memory_track_free(analyzer, *var_ptr, func_name);
               }
@@ -1086,7 +1089,7 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         for (size_t i = 0; i < else_branch->deferred_frees.count; i++) {
           const char **var_ptr =
               (const char **)((char *)else_branch->deferred_frees.data +
-                             i * sizeof(const char *));
+                              i * sizeof(const char *));
           if (*var_ptr) {
             static_memory_track_free(analyzer, *var_ptr, func_name);
           }
@@ -1511,9 +1514,6 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
     return false;
   }
 
-  // printf("DEBUG: Typechecking case with %zu values\n",
-  // node->stmt.case_clause.value_count);
-
   // Typecheck each case value
   for (size_t i = 0; i < node->stmt.case_clause.value_count; i++) {
     AstNode *case_value = node->stmt.case_clause.values[i];
@@ -1522,17 +1522,24 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
       return false;
     }
 
+    // CRITICAL FIX: Add null check before typechecking
     AstNode *value_type = typecheck_expression(case_value, scope, arena);
     if (!value_type) {
-      tc_error(node, "Case Error", "Failed to typecheck case value %zu", i);
+      tc_error(node, "Case Error",
+               "Failed to typecheck case value %zu - returned NULL type", i);
       return false;
     }
 
-    // printf("DEBUG: Case value %zu type: %s\n", i, type_to_string(value_type,
-    // arena));
-
     // If we know the expected type, check compatibility
     if (expected_type) {
+      // CRITICAL FIX: Validate expected_type before using it
+      if (expected_type->category != Node_Category_TYPE) {
+        tc_error(node, "Internal Error",
+                 "Expected type for switch is not a type node (category %d)",
+                 expected_type->category);
+        return false;
+      }
+
       TypeMatchResult match = types_match(expected_type, value_type);
       if (match == TYPE_MATCH_NONE) {
         tc_error_help(
@@ -1544,7 +1551,12 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
         return false;
       }
 
-      // Special validation for enum cases
+      // NEW: If types are compatible (enum <-> int), skip strict enum checking
+      if (match == TYPE_MATCH_COMPATIBLE) {
+        continue; // Skip to next case value
+      }
+
+      // Special validation for enum cases (only for EXACT matches)
       if (expected_type->type == AST_TYPE_BASIC &&
           value_type->type == AST_TYPE_BASIC) {
         const char *expected_name = expected_type->type_data.basic.name;
@@ -1552,11 +1564,35 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
 
         // Check if they're the same enum type
         if (strcmp(expected_name, value_name) != 0) {
-          // Check if this is an enum member access pattern (EnumName.Member)
+          // Check if this is an enum member access pattern (EnumName::Member)
           if (case_value->type == AST_EXPR_MEMBER) {
-            const char *base_name =
-                case_value->expr.member.object->expr.identifier.name;
-            if (strcmp(base_name, expected_name) != 0) {
+            // CRITICAL FIX: Add null checks for member expression parts
+            if (!case_value->expr.member.object) {
+              tc_error(node, "Internal Error",
+                       "Case member expression has NULL object");
+              return false;
+            }
+
+            if (case_value->expr.member.object->type != AST_EXPR_IDENTIFIER &&
+                case_value->expr.member.object->type != AST_EXPR_MEMBER) {
+              tc_error(
+                  node, "Case Error",
+                  "Invalid case value - expected identifier or member access");
+              return false;
+            }
+
+            // For simple case (EnumType::Member), extract base name
+            const char *base_name = NULL;
+            if (case_value->expr.member.object->type == AST_EXPR_IDENTIFIER) {
+              base_name = case_value->expr.member.object->expr.identifier.name;
+            } else {
+              // For chained case (module::EnumType::Member), the value_name
+              // should already be correct because typecheck_member_expr
+              // resolved it
+              base_name = value_name;
+            }
+
+            if (base_name && strcmp(base_name, expected_name) != 0) {
               tc_error_help(node, "Enum Case Mismatch",
                             "Case values must belong to the same enum as the "
                             "switch condition",

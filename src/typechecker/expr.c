@@ -605,23 +605,23 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
   if (is_compiletime) {
     // Compile-time access (::) - for modules, enums, static members
-    
+
     // CRITICAL FIX: Handle chained access (e.g., ast::ExprKind::EXPR_NUMBER)
     // First, resolve the base to its type
     AstNode *base_type = NULL;
     const char *base_name = NULL;
-    
+
     if (base_object->type == AST_EXPR_IDENTIFIER) {
       // Simple case: module::symbol or EnumType::Member
       base_name = base_object->expr.identifier.name;
-      
+
       // First try module-qualified symbol lookup
       Symbol *module_symbol =
           lookup_qualified_symbol(scope, base_name, member_name);
       if (module_symbol) {
         return module_symbol->type;
       }
-      
+
       // Try direct symbol lookup (for enum types in current scope)
       Symbol *base_symbol = scope_lookup(scope, base_name);
       if (base_symbol && base_symbol->type) {
@@ -643,18 +643,19 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
           }
           current = current->parent;
         }
-        
+
         if (is_module) {
           tc_error(expr, "Compile-time Access Error",
                    "Module '%s' has no exported symbol '%s'", base_name,
                    member_name);
         } else {
           tc_error(expr, "Compile-time Access Error",
-                   "Undefined identifier '%s' in compile-time access", base_name);
+                   "Undefined identifier '%s' in compile-time access",
+                   base_name);
         }
         return NULL;
       }
-      
+
     } else if (base_object->type == AST_EXPR_MEMBER) {
       // Chained case: ast::ExprKind::EXPR_NUMBER
       // First resolve the inner member expression recursively
@@ -664,8 +665,9 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
                  "Failed to resolve base expression in chained access");
         return NULL;
       }
-      
-      // Extract the name from the resolved type
+
+      // CRITICAL FIX: Extract the name from the resolved type
+      // The resolved type should be a basic type (enum type name)
       if (base_type->type == AST_TYPE_BASIC) {
         base_name = base_type->type_data.basic.name;
       } else if (base_type->type == AST_TYPE_STRUCT) {
@@ -676,10 +678,49 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
                  type_to_string(base_type, arena));
         return NULL;
       }
-      
+
+      // IMPORTANT: Now that we have base_name, we need to look up the qualified
+      // symbol Build the qualified name: base_name.member_name
+      size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
+      char *qualified_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
+
+      // Look up this qualified symbol (e.g., "ExprKind.EXPR_NUMBER")
+      Symbol *member_symbol = scope_lookup(scope, qualified_name);
+
+      if (!member_symbol) {
+        // Try looking in imported modules
+        Scope *current = scope;
+        while (current && !member_symbol) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+
+            member_symbol = scope_lookup_current_only_with_visibility(
+                import->module_scope, qualified_name, scope);
+
+            if (member_symbol) {
+              break;
+            }
+          }
+          current = current->parent;
+        }
+      }
+
+      if (member_symbol) {
+        return member_symbol->type;
+      }
+
+      tc_error(expr, "Compile-time Access Error",
+               "Type '%s' has no compile-time member '%s'", base_name,
+               member_name);
+      return NULL;
+
     } else {
       tc_error(expr, "Compile-time Access Error",
-               "Compile-time access '::' requires an identifier or member expression on the left");
+               "Compile-time access '::' requires an identifier or member "
+               "expression on the left");
       return NULL;
     }
 
@@ -691,7 +732,7 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
     // Look up the qualified symbol with visibility rules
     Symbol *member_symbol = scope_lookup(scope, qualified_name);
-    
+
     if (!member_symbol) {
       // Try looking in imported modules explicitly
       Scope *current = scope;
@@ -700,11 +741,11 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
           ModuleImport *import =
               (ModuleImport *)((char *)current->imported_modules.data +
                                i * sizeof(ModuleImport));
-          
+
           // Look in the imported module's scope
           member_symbol = scope_lookup_current_only_with_visibility(
               import->module_scope, qualified_name, scope);
-          
+
           if (member_symbol) {
             break;
           }
@@ -712,14 +753,15 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
         current = current->parent;
       }
     }
-    
+
     if (member_symbol) {
       return member_symbol->type;
     }
 
     // Error handling - symbol not found
     tc_error(expr, "Compile-time Access Error",
-             "Type '%s' has no compile-time member '%s'", base_name, member_name);
+             "Type '%s' has no compile-time member '%s'", base_name,
+             member_name);
     return NULL;
 
   } else {
