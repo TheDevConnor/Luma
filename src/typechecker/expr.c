@@ -605,62 +605,121 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
   if (is_compiletime) {
     // Compile-time access (::) - for modules, enums, static members
-    // This requires base_object to be an identifier
-    if (base_object->type != AST_EXPR_IDENTIFIER) {
+    
+    // CRITICAL FIX: Handle chained access (e.g., ast::ExprKind::EXPR_NUMBER)
+    // First, resolve the base to its type
+    AstNode *base_type = NULL;
+    const char *base_name = NULL;
+    
+    if (base_object->type == AST_EXPR_IDENTIFIER) {
+      // Simple case: module::symbol or EnumType::Member
+      base_name = base_object->expr.identifier.name;
+      
+      // First try module-qualified symbol lookup
+      Symbol *module_symbol =
+          lookup_qualified_symbol(scope, base_name, member_name);
+      if (module_symbol) {
+        return module_symbol->type;
+      }
+      
+      // Try direct symbol lookup (for enum types in current scope)
+      Symbol *base_symbol = scope_lookup(scope, base_name);
+      if (base_symbol && base_symbol->type) {
+        base_type = base_symbol->type;
+        // base_name already set above
+      } else {
+        // Check if it's an undefined module
+        bool is_module = false;
+        Scope *current = scope;
+        while (current && !is_module) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+            if (strcmp(import->alias, base_name) == 0) {
+              is_module = true;
+              break;
+            }
+          }
+          current = current->parent;
+        }
+        
+        if (is_module) {
+          tc_error(expr, "Compile-time Access Error",
+                   "Module '%s' has no exported symbol '%s'", base_name,
+                   member_name);
+        } else {
+          tc_error(expr, "Compile-time Access Error",
+                   "Undefined identifier '%s' in compile-time access", base_name);
+        }
+        return NULL;
+      }
+      
+    } else if (base_object->type == AST_EXPR_MEMBER) {
+      // Chained case: ast::ExprKind::EXPR_NUMBER
+      // First resolve the inner member expression recursively
+      base_type = typecheck_member_expr(base_object, scope, arena);
+      if (!base_type) {
+        tc_error(expr, "Compile-time Access Error",
+                 "Failed to resolve base expression in chained access");
+        return NULL;
+      }
+      
+      // Extract the name from the resolved type
+      if (base_type->type == AST_TYPE_BASIC) {
+        base_name = base_type->type_data.basic.name;
+      } else if (base_type->type == AST_TYPE_STRUCT) {
+        base_name = base_type->type_data.struct_type.name;
+      } else {
+        tc_error(expr, "Compile-time Access Error",
+                 "Cannot use compile-time access '::' on complex type '%s'",
+                 type_to_string(base_type, arena));
+        return NULL;
+      }
+      
+    } else {
       tc_error(expr, "Compile-time Access Error",
-               "Compile-time access '::' requires an identifier on the left");
+               "Compile-time access '::' requires an identifier or member expression on the left");
       return NULL;
     }
 
-    const char *base_name = base_object->expr.identifier.name;
-
-    // First try module-qualified symbol lookup
-    Symbol *module_symbol =
-        lookup_qualified_symbol(scope, base_name, member_name);
-    if (module_symbol) {
-      return module_symbol->type;
-    }
-
-    // Try enum-style lookup (EnumName::Member)
+    // Now we have base_name and member_name - look up the qualified symbol
+    // Try enum-style lookup (EnumName::Member or Module::Type)
     size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
     char *qualified_name = arena_alloc(arena, qualified_len, 1);
     snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
 
+    // Look up the qualified symbol with visibility rules
     Symbol *member_symbol = scope_lookup(scope, qualified_name);
+    
+    if (!member_symbol) {
+      // Try looking in imported modules explicitly
+      Scope *current = scope;
+      while (current && !member_symbol) {
+        for (size_t i = 0; i < current->imported_modules.count; i++) {
+          ModuleImport *import =
+              (ModuleImport *)((char *)current->imported_modules.data +
+                               i * sizeof(ModuleImport));
+          
+          // Look in the imported module's scope
+          member_symbol = scope_lookup_current_only_with_visibility(
+              import->module_scope, qualified_name, scope);
+          
+          if (member_symbol) {
+            break;
+          }
+        }
+        current = current->parent;
+      }
+    }
+    
     if (member_symbol) {
       return member_symbol->type;
     }
 
-    // Error handling for compile-time access
-    Symbol *base_symbol = scope_lookup(scope, base_name);
-    if (!base_symbol) {
-      // Check if it's an unknown module
-      for (size_t i = 0; i < scope->imported_modules.count; i++) {
-        ModuleImport *import =
-            (ModuleImport *)((char *)scope->imported_modules.data +
-                             i * sizeof(ModuleImport));
-        if (strcmp(import->alias, base_name) == 0) {
-          tc_error(expr, "Compile-time Access Error",
-                   "Module '%s' has no exported symbol '%s'", base_name,
-                   member_name);
-          return NULL;
-        }
-      }
-      tc_error(expr, "Compile-time Access Error",
-               "Undefined identifier '%s' in compile-time access", base_name);
-    } else {
-      // Base exists but member doesn't - check what kind of symbol it is
-      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
-        // Could be an enum type
-        tc_error(expr, "Compile-time Access Error",
-                 "Type '%s' has no compile-time member '%s'", base_name,
-                 member_name);
-      } else {
-        tc_error(expr, "Compile-time Access Error",
-                 "Cannot use compile-time access '::' on runtime value '%s'",
-                 base_name);
-      }
-    }
+    // Error handling - symbol not found
+    tc_error(expr, "Compile-time Access Error",
+             "Type '%s' has no compile-time member '%s'", base_name, member_name);
     return NULL;
 
   } else {

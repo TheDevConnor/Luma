@@ -1,0 +1,9 @@
+@module "arena"
+
+@use "memory" as memory
+
+pub const Arena -> struct {
+    memory: *char,
+    offset: int,
+    capacity: int,
+};

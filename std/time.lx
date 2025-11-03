@@ -73,5 +73,3 @@ pub const timer_elapsed_ms -> fn (t: Timer) int {
     let end: TimeSpec = now();
     return elapsed_ms(t.start_time, end);
 }
-
-
