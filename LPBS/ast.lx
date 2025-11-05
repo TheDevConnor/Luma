@@ -57,8 +57,8 @@ pub const Group -> struct {
 };
 
 #returns_ownership
-pub const create_program_node -> fn (nodes: *Expr) *Stmt {
-  let node: *Program = cast<*Program>(alloc(sizeof<Program>));
+pub const create_program_node -> fn (nodes: *Expr, size: int) *Stmt {
+  let node: *Program = cast<*Program>(alloc(size * sizeof<Program>));
   let base_node: *Stmt = cast<*Stmt>(node);  
 
   base_node.type = StmtKind::STMT_PROGRAM;
@@ -134,7 +134,7 @@ pub const free_expr -> fn (node: *Expr) void {
   if (node == cast<*Expr>(0)) { return; }
 
   switch(node.type) {
-    ExprKind::EXPR_NUMBER, ExprKind::EXPR_IDENT, ExprKind::EXPR_STRING -> {}
+    ExprKind::EXPR_NUMBER, ExprKind::EXPR_IDENT, ExprKind::EXPR_STRING -> { /* No child nodes to free */ }
     ExprKind::EXPR_BINARY -> {
       let bin_node: *Binary = cast<*Binary>(node);
       free_expr(bin_node.left); free_expr(bin_node.right);

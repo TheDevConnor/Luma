@@ -1,0 +1,60 @@
+@module "main"
+
+@use "terminal" as term
+@use "string" as string
+@use "termfx" as termfx
+@use "memory" as mem
+@use "board" as board
+
+// TODO: add in castle and en passant logic
+
+pub const main -> fn () int { 
+  let bd: Board;
+  let mv: Move;
+  board::init_board(&bd);
+
+  let user_input: *char = cast<*char>(alloc(5 * sizeof<char>));
+  let moves: **char = cast<**char>(alloc(256 * sizeof<*char>));
+  loop [j: int = 0](j < 256) : (++j) { 
+    moves[j] = cast<*char>(alloc(6 * sizeof<char>)); 
+  } 
+
+  defer { 
+    free(bd.squares); free(user_input); 
+    loop [j: int = 0](j < 256) : (++j) { free(moves[j]); } 
+    free(moves); 
+  }
+  
+  let white_to_move: int = 1;  // 1 = white's turn, 0 = black's turn
+  let move_count: int = 0;
+  let is_valid: int = 0;
+  loop {
+    output(termfx::CLEAR_SCREEN, termfx::CURSOR_HOME);
+
+    if (white_to_move == 1) { output("White to move\n"); }
+    else { output("Black to move\n"); }
+    
+    board::print_board(&bd, moves, move_count);
+
+    term::get_line("Enter your move (or 'exit' to quit): ", user_input, 5);
+    
+    if (string::strcmp(user_input, "exit") == 0 || 
+        string::strcmp(user_input, "quit") == 0) {
+      break;
+    }
+
+    let move: *Move = board::parse_move(&mv, user_input);
+    board::update_board(&bd, move, &white_to_move, &is_valid);
+    
+    if (is_valid == 0) {
+      string::copy(moves[move_count], user_input);
+      move_count = move_count + 1;
+    }
+    
+    is_valid = 0;
+    input<char>("");
+    output("\n");
+  }
+  
+  return 0; 
+}

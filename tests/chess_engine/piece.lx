@@ -1,0 +1,131 @@
+@module "piece"
+
+pub const PieceRules -> struct {
+  piece_type: char,
+  can_jump: int,
+  can_slide: int,
+  move_offsets: [int; 16],
+  num_offsets: int
+};
+
+const RULES: [PieceRules; 6] = [
+  PieceRules {
+    piece_type: 'P', can_jump: 0, can_slide: 0, num_offsets: 4,
+    // [forward 1 white, forward 2 white, forward 1 black, forward 2 black]
+    // Note: Captures handled separately in board logic
+    move_offsets: [0, -1, 0, -2, 0, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  PieceRules {
+    piece_type: 'N', can_jump: 1, can_slide: 0, num_offsets: 8,
+    move_offsets: [-2, -1, -2, 1, -1, -2, -1, 2, 1, -2, 1, 2, 2, -1, 2, 1],
+  },
+  PieceRules {
+    piece_type: 'B', can_jump: 0, can_slide: 1, num_offsets: 4,
+    move_offsets: [-1, -1, -1, 1, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  PieceRules {
+    piece_type: 'R', can_jump: 0, can_slide: 1, num_offsets: 4,
+    move_offsets: [-1, 0, 1, 0, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  PieceRules {
+    piece_type: 'Q', can_jump: 0, can_slide: 1, num_offsets: 8,
+    move_offsets: [-1, -1, -1, 1, 1, -1, 1, 1, -1, 0, 1, 0, 0, -1, 0, 1],
+  },
+  PieceRules {
+    piece_type: 'K', can_jump: 0, can_slide: 0, num_offsets: 8,
+    move_offsets: [-1, -1, -1, 1, 1, -1, 1, 1, -1, 0, 1, 0, 0, -1, 0, 1],
+  }
+]; 
+
+// Get rules for a specific piece
+pub const get_rules -> fn (piece: char) *PieceRules {
+  let piece_upper: char = piece;
+  if (piece >= 'a' && piece <= 'z') {
+    piece_upper = cast<char>(cast<int>(piece) - 32);
+  }
+  
+  loop [i: int = 0](i < 6) : (++i) {  // Changed from 5 to 6
+    if (RULES[i].piece_type == piece_upper) {
+      return &RULES[i];
+    }
+  }
+  
+  return cast<*PieceRules>(0);
+}
+
+// Special pawn validation function (pawns have unique rules)
+pub const validate_pawn_move -> fn (rule: *PieceRules, dc: int, dr: int, 
+                                     from_row: int, target: char, is_white: int) int {
+  // Determine direction based on color
+  let direction: int;
+  let start_row: int;
+
+  if (is_white == 1) {
+    direction = -1;
+    start_row = 6;
+  } else {
+    direction = 1;
+    start_row = 1;
+  }
+  
+  // Case 1: Forward one square (must be empty)
+  if (dc == 0 && dr == direction && target == '.') {
+    return 1;
+  }
+  
+  // Case 2: Forward two squares from starting position (both must be empty)
+  if (dc == 0 && dr == direction * 2 && from_row == start_row && target == '.') {
+    return 1;  // Note: Caller must check middle square
+  }
+  
+  // Case 3: Diagonal capture (must have enemy piece)
+  let abs_dc: int;
+  if (dc < 0) {
+    abs_dc = -dc;
+  } else {
+    abs_dc = dc;
+  }
+  
+  if (abs_dc == 1 && dr == direction && target != '.') {
+    return 1;
+  }
+  
+  return 0;
+}
+
+pub const can_move_direction -> fn (rule: *PieceRules, dc: int, dr: int) int {
+  if (rule.can_slide == 1) {
+    let step_c: int;
+    if (dc == 0) {
+      step_c = 0;
+    } elif (dc > 0) {
+      step_c = 1;
+    } else {
+      step_c = -1;
+    }
+    
+    let step_r: int;
+    if (dr == 0) {
+      step_r = 0;
+    } elif (dr > 0) {
+      step_r = 1;
+    } else {
+      step_r = -1;
+    }
+    
+    loop [i: int = 0](i < rule.num_offsets) : (++i) {
+      if (step_c == rule.move_offsets[i * 2] && 
+          step_r == rule.move_offsets[i * 2 + 1]) {
+        return 1;
+      }
+    }
+  } else {
+    loop [i: int = 0](i < rule.num_offsets) : (++i) {
+      if (dc == rule.move_offsets[i * 2] && 
+          dr == rule.move_offsets[i * 2 + 1]) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}

@@ -147,5 +147,5 @@ pub const parse -> fn (tks: *Token, path: *char) *Stmt {
   
   let node: *Expr = parse_expr(&psr, BindingPower::BP_NONE);
   
-  return ast::create_program_node(node); 
+  return ast::create_program_node(node, tks.size); 
 }

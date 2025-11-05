@@ -479,7 +479,7 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
     }
 
   } else if (object->type == AST_EXPR_MEMBER) {
-    // **NEW: Handle chained member access like psr.tks.list**
+    // **Handle chained member access like psr.tks.list**
     // First, recursively resolve the base member access
     LLVMValueRef base_value = codegen_expr_struct_access(ctx, object);
     if (!base_value) {
@@ -693,7 +693,20 @@ LLVMValueRef codegen_expr_struct_access(CodeGenContext *ctx, AstNode *node) {
       LLVMBuildStructGEP2(ctx->builder, struct_info->llvm_type, struct_ptr,
                           field_index, "field_ptr");
 
-  // Load the element value
+  // **CRITICAL FIX: Check if this field is an array**
+  LLVMTypeRef field_type = struct_info->field_types[field_index];
+  if (LLVMGetTypeKind(field_type) == LLVMArrayTypeKind) {
+    // For array fields, return a pointer to the first element
+    // This allows subsequent indexing operations to work correctly
+    // Example: rule.move_offsets[i] where move_offsets is [int; 16]
+    LLVMValueRef zero =
+        LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);
+    LLVMValueRef indices[2] = {zero, zero};
+    return LLVMBuildGEP2(ctx->builder, field_type, field_ptr, indices, 2,
+                         "array_field_ptr");
+  }
+
+  // Load the element value (for non-array fields)
   LLVMValueRef result =
       LLVMBuildLoad2(ctx->builder, struct_info->field_types[field_index],
                      field_ptr, "field_val");

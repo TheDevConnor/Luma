@@ -88,7 +88,7 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_INT:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context),
                         node->expr.literal.value.int_val, false);
-                        
+
   case LITERAL_FLOAT:
     return LLVMConstReal(LLVMDoubleTypeInContext(ctx->context),
                          node->expr.literal.value.float_val);
@@ -96,20 +96,20 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_BOOL:
     return LLVMConstInt(LLVMInt1TypeInContext(ctx->context),
                         node->expr.literal.value.bool_val ? 1 : 0, false);
-                        
+
   case LITERAL_CHAR:
     return LLVMConstInt(LLVMInt8TypeInContext(ctx->context),
                         (unsigned char)node->expr.literal.value.char_val,
                         false);
-                        
+
   case LITERAL_STRING: {
     char *processed_str =
         process_escape_sequences(node->expr.literal.value.string_val);
-    
+
     // String literals must be created in the current module
     LLVMModuleRef current_llvm_module =
         ctx->current_module ? ctx->current_module->module : ctx->module;
-    
+
     // Create the global string in the current module
     LLVMValueRef global_str =
         LLVMAddGlobal(current_llvm_module,
@@ -145,9 +145,10 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_NULL:
     return LLVMConstNull(
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0));
-        
+
   default:
-    fprintf(stderr, "ERROR: Unknown literal type: %d\n", node->expr.literal.lit_type);
+    fprintf(stderr, "ERROR: Unknown literal type: %d\n",
+            node->expr.literal.lit_type);
     return NULL;
   }
 }
@@ -1063,7 +1064,14 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
 
           // If this is the last field in the chain, get its element type
           if (i == chain_length - 1) {
-            element_type = current_struct->field_element_types[field_idx];
+            LLVMTypeRef field_type = current_struct->field_types[field_idx];
+
+            // Check if this field is an array - if so, get its element type
+            if (LLVMGetTypeKind(field_type) == LLVMArrayTypeKind) {
+              element_type = LLVMGetElementType(field_type);
+            } else {
+              element_type = current_struct->field_element_types[field_idx];
+            }
             break;
           }
 
