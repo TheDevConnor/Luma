@@ -1,20 +1,8 @@
 @module "board"
 
 @use "string" as string
+@use "helper" as helper
 @use "piece" as piece
-
-pub const Move -> struct {
-  from_col: int,
-  from_row: int,
-  to_col: int,
-  to_row: int
-};
-
-pub const Board -> struct {
-  starting_fen: *char,
-  length_fen: int,
-  squares: *char, 
-};
 
 #returns_ownership
 pub const init_board -> fn (bd: *Board) *Board {
@@ -58,41 +46,21 @@ pub const parse_move -> fn (mv: *Move, move: *char) *Move {
   return mv;
 }
 
-pub const is_path_clear -> fn (bd: *Board, mv: *Move) int {
-  let dc: int = mv.to_col - mv.from_col;
-  let dr: int = mv.to_row - mv.from_row;
-  
-  let step_c: int;
-  if (dc == 0) {
-    step_c = 0;
-  } elif (dc > 0) {
-    step_c = 1;
-  } else {
-    step_c = -1;
-  }
-  
-  let step_r: int;
-  if (dr == 0) {
-    step_r = 0;
-  } elif (dr > 0) {
-    step_r = 1;
-  } else {
-    step_r = -1;
-  }
-  
-  let curr_col: int = mv.from_col + step_c;
-  let curr_row: int = mv.from_row + step_r;
-  
-  loop (curr_col != mv.to_col || curr_row != mv.to_row) {
-    if (bd.squares[curr_row * 8 + curr_col] != '.') {
-      return 0;
-    }
+const is_check -> fn (bd: *Board, king_color: int, king_row: int, king_col: int) int { 
+  // 1. Locate the King (already provided by king_row, king_col)
 
-    curr_col = curr_col + step_c;
-    curr_row = curr_row + step_r;
-  }
-  
-  return 1;
+  // 2. Iterate Through Opponent's Pieces
+  //    (Loop through all squares, identify opponent's pieces)
+
+  // 3. Check for Attacks
+  //    (Inside the loop, for each opponent's piece,
+  //     call a helper function like 'can_piece_attack_square'
+  //     to see if it attacks king_row, king_col)
+
+  // 4. Return Check Status
+  //    (If any piece attacks, return true; otherwise, return false after the loop)
+
+  return 0; 
 }
 
 pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_valid: *int) void {
@@ -152,41 +120,17 @@ pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_val
   
   // Special handling for pawns
   if (piece_char == 'P' || piece_char == 'p') {
-    let is_valid_pawn: int = piece::validate_pawn_move(rule, dc, dr, mv.from_row, 
-                                                        target, is_white_piece);
-    if (is_valid_pawn == 0) {
+    if (piece::validate_pawn_move(rule, dc, dr, mv.from_row, target, is_white_piece) == 0 ||
+        piece::validate_pawn_path(bd, mv, dr, dc) == 0) {
       output("Error: Illegal pawn move.\n");
       *is_valid = 1;
       return;
     }
-    
-    // Check middle square for two-square move
-    if (dc == 0 && (dr == -2 || dr == 2)) {
-      let mid_row: int = (mv.from_row + mv.to_row) / 2;
-      let mid: char = bd.squares[mid_row * 8 + mv.from_col];
-      if (mid != '.') {
-        output("Error: Path is blocked.\n");
-        *is_valid = 1;
-        return;
-      }
-    }
   } else {
-    // Other pieces use standard move validation
-    let can_move: int = piece::can_move_direction(rule, dc, dr);
-    if (can_move == 0) {
+    if (piece::is_move_legal(rule, bd, mv) == 0) {
       output("Error: Illegal move for this piece.\n");
       *is_valid = 1;
       return;
-    }
-    
-    // Check path is clear for sliding pieces
-    if (rule.can_slide == 1 && rule.can_jump == 0) {
-      let path_clear: int = is_path_clear(bd, mv);
-      if (path_clear == 0) {
-        output("Error: Path is blocked.\n");
-        *is_valid = 1;
-        return;
-      }
     }
   }
 

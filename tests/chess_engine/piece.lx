@@ -1,5 +1,7 @@
 @module "piece"
 
+@use "helper" as helper
+
 pub const PieceRules -> struct {
   piece_type: char,
   can_jump: int,
@@ -111,6 +113,52 @@ pub const validate_pawn_move -> fn (rule: *PieceRules, dc: int, dr: int,
   return 0;
 }
 
+pub const validate_pawn_path -> fn (bd: *Board, mv: *Move, dr: int, dc: int) int {
+  if (dc == 0 && (dr == -2 || dr == 2)) {
+    let mid_row: int = (mv.from_row + mv.to_row) / 2;
+    let mid: char = bd.squares[mid_row * 8 + mv.from_col];
+    if (mid != '.') { return 0; } 
+  }
+  return 1;
+}
+
+const is_path_clear -> fn (bd: *Board, mv: *Move) int {
+  let dc: int = mv.to_col - mv.from_col;
+  let dr: int = mv.to_row - mv.from_row;
+  
+  let step_c: int;
+  if (dc == 0) {
+    step_c = 0;
+  } elif (dc > 0) {
+    step_c = 1;
+  } else {
+    step_c = -1;
+  }
+  
+  let step_r: int;
+  if (dr == 0) {
+    step_r = 0;
+  } elif (dr > 0) {
+    step_r = 1;
+  } else {
+    step_r = -1;
+  }
+  
+  let curr_col: int = mv.from_col + step_c;
+  let curr_row: int = mv.from_row + step_r;
+  
+  loop (curr_col != mv.to_col || curr_row != mv.to_row) {
+    if (bd.squares[curr_row * 8 + curr_col] != '.') {
+      return 0;
+    }
+
+    curr_col = curr_col + step_c;
+    curr_row = curr_row + step_r;
+  }
+  
+  return 1;
+}
+
 pub const can_move_direction -> fn (rule: *PieceRules, dc: int, dr: int) int {
   if (rule.can_slide == 1) {
     let step_c: int;
@@ -147,3 +195,14 @@ pub const can_move_direction -> fn (rule: *PieceRules, dc: int, dr: int) int {
   }
   return 0;
 }
+
+pub const is_move_legal -> fn (rule: *PieceRules, bd: *Board, mv: *Move) int {
+  let dc: int = mv.to_col - mv.from_col;
+  let dr: int = mv.to_row - mv.from_row;
+  if (can_move_direction(rule, dc, dr) == 0) { return 0; }
+  if (rule.can_slide == 1 && rule.can_jump == 0) {
+    if (is_path_clear(bd, mv) == 0) { return 0; }
+  }
+  return 1;
+}
+

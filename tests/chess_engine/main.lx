@@ -2,6 +2,7 @@
 
 @use "terminal" as term
 @use "string" as string
+@use "helper" as helper
 @use "termfx" as termfx
 @use "memory" as mem
 @use "board" as board

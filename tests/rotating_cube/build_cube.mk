@@ -1,17 +1,15 @@
 # Makefile for Luma Chess Engine
-# ./luma tests/tetris/tetris.lx -name tetris -l std/termfx.lx std/terminal.lx std/string.lx std/sys.lx std/time.lx std/math.lx   
+# ./luma tests/3d_spinning_cube.lx -name 3d -l std/math.lx std/termfx.lx std/string.lx std/memory.lx    
 LUMA = ./../../luma
-NAME = tetris
+NAME = spinning_cube
 
-MAIN = tetris.lx
-TETRIS_SRCS = $(filter-out $(MAIN), $(wildcard $/*.lx))
+MAIN = 3d_spinning_cube.lx
+SPINNING_SRCS = $(filter-out $(MAIN), $(wildcard $/*.lx))
 
 STD_LIBS = ../../std/termfx.lx \
-           ../../std/terminal.lx \
            ../../std/string.lx \
-           ../../std/sys.lx \
-           ../../std/time.lx \
-           ../../std/math.lx
+           ../../std/math.lx \
+           ../../std/memory.lx
 
 ALL_SRCS = $(MAIN) $(CHESS_SRCS) $(STD_LIBS)
 
@@ -20,18 +18,18 @@ all: $(NAME)
 
 # Build chess engine
 $(NAME): $(ALL_SRCS)
-	@echo "Building tetris..."
-	$(LUMA) $(MAIN) -name $(NAME) -l $(TETRIS_SRCS) $(STD_LIBS)
+	@echo "Building spinning cube..."
+	$(LUMA) $(MAIN) -name $(NAME) -l $(SPINNING_SRCS) $(STD_LIBS)
 	@echo "Build complete: ./$(NAME)"
 
 .PHONY: run
 run: $(NAME)
-	@echo "Starting chess engine..."
+	@echo "Starting spinning_cube..."
 	./$(NAME)
 
 .PHONY: valgrind
 valgrind: $(NAME)
-	@echo "Running tetris with valgrind..."
+	@echo "Running spinning cube with valgrind..."
 	valgrind --leak-check=full --show-leak-kinds=all ./$(NAME)
 
 .PHONY: clean
@@ -50,7 +48,7 @@ list:
 	@echo "  $(MAIN)"
 	@echo ""
 	@echo "Tetris sources:"
-	@for src in $(TETRIS_SRCS); do echo "  $$src"; done
+	@for src in $(SPINNING_SRCS); do echo "  $$src"; done
 	@echo ""
 	@echo "Standard library:"
 	@for lib in $(STD_LIBS); do echo "  $$lib"; done
@@ -58,10 +56,10 @@ list:
 # Help target
 .PHONY: help
 help:
-	@echo "Luma Tetris Build System"
+	@echo "Luma 3d Spinning Cube Build System"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  all        - Build tetris (default)"
+	@echo "  all        - Build Spinning Cube (default)"
 	@echo "  rebuild    - Clean and rebuild"
 	@echo ""
 	@echo "Run Targets:"
@@ -76,4 +74,5 @@ help:
 	@echo "  make              # Build"
 	@echo "  make run          # Build and play"
 	@echo "  make list         # Show what will be compiled"
+
 
