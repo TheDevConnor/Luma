@@ -6,7 +6,7 @@
 @use "memory" as mem
 @use "board" as board
 
-// TODO: add in castle and en passant logic
+// TODO: add in castle, en passant logic, check logic
 
 pub const main -> fn () int { 
   let bd: Board;

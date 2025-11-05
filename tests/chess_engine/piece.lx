@@ -37,6 +37,9 @@ const RULES: [PieceRules; 6] = [
   }
 ]; 
 
+pub const is_white_piece -> fn (ch: char) int { return -cast<int>(ch >= 'A' && ch <= 'Z'); }
+pub const is_black_piece -> fn (ch: char) int { return -cast<int>(ch >= 'a' && ch <= 'z'); }
+
 // Get rules for a specific piece
 pub const get_rules -> fn (piece: char) *PieceRules {
   let piece_upper: char = piece;
@@ -51,6 +54,21 @@ pub const get_rules -> fn (piece: char) *PieceRules {
   }
   
   return cast<*PieceRules>(0);
+}
+
+pub const can_capture -> fn (target: char, white_piece: int, black_piece: int) int {
+  if (target != '.') {
+    let target_is_white: int = is_white_piece(target);
+    let target_is_black: int = is_black_piece(target);
+
+    // Disallow capturing your own piece
+    if ((white_piece == 1 && target_is_white == 1) || 
+        (black_piece == 1 && target_is_black == 1)) {
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 // Special pawn validation function (pawns have unique rules)

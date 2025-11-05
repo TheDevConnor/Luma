@@ -117,8 +117,8 @@ pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_val
 
   // Determine piece color
   // FIXME: Need to fix when cast the result of a bool it returns -1 and 0 instead of 1 and 0
-  let is_white_piece: int = -cast<int>(piece_char >= 'A' && piece_char <= 'Z');
-  let is_black_piece: int = -cast<int>(piece_char >= 'a' && piece_char <= 'z');
+  let is_white_piece: int = piece::is_white_piece(piece_char); 
+  let is_black_piece: int = piece::is_black_piece(piece_char); 
 
   // Validate turn (fixed)
   if (*white_to_move == 1 && is_white_piece == 0) {
@@ -133,19 +133,10 @@ pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_val
   }
 
   // Check capture legality
-  if (target != '.') {
-    let target_is_white: int = -cast<int>(target >= 'A' && target <= 'Z');
-    let target_is_black: int = -cast<int>(target >= 'a' && target <= 'z');
-
-    // Disallow capturing your own piece
-    if ((is_white_piece == 1 && target_is_white == 1) || 
-        (is_black_piece == 1 && target_is_black == 1)) {
-      output("Error: Cannot capture your own piece.\n");
-      *is_valid = 1;
-      return;
-    }
-
-    output("Captured piece: ", target, "\n");
+  if (piece::can_capture(target, is_white_piece, is_black_piece) == 0) {
+    output("Error: Cannot capture your own piece.\n");
+    *is_valid = 1;
+    return;
   }
 
   // Validate piece movement rules
@@ -171,12 +162,7 @@ pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_val
     
     // Check middle square for two-square move
     if (dc == 0 && (dr == -2 || dr == 2)) {
-      let mid_row: int;
-      if (dr == -2) {
-        mid_row = mv.from_row - 1;
-      } else {
-        mid_row = mv.from_row + 1;
-      }
+      let mid_row: int = (mv.from_row + mv.to_row) / 2;
       let mid: char = bd.squares[mid_row * 8 + mv.from_col];
       if (mid != '.') {
         output("Error: Path is blocked.\n");
@@ -215,7 +201,7 @@ pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_val
     *white_to_move = 1;
   }
   
-  // Mark move as valid (0 = valid in your logic)
+  // Mark move as valid (0)
   *is_valid = 0;
 }
 
@@ -228,43 +214,48 @@ pub const print_board -> fn (bd: *Board, moves: **char, move_count: int) void {
   }
   output("\n");
   
-  loop [i: int = 0](i < 8) : (++i) {
-    output(8 - i, " ║ ");
-    loop [j: int = 0](j < 8) : (++j) {
-      let piece: *char;
-      switch (bd.squares[i * 8 + j]) {
-        'P' -> { piece = "♟"; }
-        'N' -> { piece = "♞"; }
-        'B' -> { piece = "♝"; }
-        'R' -> { piece = "♜"; }
-        'Q' -> { piece = "♛"; }
-        'K' -> { piece = "♚"; }
-        'p' -> { piece = "♙"; }
-        'n' -> { piece = "♘"; }
-        'b' -> { piece = "♗"; }
-        'r' -> { piece = "♖"; }
-        'q' -> { piece = "♕"; }
-        'k' -> { piece = "♔"; }
-        '.' -> { piece = "·"; }
+  let total_rows: int = (move_count + 1) / 2; 
+  if (total_rows < 8) { total_rows = 8; } 
+  
+  loop [i: int = 0](i < total_rows) : (++i) {
+    if (i < 8) {
+      output(8 - i, " ║ ");
+      loop [j: int = 0](j < 8) : (++j) {
+        let piece: *char;
+        switch (bd.squares[i * 8 + j]) {
+          'P' -> { piece = "♟"; }
+          'N' -> { piece = "♞"; }
+          'B' -> { piece = "♝"; }
+          'R' -> { piece = "♜"; }
+          'Q' -> { piece = "♛"; }
+          'K' -> { piece = "♚"; }
+          'p' -> { piece = "♙"; }
+          'n' -> { piece = "♘"; }
+          'b' -> { piece = "♗"; }
+          'r' -> { piece = "♖"; }
+          'q' -> { piece = "♕"; }
+          'k' -> { piece = "♔"; }
+          '.' -> { piece = "·"; }
+        }
+        output(piece, " ");
       }
-      output(piece, " ");
+      output("║");
+    } else {
+      output("   ");
     }
-    output("║");
-    
-    // Display moves on the right (2 per row: white and black)
+  
     let move_pair_index: int = i * 2;
     if (move_pair_index < move_count) {
       let move_num: int = move_pair_index / 2 + 1;
       output("     ", move_num, ". ", moves[move_pair_index]);
-      
-      // Show black's response if it exists
       if (move_pair_index + 1 < move_count) {
         output(" ", moves[move_pair_index + 1]);
       }
     }
-    
     output("\n");
   }
+  
   output("  ╚═════════════════╝\n");
   output("    a b c d e f g h\n\n");
 }
+
