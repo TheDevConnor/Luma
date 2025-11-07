@@ -3,6 +3,9 @@
 # Works on Linux, macOS, and Windows
 # ============================================================
 
+# Define target executable (must be defined before config.mk is included)
+BIN       := luma
+
 # Include default config
 include config.default.mk
 
@@ -14,8 +17,6 @@ endif
 # ------------------------------------------------------------
 # Paths & Files
 # ------------------------------------------------------------
-
-BIN       := luma
 
 # Detect OS and set appropriate commands
 ifeq ($(OS),Windows_NT)
