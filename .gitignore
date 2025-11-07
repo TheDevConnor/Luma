@@ -2,6 +2,9 @@ build
 obj
 lux
 
+# autotools
+autom4te.cache
+
 # Linux executables (files without extensions)
 *
 !*/

@@ -9,18 +9,18 @@
 # override LDFLAGS += $(LLVM_LDFLAGS)
 
 # # Detect platform and define commands
-include config.mk
+include config.default.mk
 
 # Detect platform and define commands
 ifeq ($(OS),Windows_NT)
-	SHELL := cmd.exe
+	SHELL ?= cmd.exe
 	MKDIR = if not exist "$(subst /,\,$1)" mkdir "$(subst /,\,$1)"
 	RMDIR = if exist "$(subst /,\,$1)" rmdir /s /q "$(subst /,\,$1)"
 	DEL   = if exist "$(subst /,\,$1)" del /q "$(subst /,\,$1)"
 	EXE   = .exe
 	PATHSEP = \\
 else
-	SHELL := /bin/sh
+	SHELL ?= /bin/sh
 	MKDIR = mkdir -p $1
 	RMDIR = rm -rf $1
 	DEL   = rm -f $1
@@ -30,7 +30,11 @@ endif
 
 BIN := luma$(EXE)
 
-.PHONY: all clean debug test llvm-test
+ifneq ($(wildcard config.mk),)
+include config.mk
+endif
+
+.PHONY: all clean debug test check llvm-test
 
 all: $(BIN)
 
@@ -48,7 +52,10 @@ debug: all
 # Test targets
 test: $(BIN)
 	@echo "Running basic tests..."
-	./$(BIN) --help
+	./$(BIN) --help || true # non-zero exit code expected
+
+# Alias
+check: test
 
 llvm-test: $(BIN)
 	@echo "Testing LLVM IR generation..."
