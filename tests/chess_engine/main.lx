@@ -2,12 +2,11 @@
 
 @use "terminal" as term
 @use "string" as string
-@use "helper" as helper
 @use "termfx" as termfx
 @use "memory" as mem
 @use "board" as board
 
-// TODO: add in castle, en passant logic, check logic
+// TODO: add in castle, en passant logic
 
 pub const main -> fn () int { 
   let bd: Board;
