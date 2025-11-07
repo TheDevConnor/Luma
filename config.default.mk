@@ -1,9 +1,9 @@
-# config.mk
+# config.default.mk
 
-CC       = g++
-CFLAGS   = -Wall -Wextra -std=c17 -Wno-unused-variable -O2 -x c  # -x c tells g++ to treat files as C code
-LDFLAGS  = 
-INCLUDES = -Isrc
+CC       ?= g++
+CFLAGS   ?= -Wall -Wextra -std=c17 -Wno-unused-variable -O2 -x c  # -x c tells g++ to treat files as C code
+LDFLAGS  ?= 
+INCLUDES ?= -Isrc
 
 # LLVM configuration - request all necessary components
 LLVM_CFLAGS := $(shell llvm-config --cflags)

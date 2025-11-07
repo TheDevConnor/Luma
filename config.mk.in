@@ -1,0 +1,14 @@
+CC = @CXX@
+CFLAGS += @CXXFLAGS@
+LDFLAGS += @LDFLAGS@
+PREFIX = @prefix@
+
+INSTALL ?= install
+DESTDIR ?= $(PREFIX)/bin
+
+.PHONY: install
+
+install: $(BIN)
+	$(INSTALL) -d $(DESTDIR)
+	$(INSTALL) -s -m 0755 $(BIN) $(DESTDIR)/$(BIN)
+	@echo "Installed to $(DESTDIR)/$(BIN)"
