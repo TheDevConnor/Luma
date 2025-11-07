@@ -1,4 +1,4 @@
-CC = @CXX@
+CC = @CC@
 CFLAGS += @CXXFLAGS@
 LDFLAGS += @LDFLAGS@
 PREFIX = @prefix@
