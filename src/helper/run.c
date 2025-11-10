@@ -128,8 +128,13 @@ bool link_object_files(const char *output_dir, const char *executable_name, int 
   char command[2048];
 
   // Build the linking command with PIE-compatible flags
-  snprintf(command, sizeof(command), "cc -O%d -pie %s/*.o -o %s", 
-         opt_level, output_dir, executable_name);
+  if (opt_level > 0) { // If optimization level is specified
+    snprintf(command, sizeof(command), "cc -O%d -pie %s/*.o -o %s", 
+        opt_level, output_dir, executable_name);
+  } else { // No optimization
+    snprintf(command, sizeof(command), "cc -pie %s/*.o -o %s", 
+        output_dir, executable_name);
+  }
 
   int result = system(command);
   if (result != 0) {

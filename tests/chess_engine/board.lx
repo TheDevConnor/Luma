@@ -15,9 +15,9 @@ pub const Board -> struct {
   length_fen: int,
   squares: *char,
 
-  white_can_castle_kingside: int,
+  white_can_castle_kingside:  int,
   white_can_castle_queenside: int,
-  black_can_castle_kingside: int,
+  black_can_castle_kingside:  int,
   black_can_castle_queenside: int,
 };
 

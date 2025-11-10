@@ -457,6 +457,57 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     }
 
     TypeMatchResult match = types_match(param_types[i], arg_type);
+    
+    // NEW: Special handling for array argument padding
+    // If the parameter expects a larger array than provided, allow it with padding
+    if (match == TYPE_MATCH_NONE && 
+        param_types[i]->type == AST_TYPE_ARRAY && 
+        arg_type->type == AST_TYPE_ARRAY) {
+      
+      // Check if element types match
+      TypeMatchResult element_match = 
+          types_match(param_types[i]->type_data.array.element_type,
+                      arg_type->type_data.array.element_type);
+      
+      if (element_match != TYPE_MATCH_NONE) {
+        // Element types match, check sizes
+        AstNode *param_size = param_types[i]->type_data.array.size;
+        AstNode *arg_size = arg_type->type_data.array.size;
+        
+        if (param_size && arg_size &&
+            param_size->type == AST_EXPR_LITERAL && 
+            arg_size->type == AST_EXPR_LITERAL &&
+            param_size->expr.literal.lit_type == LITERAL_INT &&
+            arg_size->expr.literal.lit_type == LITERAL_INT) {
+          
+          long long param_size_val = param_size->expr.literal.value.int_val;
+          long long arg_size_val = arg_size->expr.literal.value.int_val;
+          
+          // If argument array is smaller than parameter, allow it with padding
+          if (arg_size_val <= param_size_val) {
+            // Set a flag on the argument node to indicate it needs padding
+            // This will be handled by the code generator
+            if (arguments[i]->type == AST_EXPR_ARRAY) {
+              // Mark this array for padding to param_size_val elements
+              // Store the target size for the code generator to use
+              arguments[i]->expr.array.target_size = (size_t)param_size_val;
+            }
+            
+            // Continue to next argument - this is valid
+            continue;
+          } else {
+            // Argument array is LARGER than parameter - this is an error
+            tc_error_help(
+                expr, "Array Size Mismatch",
+                "Cannot pass larger array to function expecting smaller array",
+                "Argument %zu: parameter expects array of size %lld, got size %lld",
+                i + 1, param_size_val, arg_size_val);
+            return NULL;
+          }
+        }
+      }
+    }
+    
     if (match == TYPE_MATCH_NONE) {
       const char *param_str = type_to_string(param_types[i], arena);
       const char *arg_str = type_to_string(arg_type, arena);
@@ -1301,7 +1352,12 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
     }
   }
 
-  // Create array size literal
+  // NEW: Check if this array is being used in a context with an expected size
+  // This happens during function call argument checking
+  // We'll set a flag on the array expression to indicate it should be padded
+  
+  // For now, just create the array type with the actual element count
+  // The padding will be handled during code generation or in a separate pass
   long long size_val = (long long)element_count;
   AstNode *size_expr = create_literal_expr(arena, LITERAL_INT, &size_val,
                                            expr->line, expr->column);

@@ -874,6 +874,7 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
 
   AstNode **elements = node->expr.array.elements;
   size_t element_count = node->expr.array.element_count;
+  size_t target_size = node->expr.array.target_size; // NEW: Get target size for padding
 
   if (element_count == 0) {
     fprintf(stderr, "Error: Empty array literals not supported\n");
@@ -888,16 +889,21 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
   }
 
   LLVMTypeRef element_type = LLVMTypeOf(first_element);
-  LLVMTypeRef array_type = LLVMArrayType(element_type, element_count);
+  
+  // NEW: Use target_size if set (for padding), otherwise use actual element_count
+  size_t actual_array_size = (target_size > 0) ? target_size : element_count;
+  LLVMTypeRef array_type = LLVMArrayType(element_type, actual_array_size);
 
   // Check if all elements are constants
   bool all_constants = LLVMIsConstant(first_element);
+  
+  // NEW: Allocate for the FULL size (including padding)
   LLVMValueRef *element_values = (LLVMValueRef *)arena_alloc(
-      ctx->arena, sizeof(LLVMValueRef) * element_count, alignof(LLVMValueRef));
+      ctx->arena, sizeof(LLVMValueRef) * actual_array_size, alignof(LLVMValueRef));
 
   element_values[0] = first_element;
 
-  // Generate remaining elements and check for constants
+  // Generate provided elements
   for (size_t i = 1; i < element_count; i++) {
     element_values[i] = codegen_expr(ctx, elements[i]);
     if (!element_values[i]) {
@@ -922,9 +928,21 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
     }
   }
 
-  // *** ADD THE NEW CODE HERE ***
+  // NEW: Pad remaining elements with zeros if target_size > element_count
+  if (target_size > element_count) {
+    LLVMValueRef zero_value = LLVMConstNull(element_type);
+    
+    for (size_t i = element_count; i < target_size; i++) {
+      element_values[i] = zero_value;
+    }
+    
+    // If we're padding, we can't be all constants unless zeros count
+    // (which they do, so keep checking)
+    // zero_value is always constant, so all_constants remains unchanged
+  }
+
   // Check if any element references a global from another module
-  for (size_t i = 0; i < element_count && all_constants; i++) {
+  for (size_t i = 0; i < actual_array_size && all_constants; i++) {
     if (LLVMIsConstant(element_values[i]) &&
         LLVMIsAGlobalVariable(element_values[i])) {
       // Check if it's from a different module
@@ -937,17 +955,16 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
       }
     }
   }
-  // *** END NEW CODE ***
 
   if (all_constants) {
-    // Create constant array
-    return LLVMConstArray(element_type, element_values, element_count);
+    // Create constant array (now with padding)
+    return LLVMConstArray(element_type, element_values, actual_array_size);
   } else {
-    // Create runtime array
+    // Create runtime array (now with padding)
     LLVMValueRef array_alloca =
         LLVMBuildAlloca(ctx->builder, array_type, "array_literal");
 
-    for (size_t i = 0; i < element_count; i++) {
+    for (size_t i = 0; i < actual_array_size; i++) {
       // Create GEP to element
       LLVMValueRef indices[2];
       indices[0] = LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);

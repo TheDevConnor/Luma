@@ -234,6 +234,7 @@ struct AstNode {
         struct {
           AstNode **elements; // Changed from Expr** to AstNode**
           size_t element_count;
+          size_t target_size;
         } array;
 
         // Deref expression

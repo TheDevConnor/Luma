@@ -131,6 +131,7 @@ AstNode *create_array_expr(ArenaAllocator *arena, AstNode **elements,
   AstNode *node = create_expr(arena, AST_EXPR_ARRAY, line, column);
   node->expr.array.elements = elements;
   node->expr.array.element_count = element_count;
+  node->expr.array.target_size = 0; // Default to 0 (no explicit size)
   return node;
 }
 
