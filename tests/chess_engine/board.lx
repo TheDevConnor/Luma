@@ -139,7 +139,6 @@ pub const is_king_in_check -> fn (bd: *Board, is_white: int) int {
     return 1;
   }
 
-  // 2️⃣ Scan all enemy pieces to see if they can attack the king
   loop [i: int = 0](i < 64) : (++i) {
     let ch: char = bd.squares[i];
     if (ch == '.') { continue; }
@@ -184,7 +183,6 @@ pub const is_king_in_check -> fn (bd: *Board, is_white: int) int {
     return 1;
   }
 
-  // 3️⃣ No attacks found → king is safe
   return 0;
 }
 

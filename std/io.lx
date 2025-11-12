@@ -1,10 +1,89 @@
 @module "io"
 
-@use "sys" as sys
+@use "string" as string
 @use "memory" as mem
+@use "sys" as sys
 
 const INITIAL_BUFFER_SIZE: int = 4096;  // Start with 4KB
 const BUFFER_GROWTH_FACTOR: int = 2;     // Double size when growing
+
+pub const print_int -> fn (s: *char, args: [int; 256]) int {
+    // Simple implementation: only supports %d for integers
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    loop [i: int = 0](s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 'd' && arg_index < 256) {
+            let num_str: *char = string::from_int(args[arg_index]);
+            defer { free(num_str); }
+
+            loop [j: int = 0](num_str[j] != '\0') : (++j) {
+                buffer[buf_index] = num_str[j];
+                buf_index = buf_index + 1;
+            }
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 'd'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
+
+pub const print_str -> fn (s: *char, args: [*char; 256]) int {
+    // Simple implementation: only supports %s for strings
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    loop [i: int = 0](s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 's' && arg_index < 256) {
+            let str_arg: *char = args[arg_index];
+            loop [j: int = 0](str_arg[j] != '\0') : (++j) {
+                buffer[buf_index] = str_arg[j];
+                buf_index = buf_index + 1;
+            }
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 's'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
+
+pub const print_char -> fn (s: *char, args: [char; 256]) int {
+    // Simple implementation: only supports %c for characters
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    let i: int = 0;
+    loop (s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 'c' && arg_index < 256) {
+            buffer[buf_index] = args[arg_index];
+            buf_index = buf_index + 1;
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 'c'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
 
 #returns_ownership
 pub const read_file -> fn (path: *char) *char {
