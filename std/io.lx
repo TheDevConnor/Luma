@@ -1,0 +1,159 @@
+@module "io"
+
+@use "string" as string
+@use "memory" as mem
+@use "sys" as sys
+
+const INITIAL_BUFFER_SIZE: int = 4096;  // Start with 4KB
+const BUFFER_GROWTH_FACTOR: int = 2;     // Double size when growing
+
+pub const print_int -> fn (s: *char, args: [int; 256]) int {
+    // Simple implementation: only supports %d for integers
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    loop [i: int = 0](s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 'd' && arg_index < 256) {
+            let num_str: *char = string::from_int(args[arg_index]);
+            defer { free(num_str); }
+
+            loop [j: int = 0](num_str[j] != '\0') : (++j) {
+                buffer[buf_index] = num_str[j];
+                buf_index = buf_index + 1;
+            }
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 'd'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
+
+pub const print_str -> fn (s: *char, args: [*char; 256]) int {
+    // Simple implementation: only supports %s for strings
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    loop [i: int = 0](s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 's' && arg_index < 256) {
+            let str_arg: *char = args[arg_index];
+            loop [j: int = 0](str_arg[j] != '\0') : (++j) {
+                buffer[buf_index] = str_arg[j];
+                buf_index = buf_index + 1;
+            }
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 's'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
+
+pub const print_char -> fn (s: *char, args: [char; 256]) int {
+    // Simple implementation: only supports %c for characters
+    let buffer: *char = cast<*char>(alloc(256 * sizeof<char>));
+    let buf_index: int = 0; let arg_index: int = 0;
+    defer { free(buffer); }
+    
+    let i: int = 0;
+    loop (s[i] != '\0') : (++i) {
+        if (s[i] == '%' && s[i + 1] == 'c' && arg_index < 256) {
+            buffer[buf_index] = args[arg_index];
+            buf_index = buf_index + 1;
+            arg_index = arg_index + 1;
+            i = i + 1; // Skip 'c'
+        } else {
+            buffer[buf_index] = s[i];
+            buf_index = buf_index + 1;
+        }
+    }
+    buffer[buf_index] = '\0'; // Null-terminate
+
+    let written: int = sys::write_str(sys::STDOUT, buffer);
+    return written;
+}
+
+#returns_ownership
+pub const read_file -> fn (path: *char) *char {
+  let fd: int = sys::open(path, sys::O_RDONLY, 0);
+  if (sys::is_error(fd)) {
+    sys::eprint("Error: Failed to open file for reading\n");
+    return cast<*char>(0);
+  }
+
+  // Start with initial buffer
+  let buffer_size: int = INITIAL_BUFFER_SIZE;
+  let buffer: *char = cast<*char>(alloc(buffer_size * sizeof<char>));
+  if (buffer == cast<*char>(0)) {
+    sys::eprint("Error: Failed to allocate initial buffer\n");
+    sys::close(fd);
+    return cast<*char>(0);
+  }
+
+  let total_read: int = 0;
+  let bytes_read: int = 0;
+
+  loop {
+    // Read into buffer at current position
+    let read_size: int = buffer_size - total_read - 1; // Leave room for null terminator
+    bytes_read = sys::read(fd, cast<*void>(cast<int>(buffer) + total_read), read_size);
+
+    if (sys::is_error(bytes_read)) {
+      sys::eprint("Error: Failed to read from file\n");
+      sys::close(fd);
+      free(buffer);
+      return cast<*char>(0);
+    }
+
+    // If we read 0 bytes, we've reached EOF
+    if (bytes_read == 0) {
+      break;
+    }
+
+    total_read = total_read + bytes_read;
+
+    // If buffer is full (minus null terminator space), grow it
+    if (total_read >= buffer_size - 1) {
+      let new_size: int = buffer_size * BUFFER_GROWTH_FACTOR;
+      let new_buffer: *char = cast<*char>(mem::realloc(cast<*void>(buffer), new_size * sizeof<char>));
+      
+      if (new_buffer == cast<*char>(0)) {
+        sys::eprint("Error: Failed to grow buffer\n");
+        sys::close(fd);
+        free(buffer);
+        return cast<*char>(0);
+      }
+
+      buffer = new_buffer;
+      buffer_size = new_size;
+    }
+  }
+
+  // Null terminate the string
+  buffer[total_read] = cast<char>(0);
+
+  // shrink buffer to exact size to save memory
+  if (total_read < buffer_size - 1) {
+    let final_buffer: *char = cast<*char>(alloc((total_read + 1) * sizeof<char>));
+    if (final_buffer != cast<*char>(0)) {
+      mem::memcpy(cast<*void>(final_buffer), cast<*void>(buffer), total_read + 1);
+      free(buffer);
+      buffer = final_buffer;
+    }
+  }
+
+  sys::close(fd);
+  return buffer;
+}

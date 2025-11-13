@@ -1,0 +1,27 @@
+@module "main"
+
+@use "ast_helper" as ast_helper
+@use "lexer" as lexer
+@use "parser" as psr
+@use "time" as time
+@use "ast" as ast
+@use "io" as io
+
+pub const main -> fn () int {
+  let speed: Timer = time::timer_start();
+
+  let path: *char = "/home/thedevconnor/Projects/Luma/tests/LPBS/build.lmb";
+  let file: *char = io::read_file(path);
+  let lex: *Token = lexer::scan(file);
+
+  let parser: *Stmt = psr::parse(lex, path);
+  ast_helper::print_stmt(parser);
+ 
+  free(file);
+  lexer::free_tokens(lex);
+  ast::free_stmt(parser);
+
+  let elapsed: int = time::timer_elapsed_ms(speed);
+  io::print_int("Took %dms\n", [elapsed]);
+  return 0;
+}

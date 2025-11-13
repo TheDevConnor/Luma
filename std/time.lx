@@ -1,0 +1,75 @@
+@module "time"
+
+const NANOSLEEP: int = 35; 
+const CLOCK_GETTIME: int = 228;
+const CLOCK_REALTIME: int = 0;
+
+const TimeSpec -> struct {
+   sec: int,
+   nsec: int,
+};
+
+const Timer -> struct {
+    start_time: TimeSpec,
+};
+
+pub const usleep -> fn (usec: int) int {
+    let req: TimeSpec;
+
+    req.sec = usec / 1000000;
+    req.nsec = (usec % 1000000) * 1000;
+
+    return __syscall__(NANOSLEEP, cast<*int>(&req), 0);
+}
+
+pub const to_millis -> fn (t: TimeSpec) int {
+    return (t.sec * 1000) + (t.nsec / 1000000);
+}
+
+pub const to_micros -> fn (t: TimeSpec) int {
+    return (t.sec * 1000000) + (t.nsec / 1000);
+}
+
+pub const to_nanos -> fn (t: TimeSpec) int {
+    return (t.sec * 1000000000) + t.nsec;
+}
+
+pub const clock_gettime -> fn (clk_id: int, ts: *TimeSpec) int {
+    return __syscall__(CLOCK_GETTIME, clk_id, cast<*int>(ts));
+}
+
+pub const now -> fn () TimeSpec {
+    let ts: TimeSpec;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts;
+}
+
+pub const timer_start -> fn () Timer {
+    let t: Timer;
+    t.start_time = now();
+    return t;
+}
+
+pub const timespec_sub -> fn (a: TimeSpec, b: TimeSpec) TimeSpec {
+    let res: TimeSpec;
+
+    res.sec = a.sec - b.sec;
+    res.nsec = a.nsec - b.nsec;
+
+    if (res.nsec < 0) {
+        res.nsec = res.nsec + 1000000000;
+        res.sec = res.sec - 1;
+    }
+
+    return res;
+}
+
+pub const elapsed_ms -> fn (start: TimeSpec, end: TimeSpec) int {
+    let diff: TimeSpec = timespec_sub(end, start);
+    return to_millis(diff);
+}
+
+pub const timer_elapsed_ms -> fn (t: Timer) int {
+    let end: TimeSpec = now();
+    return elapsed_ms(t.start_time, end);
+}

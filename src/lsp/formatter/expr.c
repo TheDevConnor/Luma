@@ -102,6 +102,11 @@ void format_unary_expression(FormatterContext *ctx, Expr *expr) {
     case UNOP_DEREF:
         write_string(ctx, "*");
         break;
+    case UNOP_POST_INC:
+    case UNOP_POST_DEC:
+        // UNIMPLEMENTED!!
+        fprintf(stderr, "Postfix unary operators not implemented yet\n");
+        break;
     case UNOP_ADDR:
         write_string(ctx, "&");
         break;
@@ -128,7 +133,7 @@ void format_function_call(FormatterContext *ctx, Expr *expr) {
   write_string(ctx, "(");
   
   // Format arguments
-  for (int i = 0; i < expr->expr.call.arg_count; i++) {
+  for (size_t i = 0; i < expr->expr.call.arg_count; i++) {
     if (i > 0) {
       write_string(ctx, ",");
       if (ctx->config.space_after_comma) {
@@ -143,6 +148,11 @@ void format_function_call(FormatterContext *ctx, Expr *expr) {
 
 void format_literal_expression(FormatterContext *ctx, Expr *expr) {
   switch (expr->expr.literal.lit_type) {
+  case LITERAL_IDENT:
+  case LITERAL_DOUBLE:
+  case LITERAL_NULL:
+    fprintf(stderr, "Literal type not implemented in formatter yet check expr.c\n");
+    break;
   case LITERAL_INT: {
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "%lld", expr->expr.literal.value.int_val);

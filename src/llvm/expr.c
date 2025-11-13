@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "llvm.h"
@@ -68,10 +69,26 @@ LLVMValueRef range_length(CodeGenContext *ctx, LLVMValueRef range_struct) {
 }
 
 LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
+  if (!ctx) {
+    fprintf(stderr, "FATAL: ctx is NULL in codegen_expr_literal!\n");
+    abort();
+  }
+  if (!ctx->context) {
+    fprintf(stderr, "FATAL: ctx->context is NULL in codegen_expr_literal!\n");
+    fprintf(stderr, "LLVM context was not initialized properly!\n");
+    abort();
+  }
+  if (!ctx->builder) {
+    fprintf(stderr, "FATAL: ctx->builder is NULL in codegen_expr_literal!\n");
+    fprintf(stderr, "LLVM builder was not initialized properly!\n");
+    abort();
+  }
+
   switch (node->expr.literal.lit_type) {
   case LITERAL_INT:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context),
                         node->expr.literal.value.int_val, false);
+
   case LITERAL_FLOAT:
     return LLVMConstReal(LLVMDoubleTypeInContext(ctx->context),
                          node->expr.literal.value.float_val);
@@ -79,10 +96,12 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_BOOL:
     return LLVMConstInt(LLVMInt1TypeInContext(ctx->context),
                         node->expr.literal.value.bool_val ? 1 : 0, false);
+
   case LITERAL_CHAR:
     return LLVMConstInt(LLVMInt8TypeInContext(ctx->context),
                         (unsigned char)node->expr.literal.value.char_val,
                         false);
+
   case LITERAL_STRING: {
     char *processed_str =
         process_escape_sequences(node->expr.literal.value.string_val);
@@ -126,7 +145,10 @@ LLVMValueRef codegen_expr_literal(CodeGenContext *ctx, AstNode *node) {
   case LITERAL_NULL:
     return LLVMConstNull(
         LLVMPointerType(LLVMInt8TypeInContext(ctx->context), 0));
+
   default:
+    fprintf(stderr, "ERROR: Unknown literal type: %d\n",
+            node->expr.literal.lit_type);
     return NULL;
   }
 }
@@ -333,12 +355,53 @@ LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node) {
     // Range operations work with both integers and floats
     return create_range_struct(ctx, left, right);
 
+  // Bitwise operations (only for integers)
+  case BINOP_BIT_AND:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise AND not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildAnd(ctx->builder, left, right, "bitand");
+
+  case BINOP_BIT_OR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise OR not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildOr(ctx->builder, left, right, "bitor");
+
+  case BINOP_BIT_XOR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Bitwise XOR not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildXor(ctx->builder, left, right, "bitxor");
+
+  case BINOP_SHL:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Left shift not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildShl(ctx->builder, left, right, "shl");
+
+  case BINOP_SHR:
+    if (is_float_op) {
+      fprintf(stderr,
+              "Error: Right shift not supported for floating point values\n");
+      return NULL;
+    }
+    // Use arithmetic right shift (sign-extending for signed integers)
+    return LLVMBuildAShr(ctx->builder, left, right, "ashr");
+
   default:
     return NULL;
   }
 }
 
-// Enhanced codegen_expr_unary function with float support
 LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef operand = codegen_expr(ctx, node->expr.unary.operand);
   if (!operand)
@@ -364,6 +427,15 @@ LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node) {
       return NULL;
     }
     return LLVMBuildNot(ctx->builder, operand, "not");
+
+  case UNOP_BIT_NOT:
+    if (is_float) {
+      fprintf(
+          stderr,
+          "Error: Bitwise NOT (~) not supported for floating point values\n");
+      return NULL;
+    }
+    return LLVMBuildNot(ctx->builder, operand, "bitnot");
 
   case UNOP_PRE_INC:
   case UNOP_POST_INC: {
@@ -437,55 +509,55 @@ LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node) {
   LLVMValueRef callee_value = NULL;
   LLVMValueRef *args = NULL;
   size_t arg_count = node->expr.call.arg_count;
-  
+
   // Check if this is a method call (obj.method())
   if (callee->type == AST_EXPR_MEMBER && !callee->expr.member.is_compiletime) {
     // Method call: obj.method(arg1, arg2)
     // The typechecker has already injected 'self' as the first argument
     // So we just need to codegen all arguments as-is
-    
+
     // Get the method function
     const char *member_name = callee->expr.member.member;
-    
+
     // Look up the method in the current module
     LLVMModuleRef current_llvm_module =
         ctx->current_module ? ctx->current_module->module : ctx->module;
-    LLVMValueRef method_func = LLVMGetNamedFunction(current_llvm_module, member_name);
-    
+    LLVMValueRef method_func =
+        LLVMGetNamedFunction(current_llvm_module, member_name);
+
     if (!method_func) {
       fprintf(stderr, "Error: Method '%s' not found\n", member_name);
       return NULL;
     }
-    
+
     callee_value = method_func;
-    
+
     // Allocate space for all arguments (including injected self)
     args = (LLVMValueRef *)arena_alloc(
-        ctx->arena, sizeof(LLVMValueRef) * arg_count,
-        alignof(LLVMValueRef));
-    
+        ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
     // Codegen all arguments (self is already in args[0] from typechecker)
     for (size_t i = 0; i < arg_count; i++) {
       args[i] = codegen_expr(ctx, node->expr.call.args[i]);
       if (!args[i]) {
-        fprintf(stderr, "Error: Failed to generate argument %zu for method '%s'\n", 
-                i, member_name);
+        fprintf(stderr,
+                "Error: Failed to generate argument %zu for method '%s'\n", i,
+                member_name);
         return NULL;
       }
     }
-    
+
   } else {
     // Regular function call or compile-time member access (module::func)
     callee_value = codegen_expr(ctx, callee);
     if (!callee_value) {
       return NULL;
     }
-    
+
     // Allocate space for arguments
     args = (LLVMValueRef *)arena_alloc(
-        ctx->arena, sizeof(LLVMValueRef) * arg_count,
-        alignof(LLVMValueRef));
-    
+        ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
     for (size_t i = 0; i < arg_count; i++) {
       args[i] = codegen_expr(ctx, node->expr.call.args[i]);
       if (!args[i]) {
@@ -501,8 +573,7 @@ LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node) {
   // Check if return type is void
   if (LLVMGetTypeKind(return_type) == LLVMVoidTypeKind) {
     // For void functions, don't assign a name to the call
-    LLVMBuildCall2(ctx->builder, func_type, callee_value, args,
-                   arg_count, "");
+    LLVMBuildCall2(ctx->builder, func_type, callee_value, args, arg_count, "");
     // Return a void constant since we can't return NULL
     return LLVMConstNull(LLVMVoidTypeInContext(ctx->context));
   } else {
@@ -670,8 +741,6 @@ LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node) {
       // Final fallback: use value type
       if (!element_type) {
         element_type = value_type;
-        fprintf(stderr, "Warning: Could not determine pointer element type, "
-                        "using value type\n");
       }
 
       // Convert value to match element type if needed
@@ -805,6 +874,7 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
 
   AstNode **elements = node->expr.array.elements;
   size_t element_count = node->expr.array.element_count;
+  size_t target_size = node->expr.array.target_size; // NEW: Get target size for padding
 
   if (element_count == 0) {
     fprintf(stderr, "Error: Empty array literals not supported\n");
@@ -819,16 +889,21 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
   }
 
   LLVMTypeRef element_type = LLVMTypeOf(first_element);
-  LLVMTypeRef array_type = LLVMArrayType(element_type, element_count);
+  
+  // NEW: Use target_size if set (for padding), otherwise use actual element_count
+  size_t actual_array_size = (target_size > 0) ? target_size : element_count;
+  LLVMTypeRef array_type = LLVMArrayType(element_type, actual_array_size);
 
   // Check if all elements are constants
   bool all_constants = LLVMIsConstant(first_element);
+  
+  // NEW: Allocate for the FULL size (including padding)
   LLVMValueRef *element_values = (LLVMValueRef *)arena_alloc(
-      ctx->arena, sizeof(LLVMValueRef) * element_count, alignof(LLVMValueRef));
+      ctx->arena, sizeof(LLVMValueRef) * actual_array_size, alignof(LLVMValueRef));
 
   element_values[0] = first_element;
 
-  // Generate remaining elements and check for constants
+  // Generate provided elements
   for (size_t i = 1; i < element_count; i++) {
     element_values[i] = codegen_expr(ctx, elements[i]);
     if (!element_values[i]) {
@@ -853,9 +928,21 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
     }
   }
 
-  // *** ADD THE NEW CODE HERE ***
+  // NEW: Pad remaining elements with zeros if target_size > element_count
+  if (target_size > element_count) {
+    LLVMValueRef zero_value = LLVMConstNull(element_type);
+    
+    for (size_t i = element_count; i < target_size; i++) {
+      element_values[i] = zero_value;
+    }
+    
+    // If we're padding, we can't be all constants unless zeros count
+    // (which they do, so keep checking)
+    // zero_value is always constant, so all_constants remains unchanged
+  }
+
   // Check if any element references a global from another module
-  for (size_t i = 0; i < element_count && all_constants; i++) {
+  for (size_t i = 0; i < actual_array_size && all_constants; i++) {
     if (LLVMIsConstant(element_values[i]) &&
         LLVMIsAGlobalVariable(element_values[i])) {
       // Check if it's from a different module
@@ -868,17 +955,16 @@ LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node) {
       }
     }
   }
-  // *** END NEW CODE ***
 
   if (all_constants) {
-    // Create constant array
-    return LLVMConstArray(element_type, element_values, element_count);
+    // Create constant array (now with padding)
+    return LLVMConstArray(element_type, element_values, actual_array_size);
   } else {
-    // Create runtime array
+    // Create runtime array (now with padding)
     LLVMValueRef array_alloca =
         LLVMBuildAlloca(ctx->builder, array_type, "array_literal");
 
-    for (size_t i = 0; i < element_count; i++) {
+    for (size_t i = 0; i < actual_array_size; i++) {
       // Create GEP to element
       LLVMValueRef indices[2];
       indices[0] = LLVMConstInt(LLVMInt32TypeInContext(ctx->context), 0, false);
@@ -897,6 +983,172 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
   if (!node || node->type != AST_EXPR_INDEX) {
     fprintf(stderr, "Error: Expected index expression node\n");
     return NULL;
+  }
+
+  // **NEW: Special handling for indexing member access (struct.field[index])**
+  if (node->expr.index.object->type == AST_EXPR_MEMBER) {
+    AstNode *member_expr = node->expr.index.object;
+    const char *field_name = member_expr->expr.member.member;
+
+    // Generate the member access to get the pointer
+    LLVMValueRef pointer = codegen_expr_struct_access(ctx, member_expr);
+    if (!pointer) {
+      fprintf(stderr, "Error: Failed to resolve member access for indexing\n");
+      return NULL;
+    }
+
+    // Generate the index expression
+    LLVMValueRef index = codegen_expr(ctx, node->expr.index.index);
+    if (!index) {
+      return NULL;
+    }
+
+    LLVMTypeRef pointer_type = LLVMTypeOf(pointer);
+    LLVMTypeKind pointer_kind = LLVMGetTypeKind(pointer_type);
+
+    // The member access should have returned a pointer
+    if (pointer_kind != LLVMPointerTypeKind) {
+      fprintf(stderr, "Error: Member '%s' is not a pointer type for indexing\n",
+              field_name);
+      return NULL;
+    }
+
+    // Find the struct that contains this field to get element type info
+    LLVMTypeRef element_type = NULL;
+
+    // Build a list of field names in the chain (in reverse order)
+    const char *field_chain[32];
+    int chain_length = 0;
+    AstNode *current_node = member_expr;
+
+    while (current_node && current_node->type == AST_EXPR_MEMBER &&
+           chain_length < 32) {
+      field_chain[chain_length++] = current_node->expr.member.member;
+      current_node = current_node->expr.member.object;
+    }
+
+    // Reverse the chain to get the correct order
+    for (int i = 0; i < chain_length / 2; i++) {
+      const char *temp = field_chain[i];
+      field_chain[i] = field_chain[chain_length - 1 - i];
+      field_chain[chain_length - 1 - i] = temp;
+    }
+
+    // Find the base identifier
+    AstNode *base_obj = member_expr->expr.member.object;
+    while (base_obj->type == AST_EXPR_MEMBER) {
+      base_obj = base_obj->expr.member.object;
+    }
+
+    if (base_obj->type == AST_EXPR_IDENTIFIER) {
+      const char *base_name = base_obj->expr.identifier.name;
+      LLVM_Symbol *base_sym = find_symbol(ctx, base_name);
+
+      if (base_sym) {
+        // Find the initial struct type
+        StructInfo *current_struct = NULL;
+        LLVMTypeRef sym_type = base_sym->type;
+        LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
+
+        if (sym_kind == LLVMPointerTypeKind && base_sym->element_type) {
+          // It's a pointer to struct
+          for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+            if (info->llvm_type == base_sym->element_type) {
+              current_struct = info;
+              break;
+            }
+          }
+        } else if (sym_kind == LLVMStructTypeKind) {
+          // Direct struct type
+          for (StructInfo *info = ctx->struct_types; info; info = info->next) {
+            if (info->llvm_type == sym_type) {
+              current_struct = info;
+              break;
+            }
+          }
+        }
+
+        // Trace through the field chain
+        for (int i = 0; i < chain_length && current_struct; i++) {
+          const char *current_field_name = field_chain[i];
+          int field_idx = get_field_index(current_struct, current_field_name);
+
+          if (field_idx < 0) {
+            fprintf(stderr, "Error: Field '%s' not found in struct '%s'\n",
+                    current_field_name, current_struct->name);
+            break;
+          }
+
+          // If this is the last field in the chain, get its element type
+          if (i == chain_length - 1) {
+            LLVMTypeRef field_type = current_struct->field_types[field_idx];
+
+            // Check if this field is an array - if so, get its element type
+            if (LLVMGetTypeKind(field_type) == LLVMArrayTypeKind) {
+              element_type = LLVMGetElementType(field_type);
+            } else {
+              element_type = current_struct->field_element_types[field_idx];
+            }
+            break;
+          }
+
+          // Otherwise, move to the next struct in the chain
+          LLVMTypeRef field_type = current_struct->field_types[field_idx];
+          LLVMTypeKind field_kind = LLVMGetTypeKind(field_type);
+
+          if (field_kind == LLVMStructTypeKind) {
+            // Field is a struct - find its info
+            StructInfo *next_struct = NULL;
+            for (StructInfo *info = ctx->struct_types; info;
+                 info = info->next) {
+              if (info->llvm_type == field_type) {
+                next_struct = info;
+                break;
+              }
+            }
+            current_struct = next_struct;
+          } else if (field_kind == LLVMPointerTypeKind) {
+            // Field is a pointer - get what it points to
+            LLVMTypeRef pointee =
+                current_struct->field_element_types[field_idx];
+            if (pointee && LLVMGetTypeKind(pointee) == LLVMStructTypeKind) {
+              // Find the struct info for the pointee
+              StructInfo *next_struct = NULL;
+              for (StructInfo *info = ctx->struct_types; info;
+                   info = info->next) {
+                if (info->llvm_type == pointee) {
+                  next_struct = info;
+                  break;
+                }
+              }
+              current_struct = next_struct;
+            } else {
+              // Not a struct pointer, can't continue
+              break;
+            }
+          } else {
+            // Field is not a struct or pointer, can't continue
+            break;
+          }
+        }
+      }
+    }
+
+    if (!element_type) {
+      fprintf(
+          stderr,
+          "Error: Could not determine pointer element type for indexing '%s'\n",
+          field_name);
+      return NULL;
+    }
+
+    // Build GEP for pointer arithmetic
+    LLVMValueRef element_ptr = LLVMBuildGEP2(
+        ctx->builder, element_type, pointer, &index, 1, "member_ptr_element");
+
+    // Load the actual value
+    return LLVMBuildLoad2(ctx->builder, element_type, element_ptr,
+                          "member_element_val");
   }
 
   // Generate the object being indexed
@@ -1031,21 +1283,6 @@ LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node) {
         AstNode *pointee_node =
             cast_node->expr.cast.type->type_data.pointer.pointee_type;
         pointee_type = codegen_type(ctx, pointee_node);
-      }
-    } else if (node->expr.index.object->type == AST_EXPR_MEMBER) {
-      AstNode *member_expr = node->expr.index.object;
-      const char *field_name = member_expr->expr.member.member;
-      
-      // Get the struct info
-      StructInfo *struct_info = NULL;
-      for (StructInfo *info = ctx->struct_types; info; info = info->next) {
-        int field_idx = get_field_index(info, field_name);
-        if (field_idx >= 0) {
-          struct_info = info;
-          // Use the element type stored for this field
-          pointee_type = struct_info->field_element_types[field_idx];
-          break;
-        }
       }
     }
 
@@ -1380,6 +1617,170 @@ LLVMValueRef codegen_expr_system(CodeGenContext *ctx, AstNode *node) {
                         "system_call");
 }
 
+/**
+ * @brief Generate LLVM IR for syscall expression
+ *
+ * Syscall in x86_64 Linux:
+ * - syscall number goes in %rax
+ * - arguments go in %rdi, %rsi, %rdx, %r10, %r8, %r9 (in that order)
+ * - return value comes back in %rax
+ *
+ * We use inline assembly to invoke the syscall instruction.
+ */
+LLVMValueRef codegen_expr_syscall(CodeGenContext *ctx, AstNode *node) {
+  if (!node || node->type != AST_EXPR_SYSCALL) {
+    fprintf(stderr, "Error: Expected syscall expression node\n");
+    return NULL;
+  }
+
+  AstNode **args = node->expr.syscall.args;
+  size_t arg_count = node->expr.syscall.count;
+
+  // Syscall requires at least 1 argument (the syscall number)
+  if (arg_count == 0) {
+    fprintf(
+        stderr,
+        "Error: syscall() requires at least one argument (syscall number)\n");
+    return NULL;
+  }
+
+  // Maximum 7 arguments: syscall_num + 6 syscall args
+  if (arg_count > 7) {
+    fprintf(stderr, "Error: syscall() supports maximum 7 arguments (syscall "
+                    "number + 6 parameters)\n");
+    return NULL;
+  }
+
+  // Get current LLVM module
+  LLVMModuleRef current_llvm_module =
+      ctx->current_module ? ctx->current_module->module : ctx->module;
+
+  // Generate all arguments
+  LLVMValueRef *llvm_args = (LLVMValueRef *)arena_alloc(
+      ctx->arena, sizeof(LLVMValueRef) * arg_count, alignof(LLVMValueRef));
+
+  for (size_t i = 0; i < arg_count; i++) {
+    llvm_args[i] = codegen_expr(ctx, args[i]);
+    if (!llvm_args[i]) {
+      fprintf(stderr, "Error: Failed to generate syscall argument %zu\n",
+              i + 1);
+      return NULL;
+    }
+
+    // Ensure all arguments are i64 (syscalls expect 64-bit values)
+    LLVMTypeRef arg_type = LLVMTypeOf(llvm_args[i]);
+    LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
+
+    if (arg_kind == LLVMIntegerTypeKind) {
+      unsigned bits = LLVMGetIntTypeWidth(arg_type);
+      if (bits < 64) {
+        // Zero-extend smaller integers to i64
+        llvm_args[i] = LLVMBuildZExt(ctx->builder, llvm_args[i],
+                                     LLVMInt64TypeInContext(ctx->context),
+                                     "syscall_arg_ext");
+      } else if (bits > 64) {
+        // Truncate larger integers to i64
+        llvm_args[i] = LLVMBuildTrunc(ctx->builder, llvm_args[i],
+                                      LLVMInt64TypeInContext(ctx->context),
+                                      "syscall_arg_trunc");
+      }
+    } else if (arg_kind == LLVMPointerTypeKind) {
+      // Convert pointer to i64
+      llvm_args[i] = LLVMBuildPtrToInt(ctx->builder, llvm_args[i],
+                                       LLVMInt64TypeInContext(ctx->context),
+                                       "syscall_ptr_to_int");
+    } else if (arg_kind == LLVMFloatTypeKind ||
+               arg_kind == LLVMDoubleTypeKind) {
+      // Convert float/double to i64 (reinterpret bits, don't convert value)
+      fprintf(stderr,
+              "Warning: syscall argument %zu is float/double, casting to int\n",
+              i + 1);
+      llvm_args[i] = LLVMBuildFPToSI(ctx->builder, llvm_args[i],
+                                     LLVMInt64TypeInContext(ctx->context),
+                                     "syscall_float_to_int");
+    }
+  }
+
+  // Build inline assembly string based on number of arguments
+  // Linux x86_64 syscall convention:
+  // rax = syscall number
+  // rdi, rsi, rdx, r10, r8, r9 = arguments 1-6
+
+  const char *asm_template;
+  const char *constraints;
+
+  switch (arg_count) {
+  case 1: // syscall number only
+    asm_template = "syscall";
+    constraints = "={rax},{rax}";
+    break;
+  case 2: // syscall + 1 arg
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi}";
+    break;
+  case 3: // syscall + 2 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi}";
+    break;
+  case 4: // syscall + 3 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx}";
+    break;
+  case 5: // syscall + 4 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10}";
+    break;
+  case 6: // syscall + 5 args
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8}";
+    break;
+  case 7: // syscall + 6 args (maximum)
+    asm_template = "syscall";
+    constraints = "={rax},{rax},{rdi},{rsi},{rdx},{r10},{r8},{r9}";
+    break;
+  default:
+    fprintf(stderr, "Error: Invalid syscall argument count\n");
+    return NULL;
+  }
+
+  // Create parameter types array (all i64)
+  LLVMTypeRef *param_types = (LLVMTypeRef *)arena_alloc(
+      ctx->arena, sizeof(LLVMTypeRef) * arg_count, alignof(LLVMTypeRef));
+
+  for (size_t i = 0; i < arg_count; i++) {
+    param_types[i] = LLVMInt64TypeInContext(ctx->context);
+  }
+
+  // Create inline assembly function type: i64 (args...)
+  LLVMTypeRef asm_func_type = LLVMFunctionType(
+      LLVMInt64TypeInContext(ctx->context), // return type (syscall result)
+      param_types, arg_count,
+      false // not vararg
+  );
+
+  // Create the inline assembly call
+  LLVMValueRef asm_func =
+      LLVMGetInlineAsm(asm_func_type,
+                       (char *)asm_template, // assembly template
+                       strlen(asm_template),
+                       (char *)constraints, // constraints
+                       strlen(constraints),
+                       true,                    // has side effects
+                       false,                   // align stack
+                       LLVMInlineAsmDialectATT, // AT&T syntax
+                       false                    // can throw
+      );
+
+  // Call the inline assembly
+  LLVMValueRef result = LLVMBuildCall2(ctx->builder, asm_func_type, asm_func,
+                                       llvm_args, arg_count, "syscall_result");
+
+  // Mark as volatile to prevent optimization
+  LLVMSetVolatile(result, true);
+
+  return result;
+}
+
 // sizeof<type || expr>
 LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
   LLVMTypeRef type;
@@ -1408,37 +1809,61 @@ LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node) {
   case LLVMPointerTypeKind:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   case LLVMStructTypeKind: {
-    // Calculate struct size by summing field sizes
     unsigned field_count = LLVMCountStructElementTypes(type);
     LLVMTypeRef *field_types = malloc(field_count * sizeof(LLVMTypeRef));
     LLVMGetStructElementTypes(type, field_types);
 
     uint64_t total_size = 0;
+    uint64_t max_align = 1;
+
     for (unsigned i = 0; i < field_count; i++) {
-      LLVMTypeKind field_kind = LLVMGetTypeKind(field_types[i]);
-      switch (field_kind) {
+      LLVMTypeRef ftype = field_types[i];
+      uint64_t fsize = 0;
+      uint64_t falign = 1;
+
+      LLVMTypeKind fkind = LLVMGetTypeKind(ftype);
+      switch (fkind) {
       case LLVMIntegerTypeKind:
-        total_size += LLVMGetIntTypeWidth(field_types[i]) / 8;
+        fsize = LLVMGetIntTypeWidth(ftype) / 8;
+        falign = fsize > 8 ? 8 : fsize; // int64 align=8
         break;
       case LLVMFloatTypeKind:
-        total_size += 4;
+        fsize = 4;
+        falign = 4;
         break;
       case LLVMDoubleTypeKind:
-        total_size += 8;
+        fsize = 8;
+        falign = 8;
         break;
       case LLVMPointerTypeKind:
-        total_size += 8;
+        fsize = 8;
+        falign = 8;
         break;
       default:
-        total_size += 8; // fallback
+        fsize = 8;
+        falign = 8;
         break;
       }
+
+      // align current offset
+      if (total_size % falign != 0)
+        total_size += falign - (total_size % falign);
+
+      total_size += fsize;
+      if (falign > max_align)
+        max_align = falign;
     }
 
+    // align final struct size to max_align
+    if (total_size % max_align != 0)
+      total_size += max_align - (total_size % max_align);
+
     free(field_types);
+
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), total_size,
                         false);
   }
+
   default:
     return LLVMConstInt(LLVMInt64TypeInContext(ctx->context), 8, false);
   }
@@ -1564,7 +1989,8 @@ LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node) {
 
   // Final fallback if we couldn't determine the type
   if (!element_type) {
-    fprintf(stderr, "Warning: Could not determine pointer element type for dereference, defaulting to i64\n");
+    fprintf(stderr, "Warning: Could not determine pointer element type for "
+                    "dereference, defaulting to i64\n");
     element_type = LLVMInt64TypeInContext(ctx->context);
   }
 

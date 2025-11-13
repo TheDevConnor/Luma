@@ -1,0 +1,116 @@
+@module "parser"
+
+@use "parser_helper" as helper
+@use "string" as string
+@use "lexer" as lexer
+@use "ast" as ast
+@use "sys" as sys
+
+const parse_expr -> fn (psr: *Parser, bp: int) *Expr;
+
+const get_infix_bp -> fn (token_type: int) int {
+  switch (token_type) {
+    lexer::TokenType::TOK_PLUS, lexer::TokenType::TOK_MINUS 
+      -> return helper::BindingPower::BP_SUM;    
+    lexer::TokenType::TOK_SLASH, lexer::TokenType::TOK_STAR 
+      -> return helper::BindingPower::BP_PRODUCT;
+    _ -> return helper::BindingPower::BP_NONE;
+  }
+}
+
+const parse_literal -> fn (psr: *Parser) *Expr {
+  let tok: Token = helper::peek(psr);
+  
+  switch (tok.type) {
+    lexer::TokenType::TOK_NUMBER -> {
+      let value: int = string::atio(tok.value);
+      helper::advance(psr);
+      return ast::create_number_node(value);
+    }
+    lexer::TokenType::TOK_IDENT -> {
+      let name: *char = tok.value;
+      helper::advance(psr);
+      return ast::create_ident_node(name);
+    }
+    lexer::TokenType::TOK_STRING -> {
+      let value: *char = tok.value;
+      helper::advance(psr);
+      return ast::create_string_node(value);
+    }
+    _ -> {
+      output("Unexpected token in literal parsing\n");
+      return cast<*Expr>(0);
+    }
+  }
+}
+
+const nud -> fn (psr: *Parser) *Expr {
+  let tok: Token = helper::peek(psr);
+  
+  switch (tok.type) {
+    lexer::TokenType::TOK_NUMBER, lexer::TokenType::TOK_IDENT, 
+    lexer::TokenType::TOK_STRING -> { 
+      return parse_literal(psr); 
+    }
+    lexer::TokenType::TOK_LPAREN -> {
+      helper::advance(psr);
+      let expr: *Expr = parse_expr(psr, helper::BindingPower::BP_NONE);
+      let next_tok: Token = helper::peek(psr);
+      if (next_tok.type != lexer::TokenType::TOK_RPAREN) {
+        output("Expected closing parenthesis\n");
+        return cast<*Expr>(0);
+      }
+      helper::advance(psr); 
+      return ast::create_group_node(expr);
+    }
+    lexer::TokenType::TOK_PLUS, lexer::TokenType::TOK_MINUS -> {
+      let op: *char = tok.value;
+      helper::advance(psr);
+      let right: *Expr = parse_expr(psr, helper::BindingPower::BP_UNARY);
+      return ast::create_unary_node(op[0], right);
+    }
+    _ -> {
+      output("Unexpected token in prefix position\n");
+      return cast<*Expr>(0);
+    }
+  }
+}
+
+const led -> fn (psr: *Parser, left: *Expr, token: Token) *Expr {
+  switch (token.type) {
+    lexer::TokenType::TOK_EQEQ, lexer::TokenType::TOK_NOTEQ, lexer::TokenType::TOK_PLUS,
+    lexer::TokenType::TOK_MINUS, lexer::TokenType::TOK_STAR, lexer::TokenType::TOK_SLASH -> {
+      let op: *char = psr.tks.list[psr.pos].value; 
+      helper::advance(psr);
+      let right: *Expr = parse_expr(psr, get_infix_bp(token.type));
+      return ast::create_binary_node(op[0], left, right);
+    }
+    _ -> {
+      output("Unexpected token in infix position\n");
+      return cast<*Expr>(0);
+    }
+  }
+}
+
+const parse_expr -> fn (psr: *Parser, bp: int) *Expr {
+  let left: *Expr = nud(psr);
+  
+  // Inline the led logic here
+  loop (helper::at_end(psr) == 0 && bp < get_infix_bp(helper::peek(psr).type)) {
+    let tok: Token = helper::peek(psr);
+    let next_bp: int = get_infix_bp(tok.type);
+    
+    left = led(psr, left, tok);
+  }
+  
+  return left;
+}
+
+pub const parse -> fn (tks: *Token, path: *char) *Stmt {
+  let psr: Parser;
+  helper::init_parser(&psr, tks, path);
+  
+  let node: *Expr = parse_expr(&psr, helper::BindingPower::BP_NONE);
+  
+  return ast::create_program_node(node, tks.size); 
+}

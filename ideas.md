@@ -1,27 +1,29 @@
-## Fixing C:
-   - context free grammar
-   - no preprocessor
-   - strong typing
-   - no declaration order
-   - defined fixed sized primitives
-   - replace unsigned with natural that can overflow
-   - no integral promotion
-   - checked integer arithmetic
-   - bit array primitive, don't conflate bit operations with integers
-   - texts literals not null terminated
-   - remove varargs
-   - named function parameters
-   - defined expression evaluation order
-   - remove comma operator
-   - product type with undefined layout
-   - object sizes can be 0
-   - remove pointer arithmetic
-   - arrays have value semantics, remove array implicit conversion to pointer
-   - modules, including modulemap
-   - (probably many more, maybe starting with C not a great idea)
+# Fixing C
+
+- context free grammar
+- no preprocessor
+- strong typing
+- no declaration order
+- defined fixed sized primitives
+- replace unsigned with natural that can overflow
+- no integral promotion
+- checked integer arithmetic
+- bit array primitive, don't conflate bit operations with integers
+- texts literals not null terminated
+- remove varargs
+- named function parameters
+- defined expression evaluation order
+- remove comma operator
+- product type with undefined layout
+- object sizes can be 0
+- remove pointer arithmetic
+- arrays have value semantics, remove array implicit conversion to pointer
+- modules, including modulemap
+- (probably many more, maybe starting with C not a great idea)
 
 ## NOTE: for runtime constants on switch cases
-```
+
+```txt
 LLVM IRError: Case values must be compile-time constants
 Error: Case value must be a compile-time constant
 Basic Block in function 'main' does not have terminator!
@@ -30,7 +32,8 @@ LLVM ERROR: Broken module found, compilation aborted!
 ```
 
 ## Linked List Ideas
-```lux
+
+```luma
 ;; Syntax will change on somethins
 const Link = struct {
     tag: int,
@@ -65,7 +68,7 @@ const link_list_length = fn (list: *Link) int {
 };
 ```
 
-# C Interoperability in Luma
+## C Interoperability in Luma
 
 ## Overview
 
@@ -109,7 +112,9 @@ pub const main = fn () int {
 ```
 
 ## impl and its unique features
-# simple example
+
+## simple example
+
 impl [func list...] -> [struct list...] {
     if (1 > 0) {
        define a function one way
@@ -117,39 +122,66 @@ impl [func list...] -> [struct list...] {
       define the same function another way
     }
 }
-# The goals of the impl is to implement functions for structs.
-# It should have the ability to conditionally make functions.
-# The functions are `injected` into the struct and can reference
-# `self` which is a pointer to the struct AstNode that should already be there.
-# There should be two types of functions for this instance. Runtime ready, and compile time optional.
-# with a tag of #runtime, the function will be compiled and optionally ran during runtime.
-# two instances of the same function can only run one at a time, and must be derived from an expression.
-# a #compile tag from a function within a conditional will be optionally compiled, and so only one available at runtime.
-# Why the two? One use case for @run_time is to allow dynamic function assignment. Lets say you must work with an api.
-# This api does not respond with the same data, same type of data and so on. This means you can write multiple capture() functions.
-# Yes this is function overloading, but conditionally, and can be programmed for the potential context the appliction will be in.
-# For @compile_time, it optionally compiles one of the implementations of the function. Say you need portability, you can use the same
-# source code and target specific architectures. This can be thought of #IF_WINDOWS bullshit from C, you can conditionaly compile
-# one function or another, but in a nice and effecient way.
+
+## The goals of the impl is to implement functions for structs
+
+## It should have the ability to conditionally make functions
+
+## The functions are `injected` into the struct and can reference
+
+## `self` which is a pointer to the struct AstNode that should already be there
+
+## There should be two types of functions for this instance. Runtime ready, and compile time optional
+
+## with a tag of #runtime, the function will be compiled and optionally ran during runtime
+
+## two instances of the same function can only run one at a time, and must be derived from an expression
+
+## a #compile tag from a function within a conditional will be optionally compiled, and so only one available at runtime
+
+## Why the two? One use case for @run_time is to allow dynamic function assignment. Lets say you must work with an api
+
+## This api does not respond with the same data, same type of data and so on. This means you can write multiple capture() functions
+
+## Yes this is function overloading, but conditionally, and can be programmed for the potential context the appliction will be in
+
+## For @compile_time, it optionally compiles one of the implementations of the function. Say you need portability, you can use the same
+
+## source code and target specific architectures. This can be thought of #IF_WINDOWS bullshit from C, you can conditionaly compile
+
+## one function or another, but in a nice and effecient way
 
 ## the ? and None type
+
 someType: ?; # is a None, or a real type.
-# Thats what it does. Gives a way to init without a type. Can also be used to identify things. if (someType? == None) {return "Nothing found";}
-# It is our solution to NULL, but it provides a more meaning. Because it can also be a value if (someType?) {return "value found";}
-# This is very straigh forward in its concept. someType? returns the value inside, or it returns the None type.
+
+## Thats what it does. Gives a way to init without a type. Can also be used to identify things. if (someType? == None) {return "Nothing found";}
+
+## It is our solution to NULL, but it provides a more meaning. Because it can also be a value if (someType?) {return "value found";}
+
+## This is very straigh forward in its concept. someType? returns the value inside, or it returns the None type
 
 ## the set type
-# A set is a fixed sized array of types
-# a, b, c : (int, float, char);
-# const func1 = fn () (int, float, int) {}
-# The same thing.
-# a, b, c : () = func1;
-# changes the the position for the returning set.
-# a, b, c : (float, int, int) = func1;
-# The () is here to be explicit that we are expecting a set from func1.
 
-## Luma Post-Processing and Build System (LPBS).
-# LPBS is made in Luma and uses a subset (vars, funcs, if (expr)).
+## A set is a fixed sized array of types
+
+## a, b, c : (int, float, char)
+
+## const func1 = fn () (int, float, int) {}
+
+## The same thing
+
+## a, b, c : () = func1
+
+## changes the the position for the returning set
+
+## a, b, c : (float, int, int) = func1
+
+## The () is here to be explicit that we are expecting a set from func1
+
+## Luma Post-Processing and Build System (LPBS)
+
+## LPBS is made in Luma and uses a subset (vars, funcs, if (expr))
 
 // -V2 : verbose level 2 for strictness?
 // -OB : object files
@@ -195,25 +227,32 @@ clean_all -> (where) {
     output("Removed all artefacts\n");
 }
 
-# compile: and clean: are labels, there are the external commands a user can run (lpbs compile, lpbs clean).
-# Lets break it down. Post-Processing is about understanding end context from the src code and a solution.
-# The LPB System should generate bindings for the end result.
-# It should manage ffi for C and providing that compatability.
-# It should provide a way to create, manage, and work with shared libraries or static libraries.
-# Then it should build the program, it should read in a simp
+## compile: and clean: are labels, there are the external commands a user can run (lpbs compile, lpbs clean)
+
+## Lets break it down. Post-Processing is about understanding end context from the src code and a solution
+
+## The LPB System should generate bindings for the end result
+
+## It should manage ffi for C and providing that compatability
+
+## It should provide a way to create, manage, and work with shared libraries or static libraries
+
+## Then it should build the program, it should read in a simp
 
 ### Manual Binding Generation
+
 ```bash
-# Generate bindings from C header
+## Generate bindings from C header
 ./luma bindgen stdio.h -o std/stdio.lx
 
-# Build with explicit linking
+## Build with explicit linking
 ./luma build main.lx -l std/stdio.lx -name main
 ```
 
 ### Automatic Header Detection
+
 ```bash
-# Build system detects and handles C dependencies
+## Build system detects and handles C dependencies
 ./luma build main.lx -l std/stdio.lx -link-c stdio -name main
 ```
 
@@ -236,17 +275,17 @@ pub const main = fn () int {
 ## Comprehensive Standard Library Generation
 
 ```bash
-# Generate all standard C library bindings at once
+## Generate all standard C library bindings at once
 ./luma bindgen --std-headers -o std/
 
-# This creates:
-# std/stdio.lx
-# std/stdlib.lx  
-# std/math.lx
-# std/string.lx
-# etc.
+## This creates:
+## std/stdio.lx
+## std/stdlib.lx  
+## std/math.lx
+## std/string.lx
+## etc.
 
-# Build with multiple C libraries
+## Build with multiple C libraries
 ./luma build main.lx -l std/stdio.lx -l std/math.lx -name main
 ```
 
@@ -267,26 +306,32 @@ extern "C" {
 ```
 
 Build system automatically detects linking requirements:
+
 ```bash
-# Build system sees @link_lib "c" and automatically adds -lc
+## Build system sees @link_lib "c" and automatically adds -lc
 ./luma build main.lx -l std/stdio.lx -name main
 ```
 
 ## Key Benefits
 
 ### 1. **Module System Consistency**
+
 C bindings are treated as regular Luma modules, maintaining language design coherence.
 
 ### 2. **Explicit Dependency Management**
+
 Developers maintain full control over what gets linked and in what order, respecting the build system's link order requirements.
 
 ### 3. **Namespace Protection**
+
 The `@use "stdio" as io` pattern prevents namespace pollution while clearly indicating C library usage.
 
 ### 4. **Tooling Integration**
+
 Automatic binding generation creates proper Luma modules that integrate seamlessly with existing tools.
 
 ### 5. **Build System Compatibility**
+
 Works within the existing build system architecture without requiring fundamental changes.
 
 ## Implementation Strategy
@@ -298,5 +343,6 @@ Works within the existing build system architecture without requiring fundamenta
 
 This approach provides a foundation for C interoperability that feels natural to Luma developers while maintaining the language's design principles.
 
-## Look into adding in Multithreading 
+## Look into adding in Multithreading
+
 ## Add in multiple return types. ``const createStack = fn (stackCeiling: int) <*Stack, *void>``

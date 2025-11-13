@@ -1,0 +1,65 @@
+@module "ast_helper"
+
+@use "string" as string
+@use "ast" as ast
+
+pub const print_expr -> fn (node: *Expr) void {
+  if (node == cast<*Expr>(0)) { return; }
+
+  switch (node.type) {
+    ast::ExprKind::EXPR_NUMBER -> {
+      let num_node: *Number = cast<*Number>(node);
+      output(num_node.value);
+    }
+    ast::ExprKind::EXPR_IDENT  -> {
+      let ident_node: *Ident = cast<*Ident>(node);
+      output(ident_node.name);
+    }
+    ast::ExprKind::EXPR_STRING -> {
+      let str_node: *StringLit = cast<*StringLit>(node);
+      output("''", str_node.value, "''");                
+    }
+    ast::ExprKind::EXPR_BINARY -> {
+      let bin_node: *Binary = cast<*Binary>(node);      
+      let binop: *char = string::from_char(bin_node.op);
+      defer { free(binop); }                            
+                                                  
+      output("(");                                      
+      print_expr(bin_node.left);                        
+      output(" ", binop, " ");                          
+      print_expr(bin_node.right);                       
+      output(")");                                      
+    }
+    ast::ExprKind::EXPR_UNARY  -> {
+      let unary_node: *Unary = cast<*Unary>(node);       
+      let unop: *char = string::from_char(unary_node.op);
+      defer { free(unop); }                              
+                                                   
+      output(unop);                                      
+      print_expr(unary_node.operand);                    
+    }
+    ast::ExprKind::EXPR_GROUP  -> {
+      let group_node: *Group = cast<*Group>(node);
+                                            
+      output("(");                                
+      print_expr(group_node.expr);                
+      output(")");                                
+    }
+    _ -> output("Node not found: ", node.type);
+  }
+}
+
+pub const print_stmt -> fn (node: *Stmt) void {
+  if (node == cast<*Stmt>(0)) { return; }
+  
+  switch(node.type) {
+    ast::StmtKind::STMT_PROGRAM -> {
+      let prog_node: *Program = cast<*Program>(node);
+      print_expr(prog_node.nodes);
+    }
+
+    _ -> output("Node not found: ", node.type);
+  }
+
+  output("\n");
+}

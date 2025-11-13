@@ -55,7 +55,6 @@ const char *extract_module_name(const char *content, ArenaAllocator *arena) {
         memcpy(module_name, name_start, name_len);
         module_name[name_len] = '\0';
 
-        fprintf(stderr, "[LSP] Found @module \"%s\"\n", module_name);
         return module_name;
       }
     }
@@ -100,8 +99,6 @@ void scan_file_for_module(LSPServer *server, const char *file_uri,
       // Already registered, update URI
       server->module_registry.entries[i].file_uri =
           arena_strdup(server->arena, file_uri);
-      fprintf(stderr, "[LSP] Updated module '%s' -> %s\n", module_name,
-              file_uri);
       return;
     }
   }
@@ -130,9 +127,6 @@ void scan_file_for_module(LSPServer *server, const char *file_uri,
       &server->module_registry.entries[server->module_registry.count++];
   entry->module_name = arena_strdup(server->arena, module_name);
   entry->file_uri = arena_strdup(server->arena, file_uri);
-
-  fprintf(stderr, "[LSP] Registered module '%s' -> %s\n", module_name,
-          file_uri);
 }
 
 // Recursively scan directory for .lx files
@@ -210,9 +204,6 @@ void scan_directory_recursive(LSPServer *server, const char *dir_path,
 
 // Build module registry by scanning workspace
 void build_module_registry(LSPServer *server, const char *workspace_uri) {
-  fprintf(stderr, "[LSP] Building module registry for workspace: %s\n",
-          workspace_uri);
-
   ArenaAllocator temp_arena;
   arena_allocator_init(&temp_arena, 64 * 1024);
 
@@ -223,10 +214,6 @@ void build_module_registry(LSPServer *server, const char *workspace_uri) {
   }
 
   scan_directory_recursive(server, workspace_path, &temp_arena);
-
-  fprintf(stderr, "[LSP] Module registry built: %zu modules\n",
-          server->module_registry.count);
-
   arena_destroy(&temp_arena);
 }
 
@@ -235,13 +222,10 @@ const char *lookup_module(LSPServer *server, const char *module_name) {
   for (size_t i = 0; i < server->module_registry.count; i++) {
     if (strcmp(server->module_registry.entries[i].module_name, module_name) ==
         0) {
-      fprintf(stderr, "[LSP] Lookup: '%s' -> %s\n", module_name,
-              server->module_registry.entries[i].file_uri);
       return server->module_registry.entries[i].file_uri;
     }
   }
 
-  fprintf(stderr, "[LSP] Lookup: '%s' not found\n", module_name);
   return NULL;
 }
 
@@ -365,7 +349,6 @@ AstNode *parse_imported_module_ast(LSPServer *server, const char *module_uri,
 
   FILE *f = fopen(file_path, "r");
   if (!f) {
-    fprintf(stderr, "[LSP] Failed to open module: %s\n", file_path);
     return NULL;
   }
 
@@ -396,7 +379,6 @@ AstNode *parse_imported_module_ast(LSPServer *server, const char *module_uri,
   AstNode *module_ast = parse(&tokens, arena, config);
 
   if (!module_ast) {
-    fprintf(stderr, "[LSP] Failed to parse imported module: %s\n", file_path);
     return NULL;
   }
 
@@ -415,9 +397,6 @@ void resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config,
   if (!doc || !doc->imports || doc->import_count == 0)
     return;
 
-  fprintf(stderr, "[LSP] Resolving %zu imports for %s\n", doc->import_count,
-          doc->uri);
-
   for (size_t i = 0; i < doc->import_count; i++) {
     ImportedModule *import = &doc->imports[i];
 
@@ -425,13 +404,8 @@ void resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config,
     const char *resolved_uri = lookup_module(server, import->module_path);
 
     if (!resolved_uri) {
-      fprintf(stderr, "[LSP] Module '%s' not found in registry\n",
-              import->module_path);
       continue;
     }
-
-    fprintf(stderr, "[LSP] Resolved '%s' -> %s\n", import->module_path,
-            resolved_uri);
 
     // Parse module and get its AST
     AstNode *module_ast =
@@ -442,8 +416,6 @@ void resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config,
       AstNode **slot = (AstNode **)growable_array_push(imported_modules);
       if (slot) {
         *slot = module_ast;
-        fprintf(stderr, "[LSP] Successfully loaded module: %s (alias: %s)\n",
-                import->module_path, import->alias ? import->alias : "none");
       }
     }
   }

@@ -48,11 +48,11 @@ pub const INVERT: *char        = "\x1b[7m";  // swap fg/bg
 pub const HIDDEN: *char        = "\x1b[8m";  // invisible text
 pub const STRIKETHROUGH: *char = "\x1b[9m";
 
-pub const CLEAR_SCREEN: *char     = "\x1b[2J";
-pub const CLEAR_LINE: *char       = "\x1b[2K";
-pub const CURSOR_HOME: *char      = "\x1b[H";
-pub const CURSOR_HIDE: *char      = "\x1b[?25l";
-pub const CURSOR_SHOW: *char      = "\x1b[?25h";
+pub const CLEAR_SCREEN: *char  = "\x1b[2J";
+pub const CLEAR_LINE: *char    = "\x1b[2K";
+pub const CURSOR_HOME: *char   = "\x1b[H";
+pub const CURSOR_HIDE: *char   = "\x1b[?25l";
+pub const CURSOR_SHOW: *char   = "\x1b[?25h";
 
 pub const SAVE_CURSOR: *char    = "\x1b[s";
 pub const RESTORE_CURSOR: *char = "\x1b[u";

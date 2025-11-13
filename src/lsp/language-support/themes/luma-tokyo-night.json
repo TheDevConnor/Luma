@@ -1,0 +1,156 @@
+{
+  "name": "Luma Tokyo Night",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1a1b26",
+    "editor.foreground": "#a9b1d6",
+    "activityBar.background": "#16161e",
+    "sideBar.background": "#16161e",
+    "statusBar.background": "#16161e"
+  },
+  "tokenColors": [
+    {
+      "name": "Comment",
+      "scope": [
+        "comment.line.double-slash.luma",
+        "comment.block.luma"
+      ],
+      "settings": {
+        "foreground": "#565f89",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Preprocessor Directives",
+      "scope": [
+        "meta.preprocessor.luma",
+        "punctuation.definition.directive.luma",
+        "keyword.control.directive.luma"
+      ],
+      "settings": {
+        "foreground": "#bb9af7"
+      }
+    },
+    {
+      "name": "Function Attributes",
+      "scope": "storage.modifier.attribute.luma",
+      "settings": {
+        "foreground": "#7aa2f7",
+        "fontStyle": "bold italic"
+      }
+    },
+    {
+      "name": "Keywords",
+      "scope": [
+        "keyword.control.luma",
+        "storage.type.luma",
+        "keyword.other.luma"
+      ],
+      "settings": {
+        "foreground": "#bb9af7",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Storage Modifiers",
+      "scope": "storage.modifier.luma",
+      "settings": {
+        "foreground": "#f7768e"
+      }
+    },
+    {
+      "name": "Primitive Types",
+      "scope": "support.type.primitive.luma",
+      "settings": {
+        "foreground": "#2ac3de"
+      }
+    },
+    {
+      "name": "User-defined Types",
+      "scope": "entity.name.type.luma",
+      "settings": {
+        "foreground": "#9ece6a"
+      }
+    },
+    {
+      "name": "Function Names",
+      "scope": "entity.name.function.luma",
+      "settings": {
+        "foreground": "#7aa2f7"
+      }
+    },
+    {
+      "name": "Function Parameters",
+      "scope": "variable.parameter.luma",
+      "settings": {
+        "foreground": "#e0af68"
+      }
+    },
+    {
+      "name": "Strings",
+      "scope": [
+        "string.quoted.double.luma",
+        "string.quoted.single.luma"
+      ],
+      "settings": {
+        "foreground": "#9ece6a"
+      }
+    },
+    {
+      "name": "String Escape Characters",
+      "scope": "constant.character.escape.luma",
+      "settings": {
+        "foreground": "#ff9e64"
+      }
+    },
+    {
+      "name": "Numbers",
+      "scope": [
+        "constant.numeric.integer.luma",
+        "constant.numeric.float.luma"
+      ],
+      "settings": {
+        "foreground": "#ff9e64"
+      }
+    },
+    {
+      "name": "Operators",
+      "scope": [
+        "keyword.operator.arithmetic.luma",
+        "keyword.operator.comparison.luma",
+        "keyword.operator.logical.luma",
+        "keyword.operator.assignment.luma",
+        "keyword.operator.bitwise.luma",
+        "keyword.operator.pointer.luma",
+        "keyword.operator.member.luma"
+      ],
+      "settings": {
+        "foreground": "#89ddff"
+      }
+    },
+    {
+      "name": "Variables",
+      "scope": "variable.other.luma",
+      "settings": {
+        "foreground": "#a9b1d6"
+      }
+    },
+    {
+      "name": "Namespaces",
+      "scope": "entity.name.namespace.luma",
+      "settings": {
+        "foreground": "#73daca"
+      }
+    },
+    {
+      "name": "Punctuation",
+      "scope": [
+        "punctuation.definition.parameters.begin.luma",
+        "punctuation.definition.parameters.end.luma"
+      ],
+      "settings": {
+        "foreground": "#a9b1d6"
+      }
+    }
+  ]
+}

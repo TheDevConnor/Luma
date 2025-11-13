@@ -4,6 +4,7 @@
 #include "../parser/parser.h"
 #include "../typechecker/type.h"
 #include "help.h"
+#include "std_path.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -12,17 +13,16 @@
 #include <sys/types.h>
 
 // Helper function to create directory if it doesn't exist
-bool create_directory(const char *path) {
+// NOTE Replaced with macro
 #ifdef _WIN32
-  return mkdir(path) == 0 || errno == EEXIST;
+#define create_directory(path) (mkdir((path)) == 0 || errno == EEXIST)
 #else
-  return mkdir(path, 0755) == 0 || errno == EEXIST;
+#define create_directory(path) (mkdir((path), 0755) == 0 || errno == EEXIST)
 #endif
-}
 
 void handle_segfault(int sig) {
   (void)sig;
-  fprintf(stderr, "\nSegmentation fault caught during LLVM operations!\n");
+  fprintf(stderr, "\nSegmentation fault!\n");
   fprintf(stderr, "This likely indicates a problem in LLVM IR generation.\n");
   exit(1);
 }
@@ -73,10 +73,30 @@ void save_module_output_files(CodeGenContext *ctx, const char *output_dir) {
   }
 }
 
+// ADD THIS NEW HELPER FUNCTION
+const char *resolve_import_path(const char *path, ArenaAllocator *allocator) {
+  // Check if this is a std/ import
+  if (strncmp(path, "std/", 4) == 0 || strncmp(path, "std\\", 4) == 0) {
+    char resolved_path[1024];
+    if (resolve_std_path(path, resolved_path, sizeof(resolved_path))) {
+      return arena_strdup(allocator, resolved_path);
+    } else {
+      fprintf(stderr, "Error: Could not find standard library file: %s\n",
+              path);
+      fprintf(stderr, "\n");
+      print_std_search_paths();
+      return NULL;
+    }
+  }
+
+  // Not a std/ import, return as-is
+  return path;
+}
+
 // Update your generate_llvm_code_modules function:
 bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
                                 ArenaAllocator *allocator, int *step,
-                                CompileTimer *timer) { // ADD TIMER PARAM
+                                CompileTimer *timer) {
   CodeGenContext *ctx = init_codegen_context(allocator);
   if (!ctx) {
     return false;
@@ -95,14 +115,14 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
   signal(SIGILL, handle_illegal_instruction);
 
   bool success = generate_program_modules(ctx, root, output_dir);
+
   if (!success) {
     fprintf(stderr, "Failed to generate LLVM modules\n");
     cleanup_codegen_context(ctx);
     return false;
   }
 
-  print_progress_with_time(++(*step), 9, "LLVM IR Generation",
-                           timer); // USE TIMER
+  print_progress_with_time(++(*step), 9, "LLVM IR Generation", timer);
 
   if (config.save) {
     save_module_output_files(ctx, output_dir);
@@ -117,19 +137,25 @@ bool generate_llvm_code_modules(AstNode *root, BuildConfig config,
     return false;
   }
 
-  print_progress_with_time(++(*step), 9, "Linking", timer); // USE TIMER
+  print_progress_with_time(++(*step), 9, "Linking", timer);
 
   cleanup_codegen_context(ctx);
   return true;
 }
 
 // Helper function to link all object files in a directory
-bool link_object_files(const char *output_dir, const char *executable_name, int opt_level) {
+bool link_object_files(const char *output_dir, const char *executable_name,
+                       int opt_level) {
   char command[2048];
 
   // Build the linking command with PIE-compatible flags
-  snprintf(command, sizeof(command), "cc -O%d -pie %s/*.o -o %s", 
-         opt_level, output_dir, executable_name);
+  if (opt_level > 0) {
+    snprintf(command, sizeof(command), "cc -O%d -pie %s/*.o -o %s", opt_level,
+             output_dir, executable_name);
+  } else {
+    snprintf(command, sizeof(command), "cc -pie %s/*.o -o %s", output_dir,
+             executable_name);
+  }
 
   int result = system(command);
   if (result != 0) {
@@ -137,8 +163,8 @@ bool link_object_files(const char *output_dir, const char *executable_name, int 
 
     // Try alternative linking approach
     printf("Trying alternative linking approach...\n");
-    snprintf(command, sizeof(command), "gcc -O%d -no-pie %s/*.o -o %s", opt_level, output_dir,
-             executable_name);
+    snprintf(command, sizeof(command), "gcc -O%d -no-pie %s/*.o -o %s",
+             opt_level, output_dir, executable_name);
 
     printf("Alternative linking command: %s\n", command);
     result = system(command);
@@ -153,11 +179,18 @@ bool link_object_files(const char *output_dir, const char *executable_name, int 
   return true;
 }
 
+// UPDATED parse_file_to_module
 Stmt *parse_file_to_module(const char *path, size_t position,
                            ArenaAllocator *allocator, BuildConfig *config) {
-  const char *source = read_file(path);
+  // Resolve the path if it's a std/ import
+  const char *resolved_path = resolve_import_path(path, allocator);
+  if (!resolved_path) {
+    return NULL;
+  }
+
+  const char *source = read_file(resolved_path);
   if (!source) {
-    fprintf(stderr, "Failed to read source file: %s\n", path);
+    fprintf(stderr, "Failed to read source file: %s\n", resolved_path);
     return NULL;
   }
 
@@ -166,7 +199,8 @@ Stmt *parse_file_to_module(const char *path, size_t position,
 
   GrowableArray tokens;
   if (!growable_array_init(&tokens, allocator, MAX_TOKENS, sizeof(Token))) {
-    fprintf(stderr, "Failed to initialize token array for %s.\n", path);
+    fprintf(stderr, "Failed to initialize token array for %s.\n",
+            resolved_path);
     free((void *)source);
     return NULL;
   }
@@ -213,19 +247,18 @@ Stmt *parse_file_to_module(const char *path, size_t position,
     }
 
     char abs_path[4096];
-    const char *file_path_to_store = path;
+    const char *file_path_to_store = resolved_path;
 
 #ifndef _WIN32
-    if (realpath(path, abs_path)) {
+    if (realpath(resolved_path, abs_path)) {
       file_path_to_store = arena_strdup(allocator, abs_path);
     }
 #else
-    if (_fullpath(abs_path, path, sizeof(abs_path))) {
+    if (_fullpath(abs_path, resolved_path, sizeof(abs_path))) {
       file_path_to_store = arena_strdup(allocator, abs_path);
     }
 #endif
 
-    // ... rest of the function, using file_path_to_store instead of path
     module->preprocessor.module.file_path = file_path_to_store;
 
     // Restore config
@@ -240,11 +273,18 @@ Stmt *parse_file_to_module(const char *path, size_t position,
   return NULL;
 }
 
+// UPDATED lex_and_parse_file
 AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
                             BuildConfig *config) {
-  const char *source = read_file(path);
+  // Resolve the path if it's a std/ import
+  const char *resolved_path = resolve_import_path(path, allocator);
+  if (!resolved_path) {
+    return NULL;
+  }
+
+  const char *source = read_file(resolved_path);
   if (!source) {
-    fprintf(stderr, "Failed to read source file: %s\n", path);
+    fprintf(stderr, "Failed to read source file: %s\n", resolved_path);
     return NULL;
   }
 
@@ -253,7 +293,8 @@ AstNode *lex_and_parse_file(const char *path, ArenaAllocator *allocator,
 
   GrowableArray tokens;
   if (!growable_array_init(&tokens, allocator, MAX_TOKENS, sizeof(Token))) {
-    fprintf(stderr, "Failed to initialize token array for %s.\n", path);
+    fprintf(stderr, "Failed to initialize token array for %s.\n",
+            resolved_path);
     free((void *)source);
     return NULL;
   }
@@ -332,6 +373,8 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (!combined_program)
     goto cleanup;
 
+  // print_ast(combined_program, "", false, false);
+
   // Stage 4: Typechecking
   print_progress_with_time(++step, total_stages, "Typechecking", &timer);
 
@@ -347,7 +390,10 @@ bool run_build(BuildConfig config, ArenaAllocator *allocator) {
   if (tc) {
     // Stage 6: LLVM IR
     print_progress_with_time(++step, total_stages, "LLVM IR", &timer);
-
+    if (!combined_program || combined_program->type != AST_PROGRAM) {
+      fprintf(stderr, "ERROR: Invalid program node before codegen\n");
+      goto cleanup;
+    }
     success = generate_llvm_code_modules(combined_program, config, allocator,
                                          &step, &timer);
   }
