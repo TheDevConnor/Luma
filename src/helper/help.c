@@ -105,7 +105,6 @@ int print_help() {
   printf("  This mode is used by editors/IDEs for:\n");
   printf("    - Code completion\n");
   printf("    - Hover information\n");
-  printf("    - Go to definition\n");
   printf("    - Real-time diagnostics\n");
   printf("    - Document symbols\n");
 
@@ -118,7 +117,7 @@ int print_help() {
  * @return Always returns 0.
  */
 int print_version() {
-  printf("Luma Compiler v1.0\n");
+  printf("Luma Compiler %s\n", Luma_Compiler_version);
   return 0;
 }
 

@@ -63,7 +63,7 @@ const Status -> enum {
     Pending,
 };
 
-const main -> fn () int {
+pub const main -> fn () int {
     let origin: Point = Point { x: 0, y: 0 };
     let destination: Point = Point { x: 3, y: 4 };
     let current_status: Status = Status::Active;
@@ -100,7 +100,7 @@ Luma provides a straightforward type system with both primitive and compound typ
 | Type | Description | Size |
 |------|-------------|------|
 | `int` | Signed integer | 64-bit |
-| `uint` | Unsigned integer | 64-bit |
+| `uint` | Unsigned integer | 64-bit | (not yet added)
 | `float` | Floating point | 32-bit |
 | `double` | Floating point | 64-bit |
 | `bool` | Boolean | 1 byte |
@@ -160,7 +160,7 @@ const player: Player = Player {
 
 ---
 
-## Generics
+## Generics (Not yet supported)
 
 Luma supports generic programming through templates, enabling you to write code that works with multiple types while maintaining type safety and zero-cost abstractions.
 
