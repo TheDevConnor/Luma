@@ -147,7 +147,7 @@ If you see this error, the compiler couldn't find the requested `std/` file.
 
 To see which paths are being searched:
 ```bash
-luma your_file.luma
+luma your_file.lx
 # If std/ import fails, search paths will be displayed
 ```
 

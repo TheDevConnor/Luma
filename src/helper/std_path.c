@@ -1,8 +1,3 @@
-/**
- * @file std_path.c
- * @brief Implementation of standard library path resolution
- */
-
 #include "std_path.h"
 
 bool file_exists(const char *path) {
@@ -28,10 +23,9 @@ const char *normalize_std_import(const char *path) {
 
 bool get_system_std_path(char *buffer, size_t buffer_size) {
 #if defined(__MINGW32__) || defined(_WIN32)
-  // Windows: C:\Program Files\luma\std\
-    char program_files[MAX_PATH];
-  if (SHGetFolderPathA(NULL, CSIDL_PROGRAM_FILES, NULL, 0, program_files) !=
-      S_OK) {
+  char program_files[MAX_PATH];
+  // Windows: C:\Program Files\luma\std
+  if (SHGetFolderPathA(NULL, CSIDL_PROGRAM_FILES, NULL, 0, program_files) != S_OK) {
     return false;
   }
   snprintf(buffer, buffer_size, "%s\\luma\\std", program_files);
@@ -44,8 +38,8 @@ bool get_system_std_path(char *buffer, size_t buffer_size) {
 
 bool get_user_std_path(char *buffer, size_t buffer_size) {
 #if defined(__MINGW32__) || defined(_WIN32)
-  // Windows: %USERPROFILE%\.luma\std\
-    char *userprofile = getenv("USERPROFILE");
+  char *userprofile = getenv("USERPROFILE");
+  // Windows: %USERPROFILE%\.luma\std
   if (!userprofile) {
     return false;
   }
@@ -89,7 +83,6 @@ bool resolve_std_path(const char *import_path, char *buffer,
   // Try both .lx and .luma extensions
   const char *extensions[] = {with_extension, NULL};
   char alt_extension[512];
-
   // If we used .lx, also try .luma as fallback
   if (ext == NULL || (strcmp(ext, ".lx") != 0 && strcmp(ext, ".luma") != 0)) {
     snprintf(alt_extension, sizeof(alt_extension), "%s.luma", normalized);
@@ -138,7 +131,6 @@ bool resolve_std_path(const char *import_path, char *buffer,
 // Helper function to print search paths for debugging
 void print_std_search_paths(void) {
   char path[1024];
-
   fprintf(stderr, "Standard library search paths:\n");
 
   if (get_system_std_path(path, sizeof(path))) {
