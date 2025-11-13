@@ -1,0 +1,15 @@
+<map id="src/c_libs/memory/memory.c" name="src/c_libs/memory/memory.c">
+<area shape="rect" id="Node000001" title="Implementation of arena allocator and growable array utilities." alt="" coords="155,5,364,31"/>
+<area shape="rect" id="Node000002" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="115,79,201,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="245,33,187,73,184,68,242,28"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="226,79,293,104"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="262,31,262,65,257,65,257,31"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="317,79,388,104"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="276,29,328,68,325,72,273,33"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="5,152,92,177"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="142,106,80,147,77,142,139,102"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="117,152,199,177"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="161,104,161,138,155,138,155,104"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="223,152,298,177"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="176,102,234,142,231,146,173,106"/>
+</map>

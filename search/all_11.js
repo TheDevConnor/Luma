@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['range_0',['range',['../structLSPLocation.html#a9a17f44239027c9ff4993f715cd7e76e',1,'LSPLocation::range'],['../structLSPDiagnostic.html#aa5399b57862bb62491f230bc8f17ecb4',1,'LSPDiagnostic::range'],['../structLSPDocumentSymbol.html#a5d7871b46fa691ff9bb8b3312a5eb9f5',1,'LSPDocumentSymbol::range']]],
+  ['range_5fcontains_1',['range_contains',['../llvm_8h.html#a933a0e6c90bdf8fe473f051f0093f253',1,'range_contains(CodeGenContext *ctx, LLVMValueRef range_struct, LLVMValueRef value):&#160;expr.c'],['../llvm_2expr_8c.html#a933a0e6c90bdf8fe473f051f0093f253',1,'range_contains(CodeGenContext *ctx, LLVMValueRef range_struct, LLVMValueRef value):&#160;expr.c']]],
+  ['range_5flength_2',['range_length',['../llvm_8h.html#a08f48894913d51d99fa18fbe6f76963a',1,'range_length(CodeGenContext *ctx, LLVMValueRef range_struct):&#160;expr.c'],['../llvm_2expr_8c.html#a08f48894913d51d99fa18fbe6f76963a',1,'range_length(CodeGenContext *ctx, LLVMValueRef range_struct):&#160;expr.c']]],
+  ['read_5ffile_3',['read_file',['../help_8h.html#aa4f0c09d1bcf5d6f283154e140012ab8',1,'read_file(const char *filename):&#160;help.c'],['../help_8c.html#aa4f0c09d1bcf5d6f283154e140012ab8',1,'read_file(const char *filename):&#160;help.c']]],
+  ['red_4',['RED',['../color_8h.html#a27f5724b69dc6b891012559b0216c617',1,'color.h']]],
+  ['register_5fmodule_5',['register_module',['../module_8c.html#ab0e748286ccde2d79e411e0e74e6cdf1',1,'register_module(Scope *global_scope, const char *module_name, Scope *module_scope, ArenaAllocator *arena):&#160;module.c'],['../type_8h.html#ab0e748286ccde2d79e411e0e74e6cdf1',1,'register_module(Scope *global_scope, const char *module_name, Scope *module_scope, ArenaAllocator *arena):&#160;module.c']]],
+  ['report_5flexer_5ferror_6',['report_lexer_error',['../lexer_8c.html#a3db6562311facfb208b9e4a650871e57',1,'report_lexer_error(Lexer *lx, const char *error_type, const char *file, const char *msg, const char *line_text, int line, int col, int tk_length):&#160;lexer.c'],['../lexer_8h.html#a3db6562311facfb208b9e4a650871e57',1,'report_lexer_error(Lexer *lx, const char *error_type, const char *file, const char *msg, const char *line_text, int line, int col, int tk_length):&#160;lexer.c']]],
+  ['reported_7',['reported',['../structStaticAllocation.html#a52c2cd8c8758dc1427c938e6610ed2ca',1,'StaticAllocation']]],
+  ['resolution_8',['resolution',['../structAstNode.html#ac48172fcd5adeb9991dadbab24283232',1,'AstNode']]],
+  ['resolution_5ftype_9',['resolution_type',['../parser_2type_8c.html#a420ef8c1534dbf9c027393bb3ce9bcbe',1,'type.c']]],
+  ['resolve_5fimport_5fpath_10',['resolve_import_path',['../run_8c.html#a262c75b862caade5dcb806b76b6d8d83',1,'run.c']]],
+  ['resolve_5fimports_11',['resolve_imports',['../lsp__module_8c.html#afbfe0d347f0987bb3511e5c7f04f0b86',1,'resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config, GrowableArray *imported_modules):&#160;lsp_module.c'],['../lsp_8h.html#afbfe0d347f0987bb3511e5c7f04f0b86',1,'resolve_imports(LSPServer *server, LSPDocument *doc, BuildConfig *config, GrowableArray *imported_modules):&#160;lsp_module.c']]],
+  ['resolve_5fmodule_5fpath_12',['resolve_module_path',['../lsp__module_8c.html#adc40dda9fce28f0036ab061d4d7bfcac',1,'lsp_module.c']]],
+  ['resolve_5fstd_5fpath_13',['resolve_std_path',['../std__path_8h.html#a554db746610760a873f901bfa9af3534',1,'resolve_std_path(const char *import_path, char *buffer, size_t buffer_size):&#160;std_path.c'],['../std__path_8c.html#a554db746610760a873f901bfa9af3534',1,'resolve_std_path(const char *import_path, char *buffer, size_t buffer_size):&#160;std_path.c']]],
+  ['responsibilities_14',['Responsibilities',['../main_8c.html#autotoc_md3',1,'']]],
+  ['return_5fstmt_15',['return_stmt',['../structAstNode.html#af905dbaf090d20d73eb3b260c85356f1',1,'AstNode::return_stmt'],['../parser_8h.html#a65feab14f178a93af29954494842495c',1,'return_stmt(Parser *parser):&#160;stmt.c'],['../parser_2stmt_8c.html#a65feab14f178a93af29954494842495c',1,'return_stmt(Parser *parser):&#160;stmt.c']]],
+  ['return_5ftype_16',['return_type',['../structAstNode.html#ac21f8206e8f2802d54c408dcdc917cae',1,'AstNode']]],
+  ['returns_5fownership_17',['returns_ownership',['../structAstNode.html#a827800e3317ed1e73b81add78f7b25e5',1,'AstNode::returns_ownership'],['../structSymbol.html#aed7c894ddc3f95c42f72c847b7073499',1,'Symbol::returns_ownership'],['../structScope.html#aebf440690841ebef8a8d0fd1bc12f5b3',1,'Scope::returns_ownership']]],
+  ['right_18',['right',['../structAstNode.html#ada613e942c8c4a026e5b921a7ae5d531',1,'AstNode']]],
+  ['run_2ec_19',['run.c',['../run_8c.html',1,'']]],
+  ['run_5fbuild_20',['run_build',['../help_8h.html#ab11d8698b67e1659da80c5d6a4eeae15',1,'run_build(BuildConfig config, ArenaAllocator *allocator):&#160;run.c'],['../run_8c.html#ab11d8698b67e1659da80c5d6a4eeae15',1,'run_build(BuildConfig config, ArenaAllocator *allocator):&#160;run.c']]],
+  ['run_5fformatter_21',['run_formatter',['../help_8c.html#aa246059fb136d8b076b1ff89b724e61f',1,'run_formatter(BuildConfig config, ArenaAllocator *allocator):&#160;help.c'],['../help_8h.html#aa246059fb136d8b076b1ff89b724e61f',1,'run_formatter(BuildConfig config, ArenaAllocator *allocator):&#160;help.c']]],
+  ['runtime_5ferror_22',['RUNTIME_ERROR',['../help_8h.html#a59e56af19e754a6aa26a612ebf91d05fa1e1e25ce9bc82ccfb34ba5e61e435cfa',1,'help.h']]]
+];

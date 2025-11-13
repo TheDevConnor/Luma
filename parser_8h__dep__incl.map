@@ -1,0 +1,35 @@
+<map id="src/parser/parser.h" name="src/parser/parser.h">
+<area shape="rect" id="Node000001" title="Recursive descent and Pratt parser for the Zura language." alt="" coords="1033,5,1176,31"/>
+<area shape="rect" id="Node000002" href="$run_8c.html" title=" " alt="" coords="610,79,733,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="1022,36,733,83,732,77,1021,30"/>
+<area shape="rect" id="Node000003" href="$lsp_8h.html" title="Language Server Protocol implementation for Luma language." alt="" coords="757,79,855,104"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="1044,36,855,81,854,76,1043,31"/>
+<area shape="rect" id="Node000013" href="$parser_2expr_8c.html" title="Expression parsing implementation for the programming language compiler." alt="" coords="880,79,1009,104"/>
+<area shape="poly" id="edge12_Node000001_Node000013" title=" " alt="" coords="1068,39,972,81,970,76,1066,34"/>
+<area shape="rect" id="Node000014" href="$parser_8c.html" title="Implementation of the parser module for the programming language compiler." alt="" coords="1034,79,1175,104"/>
+<area shape="poly" id="edge13_Node000001_Node000014" title=" " alt="" coords="1107,44,1107,79,1102,79,1102,44"/>
+<area shape="rect" id="Node000015" href="$parser__utils_8c.html" title="Utility functions for the parser module." alt="" coords="1200,79,1377,104"/>
+<area shape="poly" id="edge14_Node000001_Node000015" title=" " alt="" coords="1148,33,1260,76,1258,81,1146,38"/>
+<area shape="rect" id="Node000016" href="$parser_2stmt_8c.html" title="Statement parsing implementation for the programming language compiler." alt="" coords="1402,79,1533,104"/>
+<area shape="poly" id="edge15_Node000001_Node000016" title=" " alt="" coords="1177,31,1409,76,1408,81,1176,36"/>
+<area shape="rect" id="Node000017" href="$parser_2type_8c.html" title=" " alt="" coords="1557,79,1687,104"/>
+<area shape="poly" id="edge16_Node000001_Node000017" title=" " alt="" coords="1190,28,1545,76,1557,78,1556,83,1544,81,1190,33"/>
+<area shape="rect" id="Node000004" href="$help_8c.html" title="Implements command&#45;line argument parsing, file reading, help/version/license printing,..." alt="" coords="5,152,135,177"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="743,107,575,125,444,132,313,140,148,155,135,156,135,151,147,149,313,134,443,127,575,119,743,101"/>
+<area shape="rect" id="Node000005" href="$lsp__diagnostics_8c.html" title=" " alt="" coords="159,152,338,177"/>
+<area shape="poly" id="edge4_Node000003_Node000005" title=" " alt="" coords="743,107,338,156,338,151,742,101"/>
+<area shape="rect" id="Node000006" href="$lsp__document_8c.html" title=" " alt="" coords="362,152,533,177"/>
+<area shape="poly" id="edge5_Node000003_Node000006" title=" " alt="" coords="744,108,506,155,505,149,743,102"/>
+<area shape="rect" id="Node000007" href="$lsp__features_8c.html" title=" " alt="" coords="557,152,716,177"/>
+<area shape="poly" id="edge6_Node000003_Node000007" title=" " alt="" coords="767,112,665,154,663,149,765,107"/>
+<area shape="rect" id="Node000008" href="$lsp__json_8c.html" title=" " alt="" coords="740,152,872,177"/>
+<area shape="poly" id="edge7_Node000003_Node000008" title=" " alt="" coords="809,118,809,152,803,152,803,118"/>
+<area shape="rect" id="Node000009" href="$lsp__message_8c.html" title=" " alt="" coords="896,152,1060,177"/>
+<area shape="poly" id="edge8_Node000003_Node000009" title=" " alt="" coords="847,107,951,149,949,154,845,112"/>
+<area shape="rect" id="Node000010" href="$lsp__module_8c.html" title=" " alt="" coords="1085,152,1239,177"/>
+<area shape="poly" id="edge9_Node000003_Node000010" title=" " alt="" coords="869,103,1105,149,1104,155,868,108"/>
+<area shape="rect" id="Node000011" href="$lsp__server_8c.html" title="Language Server Protocol implementation with type error diagnostics." alt="" coords="1264,152,1409,177"/>
+<area shape="poly" id="edge10_Node000003_Node000011" title=" " alt="" coords="870,101,1063,127,1252,149,1264,151,1263,156,1251,155,1062,132,869,107"/>
+<area shape="rect" id="Node000012" href="$main_8c.html" title="Entry point for the Luma compiler/interpreter build process." alt="" coords="1433,152,1523,177"/>
+<area shape="poly" id="edge11_Node000003_Node000012" title=" " alt="" coords="869,101,1026,117,1148,124,1269,132,1422,149,1433,151,1432,156,1422,155,1269,137,1148,130,1025,123,869,106"/>
+</map>

@@ -1,0 +1,27 @@
+var searchData=
+[
+  ['identifier_0',['identifier',['../structAstNode.html#a72b3de2c66375026ef565f03844e517e',1,'AstNode']]],
+  ['if_5fstmt_1',['if_stmt',['../structAstNode.html#ae5ec555d34d105c534d1180a58a282d6',1,'AstNode']]],
+  ['impl_5fstmt_2',['impl_stmt',['../structAstNode.html#a8534d2d8df047af224b28039c6d31cd3',1,'AstNode']]],
+  ['import_5fcount_3',['import_count',['../structLSPDocument.html#a2b2dbb34f2025e1eaf0703095bd455a4',1,'LSPDocument']]],
+  ['imported_5fmodules_4',['imported_modules',['../structScope.html#a07e4d1efeeb4bc7aa3d4abd3e8fc1250',1,'Scope']]],
+  ['imports_5',['imports',['../structLSPDocument.html#a41a96d8237089ab1adf388ee88d6ee25',1,'LSPDocument']]],
+  ['indent_5fsize_6',['indent_size',['../structFormatterConfig.html#a99bc588c124344ceb94d22dd29dbef0c',1,'FormatterConfig']]],
+  ['index_7',['index',['../structAstNode.html#a719cd65c6c80a62a253aa09315c6092f',1,'AstNode::index'],['../structAstNode.html#a91fd07d9eeaea38dcb14c1e837ac4f7c',1,'AstNode::index']]],
+  ['init_5fcount_8',['init_count',['../structAstNode.html#a6a976bac4607506d3b6001764d36f685',1,'AstNode']]],
+  ['initialized_9',['initialized',['../structLSPServer.html#a2a8922c9349c328e25ae2f85d6182d5d',1,'LSPServer']]],
+  ['initializer_10',['initializer',['../structAstNode.html#ad25770963e7bc12691787bd59fc7fb84',1,'AstNode::initializer'],['../structAstNode.html#af9d3c6fe16e650baa3159e19439dbbb3',1,'AstNode::initializer']]],
+  ['input_11',['input',['../structAstNode.html#af7edf9d402af35c7169c1e25572e47d2',1,'AstNode']]],
+  ['insert_5ftext_12',['insert_text',['../structLSPCompletionItem.html#a0f711b63030f0c073af376cf1d5230ca',1,'LSPCompletionItem']]],
+  ['int_5fval_13',['int_val',['../structAstNode.html#a89cc8900c4efb1c997f902dcf68622c5',1,'AstNode']]],
+  ['is_5fcompiletime_14',['is_compiletime',['../structAstNode.html#a25a31b3217d8baba9be9bf8678f04e8c',1,'AstNode']]],
+  ['is_5fcontinue_15',['is_continue',['../structAstNode.html#a6a4b5c20696d1532b32f048775a7c15a',1,'AstNode']]],
+  ['is_5ffunction_16',['is_function',['../structLLVM__Symbol.html#a0d75701d21a8a92bd141476aa0a6d235',1,'LLVM_Symbol']]],
+  ['is_5ffunction_5fscope_17',['is_function_scope',['../structScope.html#afb8e1118246074c80b7a2c77c6d7674d',1,'Scope']]],
+  ['is_5fmain_5fmodule_18',['is_main_module',['../structModuleCompilationUnit.html#a241b38632cf5d42c1a585985f0cec23a',1,'ModuleCompilationUnit']]],
+  ['is_5fmodule_5fscope_19',['is_module_scope',['../structScope.html#a97aede7a5a13f0d21e83999e7008208c',1,'Scope']]],
+  ['is_5fmutable_20',['is_mutable',['../structAstNode.html#a282d5cd9e3d6af53e11c5f1bcfdec226',1,'AstNode::is_mutable'],['../structSymbol.html#a5334dae4aa73c33e0ccf675da67d22c9',1,'Symbol::is_mutable']]],
+  ['is_5fpublic_21',['is_public',['../structAstNode.html#afba7feda394bab058c1947a6ae14a677',1,'AstNode::is_public'],['../structStructInfo.html#a632f67be072d6136f21be4e635ab2187',1,'StructInfo::is_public'],['../structSymbol.html#a109791f1eab626e64fe6c3e455558399',1,'Symbol::is_public']]],
+  ['is_5ftype_22',['is_type',['../structAstNode.html#a2a51bc33a0217bf90b0267c65fad6619',1,'AstNode']]],
+  ['item_5fsize_23',['item_size',['../structGrowableArray.html#a95d11f2d7b0ef80bfd6636350a5427f7',1,'GrowableArray']]]
+];

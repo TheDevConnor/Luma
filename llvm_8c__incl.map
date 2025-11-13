@@ -1,0 +1,49 @@
+<map id="src/llvm/llvm.c" name="src/llvm/llvm.c">
+<area shape="rect" id="Node000001" title=" " alt="" coords="897,5,1016,31"/>
+<area shape="rect" id="Node000002" href="$llvm_8h.html" title=" " alt="" coords="880,79,943,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="951,32,928,69,924,66,947,30"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="5,152,180,177"/>
+<area shape="poly" id="edge25_Node000001_Node000008" title=" " alt="" coords="898,32,175,152,174,147,897,27"/>
+<area shape="rect" id="Node000019" title=" " alt="" coords="967,79,1037,104"/>
+<area shape="poly" id="edge26_Node000001_Node000019" title=" " alt="" coords="966,30,990,66,985,69,962,32"/>
+<area shape="rect" id="Node000020" title=" " alt="" coords="1062,79,1147,104"/>
+<area shape="poly" id="edge27_Node000001_Node000020" title=" " alt="" coords="982,28,1069,70,1067,75,979,33"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="1379,152,1513,177"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="943,99,956,101,1069,119,1158,129,1365,149,1365,154,1158,134,1068,125,955,107,942,104"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="1538,152,1674,177"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="943,99,956,101,1113,123,1237,131,1363,136,1525,149,1524,155,1363,141,1237,136,1112,128,955,107,942,104"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="1698,152,1807,177"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="943,99,956,101,1065,116,1158,125,1317,131,1478,133,1573,139,1684,149,1684,155,1573,144,1478,139,1317,136,1157,130,1064,122,955,107,942,104"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="205,152,391,177"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="880,99,405,154,405,148,879,94"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="416,152,535,177"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="880,100,549,154,548,149,880,95"/>
+<area shape="poly" id="edge7_Node000002_Node000008" title=" " alt="" coords="880,98,603,119,194,155,194,149,602,113,880,92"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="559,152,675,177"/>
+<area shape="poly" id="edge8_Node000002_Node000009" title=" " alt="" coords="880,103,678,151,676,146,879,98"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="695,372,781,397"/>
+<area shape="poly" id="edge9_Node000002_Node000010" title=" " alt="" coords="896,106,870,127,844,154,810,208,782,265,748,360,743,358,777,263,805,205,840,150,866,123,892,102"/>
+<area shape="rect" id="Node000011" title=" " alt="" coords="1003,372,1086,397"/>
+<area shape="poly" id="edge10_Node000002_Node000011" title=" " alt="" coords="940,102,993,128,1058,170,1091,197,1122,227,1148,260,1168,298,1172,311,1170,324,1155,344,1129,360,1100,372,1098,367,1127,355,1151,340,1165,322,1166,311,1164,300,1144,263,1118,230,1088,201,1055,174,990,133,937,106"/>
+<area shape="rect" id="Node000012" title=" " alt="" coords="1083,299,1153,324"/>
+<area shape="poly" id="edge11_Node000002_Node000012" title=" " alt="" coords="927,102,984,153,1055,224,1104,286,1100,289,1051,227,980,157,923,106"/>
+<area shape="rect" id="Node000013" title=" " alt="" coords="1193,152,1259,177"/>
+<area shape="poly" id="edge12_Node000002_Node000013" title=" " alt="" coords="944,98,956,101,1180,151,1179,156,955,107,942,104"/>
+<area shape="rect" id="Node000014" title=" " alt="" coords="1284,152,1355,177"/>
+<area shape="poly" id="edge13_Node000002_Node000014" title=" " alt="" coords="944,99,956,101,1042,117,1111,126,1181,135,1271,149,1270,155,1180,140,1110,131,1041,122,955,107,942,104"/>
+<area shape="rect" id="Node000015" href="$ast_8h.html" title=" " alt="" coords="866,152,957,177"/>
+<area shape="poly" id="edge14_Node000002_Node000015" title=" " alt="" coords="914,104,914,138,909,138,909,104"/>
+<area shape="rect" id="Node000017" href="$memory_8h.html" title="Arena allocator and growable array utilities for fast memory management." alt="" coords="809,299,1008,324"/>
+<area shape="poly" id="edge24_Node000002_Node000017" title=" " alt="" coords="896,106,874,126,856,153,852,171,851,189,859,225,875,259,893,286,888,289,870,261,854,227,846,189,846,170,852,151,870,123,893,102"/>
+<area shape="poly" id="edge15_Node000015_Node000011" title=" " alt="" coords="958,175,997,193,1016,207,1031,224,1047,257,1053,294,1054,329,1052,359,1046,358,1049,329,1048,295,1042,259,1026,227,1012,211,995,198,956,180"/>
+<area shape="rect" id="Node000016" title=" " alt="" coords="831,372,906,397"/>
+<area shape="poly" id="edge16_Node000015_Node000016" title=" " alt="" coords="898,179,847,228,820,261,800,300,797,311,800,323,816,345,837,362,833,366,812,348,796,325,792,311,796,298,816,259,843,224,894,176"/>
+<area shape="poly" id="edge17_Node000015_Node000017" title=" " alt="" coords="909,178,894,226,894,257,902,285,896,287,889,257,889,225,904,177"/>
+<area shape="rect" id="Node000018" href="$lexer_8h.html" title="Tokenizer (lexer) definitions and API for lexical analysis of source code." alt="" coords="903,225,1016,251"/>
+<area shape="poly" id="edge21_Node000015_Node000018" title=" " alt="" coords="921,176,946,213,942,216,917,179"/>
+<area shape="poly" id="edge18_Node000017_Node000010" title=" " alt="" coords="882,326,779,369,777,364,880,322"/>
+<area shape="poly" id="edge19_Node000017_Node000011" title=" " alt="" coords="932,322,1012,363,1009,368,929,326"/>
+<area shape="poly" id="edge20_Node000017_Node000016" title=" " alt="" coords="904,326,884,361,880,359,900,323"/>
+<area shape="poly" id="edge23_Node000018_Node000012" title=" " alt="" coords="986,248,1081,291,1079,295,984,253"/>
+<area shape="poly" id="edge22_Node000018_Node000017" title=" " alt="" coords="953,253,927,289,923,286,949,249"/>
+</map>

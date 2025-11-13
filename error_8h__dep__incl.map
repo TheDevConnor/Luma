@@ -1,0 +1,21 @@
+<map id="src/c_libs/error/error.h" name="src/c_libs/error/error.h">
+<area shape="rect" id="Node000001" title="Error reporting utilities for lexer and parser diagnostics." alt="" coords="725,5,888,31"/>
+<area shape="rect" id="Node000002" href="$c__libs_2error_2error_8c.html" title="Implementation of error reporting and diagnostics functions." alt="" coords="5,86,168,111"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="712,28,470,47,325,63,180,81,139,89,138,83,180,76,325,57,470,42,712,23"/>
+<area shape="rect" id="Node000003" href="$run_8c.html" title=" " alt="" coords="192,86,315,111"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="712,30,533,50,327,81,295,89,294,83,326,76,532,45,711,25"/>
+<area shape="rect" id="Node000004" href="$lexer_8c.html" title="Implements the lexical analysis functions for tokenizing source code." alt="" coords="339,86,461,111"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="720,36,474,81,443,89,442,83,473,76,720,30"/>
+<area shape="rect" id="Node000005" href="$formatter_8c.html" title=" " alt="" coords="486,86,693,111"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="763,38,622,88,620,83,761,33"/>
+<area shape="rect" id="Node000006" href="$lsp__diagnostics_8c.html" title=" " alt="" coords="717,86,896,111"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="809,44,809,86,804,86,804,44"/>
+<area shape="rect" id="Node000007" href="$lsp__document_8c.html" title=" " alt="" coords="920,86,1091,111"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="849,33,977,83,975,88,847,38"/>
+<area shape="rect" id="Node000008" href="$parser_8c.html" title="Implementation of the parser module for the programming language compiler." alt="" coords="1115,86,1256,111"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="879,31,1103,76,1137,83,1135,89,1102,81,878,36"/>
+<area shape="rect" id="Node000009" href="$typechecker_2error_8c.html" title=" " alt="" coords="1281,86,1450,111"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="902,27,1073,48,1268,76,1310,83,1309,89,1268,81,1072,53,901,32"/>
+<area shape="rect" id="Node000010" href="$static__mem__tracker_8c.html" title=" " alt="" coords="1474,79,1638,119"/>
+<area shape="poly" id="edge9_Node000001_Node000010" title=" " alt="" coords="902,22,1156,41,1310,57,1463,76,1474,78,1473,83,1462,81,1309,62,1156,47,902,27"/>
+</map>
