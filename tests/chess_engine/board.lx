@@ -1,0 +1,343 @@
+@module "board"
+
+@use "string" as string
+@use "piece" as piece
+
+pub const Move -> struct {
+  from_col: int,
+  from_row: int,
+  to_col: int,
+  to_row: int
+};
+
+pub const Board -> struct {
+  starting_fen: *char,
+  length_fen: int,
+  squares: *char,
+
+  white_can_castle_kingside:  int,
+  white_can_castle_queenside: int,
+  black_can_castle_kingside:  int,
+  black_can_castle_queenside: int,
+};
+
+#returns_ownership
+pub const init_board -> fn (bd: *Board) *Board {
+  bd.squares = cast<*char>(alloc(8 * sizeof<*char>));
+
+  // Initialize the chess board with starting positions
+  bd.starting_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+  bd.length_fen = string::strlen(bd.starting_fen);
+
+  bd.white_can_castle_kingside  = 1;
+  bd.white_can_castle_queenside = 1;
+  bd.black_can_castle_kingside  = 1;
+  bd.black_can_castle_queenside = 1;
+
+  loop [i: int = 0, row: int = 0, col: int = 0](i < bd.length_fen) : (++i) {
+    let c: char = bd.starting_fen[i];
+    if (c == '/') {
+      row = row + 1;
+      col = 0;
+    } elif (c >= '1' && c <= '8') {
+      let empty_squares: int = cast<int>(c - '0');
+      loop [j: int = 0](j < empty_squares) : (++j) {
+        bd.squares[row * 8 + col] = '.';
+        col = col + 1;
+      }
+    } else {
+      bd.squares[row * 8 + col] = c;
+      col = col + 1;
+    }
+  }
+
+  return bd;
+}
+
+pub const parse_move -> fn (mv: *Move, move: *char) *Move {
+  let from_col: char = move[0];
+  let from_row: char = move[1];
+  let to_col: char = move[2];
+  let to_row: char = move[3];
+
+  mv.from_col = cast<int>(from_col) - cast<int>('a');
+  mv.from_row = 7 - (cast<int>(from_row) - cast<int>('1'));  
+  mv.to_col = cast<int>(to_col) - cast<int>('a');
+  mv.to_row = 7 - (cast<int>(to_row) - cast<int>('1'));      
+
+  return mv;
+}
+
+pub const validate_pawn_path -> fn (bd: *Board, mv: *Move, dr: int, dc: int) int {
+  if (dc == 0 && (dr == -2 || dr == 2)) {
+    let mid_row: int = (mv.from_row + mv.to_row) / 2;
+    let mid: char = bd.squares[mid_row * 8 + mv.from_col];
+    if (mid != '.') { return 0; } 
+  }
+  return 1;
+}
+
+pub const is_path_clear -> fn (bd: *Board, mv: *Move) int {
+  let dc: int = mv.to_col - mv.from_col;
+  let dr: int = mv.to_row - mv.from_row;
+  
+  let step_c: int;
+  if (dc == 0) { step_c = 0;
+  } elif (dc > 0) { step_c = 1;
+  } else { step_c = -1; }
+  
+  let step_r: int;
+  if (dr == 0) { step_r = 0;
+  } elif (dr > 0) { step_r = 1;
+  } else { step_r = -1; }
+  
+  let curr_col: int = mv.from_col + step_c;
+  let curr_row: int = mv.from_row + step_r;
+  
+  loop (curr_col != mv.to_col || curr_row != mv.to_row) {
+    if (bd.squares[curr_row * 8 + curr_col] != '.') {
+      return 0;
+    }
+
+    curr_col = curr_col + step_c;
+    curr_row = curr_row + step_r;
+  }
+  
+  return 1;
+}
+
+pub const is_move_legal -> fn (rule: *PieceRules, bd: *Board, mv: *Move) int {
+  let dc: int = mv.to_col - mv.from_col;
+  let dr: int = mv.to_row - mv.from_row;
+  if (piece::can_move_direction(rule, dc, dr) == 0) { return 0; }
+  if (rule.can_slide == 1 && rule.can_jump == 0) {
+    if (is_path_clear(bd, mv) == 0) { return 0; }
+  }
+  return 1;
+}
+
+pub const is_king_in_check -> fn (bd: *Board, is_white: int) int {
+  let king_char: char; 
+  if (is_white == 1) { king_char = 'K'; } 
+  else { king_char = 'k'; }
+  
+  let king_row: int = -1;
+  let king_col: int = -1;
+
+  // Find the king position
+  loop [i: int = 0](i < 64) : (++i) {
+    if (bd.squares[i] == king_char) {
+      king_row = i / 8;
+      king_col = i % 8;
+      break;
+    }
+  }
+
+  if (king_row == -1) {
+    // Should never happen unless the king was captured (illegal position)
+    output("Error: King not found on board!\n");
+    return 1;
+  }
+
+  loop [i: int = 0](i < 64) : (++i) {
+    let ch: char = bd.squares[i];
+    if (ch == '.') { continue; }
+
+    // Skip same color pieces
+    if (is_white == 1 && piece::is_white_piece(ch) == 1) { continue; }
+    if (is_white == 0 && piece::is_black_piece(ch) == 1) { continue; }
+
+    let rule: *PieceRules = piece::get_rules(ch);
+    if (rule == cast<*PieceRules>(0)) { continue; }
+
+    let from_row: int = i / 8;
+    let from_col: int = i % 8;
+    let dr: int = king_row - from_row;
+    let dc: int = king_col - from_col;
+
+    // Special handling for pawn attacks
+    if (ch == 'P' || ch == 'p') {
+      // Pawns attack diagonally forward only
+      if (ch == 'P' && dr == -1 && (dc == -1 || dc == 1)) { return 1; }
+      if (ch == 'p' && dr == 1 && (dc == -1 || dc == 1)) { return 1; }
+      continue;
+    }
+
+    // Check if move direction matches the piece’s legal move
+    let can_attack: int = piece::can_move_direction(rule, dc, dr);
+    if (can_attack == 0) { continue; }
+
+    // Check path clearance for sliding pieces
+    if (rule.can_slide == 1 && rule.can_jump == 0) {
+      let mv: Move = { 
+        from_row: from_row, 
+        from_col: from_col, 
+        to_row: king_row, 
+        to_col: king_col 
+      };
+      let clear: int = is_path_clear(bd, &mv);
+      if (clear == 0) { continue; }
+    }
+
+    // If we reach this point → piece can attack the king
+    return 1;
+  }
+
+  return 0;
+}
+
+pub const update_board -> fn (bd: *Board, mv: *Move, white_to_move: *int, is_valid: *int) void {
+  let from_index: int = mv.from_row * 8 + mv.from_col;
+  let to_index: int   = mv.to_row   * 8 + mv.to_col;
+
+  // Safety: Ensure coordinates are within bounds
+  if (from_index < 0 || from_index >= 64 || to_index < 0 || to_index >= 64) {
+    output("Error: Move out of bounds.\n");
+    *is_valid = 1;
+    return;
+  }
+
+  let piece_char: char = bd.squares[from_index];
+  if (piece_char == '.') {
+    output("Error: No piece at source square.\n");
+    *is_valid = 1;
+    return;
+  }
+
+  let target: char = bd.squares[to_index];
+
+  // Determine piece color
+  // FIXME: Need to fix when cast the result of a bool it returns -1 and 0 instead of 1 and 0
+  let is_white_piece: int = piece::is_white_piece(piece_char); 
+  let is_black_piece: int = piece::is_black_piece(piece_char); 
+
+  // Validate turn (fixed)
+  if (*white_to_move == 1 && is_white_piece == 0) {
+    output("Error: It's White's turn.\n");
+    *is_valid = 1;
+    return;
+  }
+  if (*white_to_move == 0 && is_black_piece == 0) {
+    output("Error: It's Black's turn.\n");
+    *is_valid = 1;
+    return;
+  }
+
+  // Check capture legality
+  if (piece::can_capture(piece_char, target) == 0) {
+    output("Error: Cannot capture your own piece.\n");
+    *is_valid = 1;
+    return;
+  }
+
+  // Validate piece movement rules
+  let rule: *PieceRules = piece::get_rules(piece_char);
+  if (rule == cast<*PieceRules>(0)) {
+    output("Error: Unknown piece type.\n");
+    *is_valid = 1;
+    return;
+  }
+  
+  let dc: int = mv.to_col - mv.from_col;
+  let dr: int = mv.to_row - mv.from_row;
+  
+  // Special handling for pawns
+  if (piece_char == 'P' || piece_char == 'p') {
+    if (piece::validate_pawn_move(rule, dc, dr, mv.from_row, target, is_white_piece) == 0 ||
+        validate_pawn_path(bd, mv, dr, dc) == 0) {
+      output("Error: Illegal pawn move.\n");
+      *is_valid = 1;
+      return;
+    }
+  } else {
+    if (is_move_legal(rule, bd, mv) == 0) {
+      output("Error: Illegal move for this piece.\n");
+      *is_valid = 1;
+      return;
+    }
+  }
+  
+  // Save old state
+  let backup_from: char = bd.squares[from_index];
+  let backup_to: char   = bd.squares[to_index];
+
+  // Simulate move
+  bd.squares[to_index] = piece_char;
+  bd.squares[from_index] = '.';
+
+  // Check if own king is now in check
+  let in_check: int = is_king_in_check(bd, -cast<int>(is_white_piece == 1));
+  if (in_check == 1) {
+    // Undo move
+    bd.squares[from_index] = backup_from;
+    bd.squares[to_index] = backup_to;
+    output("Error: Move leaves king in check.\n");
+    *is_valid = 1;
+    return;
+  }
+
+  // Flip turn
+  if (*white_to_move == 1) {
+    *white_to_move = 0;
+  } else {
+    *white_to_move = 1;
+  }
+  
+  // Mark move as valid (0)
+  *is_valid = 0;
+}
+
+pub const print_board -> fn (bd: *Board, moves: **char, move_count: int) void {
+  output("  ╔═════════════════╗");
+  
+  // Show moves on the right side of the board
+  if (move_count > 0) {
+    output("     Move History");
+  }
+  output("\n");
+  
+  let total_rows: int = (move_count + 1) / 2; 
+  if (total_rows < 8) { total_rows = 8; } 
+  
+  loop [i: int = 0](i < total_rows) : (++i) {
+    if (i < 8) {
+      output(8 - i, " ║ ");
+      loop [j: int = 0](j < 8) : (++j) {
+        let piece: *char;
+        switch (bd.squares[i * 8 + j]) {
+          'P' -> { piece = "♟"; }
+          'N' -> { piece = "♞"; }
+          'B' -> { piece = "♝"; }
+          'R' -> { piece = "♜"; }
+          'Q' -> { piece = "♛"; }
+          'K' -> { piece = "♚"; }
+          'p' -> { piece = "♙"; }
+          'n' -> { piece = "♘"; }
+          'b' -> { piece = "♗"; }
+          'r' -> { piece = "♖"; }
+          'q' -> { piece = "♕"; }
+          'k' -> { piece = "♔"; }
+          '.' -> { piece = "·"; }
+        }
+        output(piece, " ");
+      }
+      output("║");
+    } else {
+      output("   ");
+    }
+  
+    let move_pair_index: int = i * 2;
+    if (move_pair_index < move_count) {
+      let move_num: int = move_pair_index / 2 + 1;
+      output("     ", move_num, ". ", moves[move_pair_index]);
+      if (move_pair_index + 1 < move_count) {
+        output(" ", moves[move_pair_index + 1]);
+      }
+    }
+    output("\n");
+  }
+  
+  output("  ╚═════════════════╝\n");
+  output("    a b c d e f g h\n\n");
+}
+

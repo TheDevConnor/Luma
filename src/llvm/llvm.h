@@ -200,9 +200,9 @@ void add_struct_type(CodeGenContext *ctx, StructInfo *struct_info);
 int get_field_index(StructInfo *struct_info, const char *field_name);
 bool is_field_access_allowed(CodeGenContext *ctx, StructInfo *struct_info,
                              int field_index);
-LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node, 
-                                   StructInfo *struct_info, const char *method_name,
-                                   bool is_public);
+LLVMValueRef codegen_struct_method(CodeGenContext *ctx, AstNode *func_node,
+                                   StructInfo *struct_info,
+                                   const char *method_name, bool is_public);
 // Enhanced member access (handles both struct.field and module.symbol)
 LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
                                                  AstNode *node);
@@ -286,18 +286,19 @@ LLVMValueRef codegen_expr_identifier(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_binary(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_unary(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_call(CodeGenContext *ctx, AstNode *node);
-// LLVMValueRef codegen_method_call(CodeGenContext *ctx, AstNode *call_node);
 LLVMValueRef codegen_expr_assignment(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_array(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_index(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_cast(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_input(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_system(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_syscall(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_sizeof(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_alloc(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_free(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_deref(CodeGenContext *ctx, AstNode *node);
 LLVMValueRef codegen_expr_addr(CodeGenContext *ctx, AstNode *node);
+LLVMValueRef codegen_expr_struct_literal(CodeGenContext *ctx, AstNode *node);
 
 // =============================================================================
 // AST NODE HANDLERS - STATEMENT TYPES

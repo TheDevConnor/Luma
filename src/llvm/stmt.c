@@ -13,19 +13,18 @@ LLVMValueRef codegen_stmt_expression(CodeGenContext *ctx, AstNode *node) {
   return codegen_expr(ctx, node->stmt.expr_stmt.expression);
 }
 
-void add_symbol_with_element_type(CodeGenContext *ctx, const char *name, 
-                                  LLVMValueRef value, LLVMTypeRef type, 
+void add_symbol_with_element_type(CodeGenContext *ctx, const char *name,
+                                  LLVMValueRef value, LLVMTypeRef type,
                                   LLVMTypeRef element_type, bool is_function) {
   if (ctx->current_module) {
-    add_symbol_to_module_with_element_type(ctx->current_module, name, value, 
-                                          type, element_type, is_function);
+    add_symbol_to_module_with_element_type(ctx->current_module, name, value,
+                                           type, element_type, is_function);
   }
 }
 
-void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module, 
-                                           const char *name, LLVMValueRef value, 
-                                           LLVMTypeRef type, LLVMTypeRef element_type, 
-                                           bool is_function) {
+void add_symbol_to_module_with_element_type(
+    ModuleCompilationUnit *module, const char *name, LLVMValueRef value,
+    LLVMTypeRef type, LLVMTypeRef element_type, bool is_function) {
   LLVM_Symbol *sym = (LLVM_Symbol *)malloc(sizeof(LLVM_Symbol));
   sym->name = strdup(name);
   sym->value = value;
@@ -36,18 +35,20 @@ void add_symbol_to_module_with_element_type(ModuleCompilationUnit *module,
   module->symbols = sym;
 }
 
-LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx, AstNode *type_node) {
-  if (!type_node) return NULL;
-  
+LLVMTypeRef extract_element_type_from_ast(CodeGenContext *ctx,
+                                          AstNode *type_node) {
+  if (!type_node)
+    return NULL;
+
   if (type_node->type == AST_TYPE_POINTER) {
     // This is a pointer type, get what it points to
     AstNode *pointee = type_node->type_data.pointer.pointee_type;
-    
+
     // Generate the full type for what this pointer points to
     // This correctly handles **char -> *char, ***int -> **int, etc.
     return codegen_type(ctx, pointee);
   }
-  
+
   return NULL; // Not a pointer type
 }
 
@@ -58,14 +59,16 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     return NULL;
 
   // Extract element type if this is a pointer
-  LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.var_decl.var_type);
+  LLVMTypeRef element_type =
+      extract_element_type_from_ast(ctx, node->stmt.var_decl.var_type);
 
   LLVMValueRef var_ref;
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
   if (ctx->current_function == NULL) {
-    var_ref = LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
+    var_ref =
+        LLVMAddGlobal(current_llvm_module, var_type, node->stmt.var_decl.name);
     if (node->stmt.var_decl.is_public) {
       LLVMSetLinkage(var_ref, LLVMExternalLinkage);
     } else {
@@ -80,30 +83,38 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
     LLVMValueRef init_val = codegen_expr(ctx, node->stmt.var_decl.initializer);
     if (init_val) {
       LLVMTypeRef init_type = LLVMTypeOf(init_val);
-      
+
       if (var_type != init_type) {
         // Handle type conversions
         LLVMTypeKind var_kind = LLVMGetTypeKind(var_type);
         LLVMTypeKind init_kind = LLVMGetTypeKind(init_type);
-        
+
         if (var_kind == LLVMDoubleTypeKind && init_kind == LLVMFloatTypeKind) {
-          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type, "float_to_double");
-        } else if (var_kind == LLVMFloatTypeKind && init_kind == LLVMDoubleTypeKind) {
-          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type, "double_to_float");
-        } else if (var_kind == LLVMIntegerTypeKind && 
-                  (init_kind == LLVMFloatTypeKind || init_kind == LLVMDoubleTypeKind)) {
-          init_val = LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
-        } else if ((var_kind == LLVMFloatTypeKind || var_kind == LLVMDoubleTypeKind) && 
+          init_val = LLVMBuildFPExt(ctx->builder, init_val, var_type,
+                                    "float_to_double");
+        } else if (var_kind == LLVMFloatTypeKind &&
+                   init_kind == LLVMDoubleTypeKind) {
+          init_val = LLVMBuildFPTrunc(ctx->builder, init_val, var_type,
+                                      "double_to_float");
+        } else if (var_kind == LLVMIntegerTypeKind &&
+                   (init_kind == LLVMFloatTypeKind ||
+                    init_kind == LLVMDoubleTypeKind)) {
+          init_val =
+              LLVMBuildFPToSI(ctx->builder, init_val, var_type, "float_to_int");
+        } else if ((var_kind == LLVMFloatTypeKind ||
+                    var_kind == LLVMDoubleTypeKind) &&
                    init_kind == LLVMIntegerTypeKind) {
-          init_val = LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
+          init_val =
+              LLVMBuildSIToFP(ctx->builder, init_val, var_type, "int_to_float");
         }
       }
-      
+
       if (ctx->current_function == NULL) {
         if (LLVMIsConstant(init_val)) {
           LLVMSetInitializer(var_ref, init_val);
         } else {
-          fprintf(stderr, "Error: Global variable initializer must be constant\n");
+          fprintf(stderr,
+                  "Error: Global variable initializer must be constant\n");
           LLVMSetInitializer(var_ref, LLVMConstNull(var_type));
         }
       } else {
@@ -121,42 +132,157 @@ LLVMValueRef codegen_stmt_var_decl(CodeGenContext *ctx, AstNode *node) {
   }
 
   // Add symbol with element type information
-  add_symbol_with_element_type(ctx, node->stmt.var_decl.name, var_ref, var_type, element_type, false);
+  add_symbol_with_element_type(ctx, node->stmt.var_decl.name, var_ref, var_type,
+                               element_type, false);
   return var_ref;
 }
 
 LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
+  const char *func_name = node->stmt.func_decl.name;
+  bool forward_declared = node->stmt.func_decl.forward_declared;
+
+  // Generate parameter types
   LLVMTypeRef *param_types = (LLVMTypeRef *)arena_alloc(
       ctx->arena, sizeof(LLVMTypeRef) * node->stmt.func_decl.param_count,
       alignof(LLVMTypeRef));
 
   for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
     param_types[i] = codegen_type(ctx, node->stmt.func_decl.param_types[i]);
-    if (!param_types[i])
+    if (!param_types[i]) {
+      fprintf(
+          stderr,
+          "Error: Failed to generate parameter type %zu for function '%s'\n", i,
+          func_name);
       return NULL;
+    }
   }
 
+  // Generate return type
   LLVMTypeRef return_type = codegen_type(ctx, node->stmt.func_decl.return_type);
-  if (!return_type)
+  if (!return_type) {
+    fprintf(stderr, "Error: Failed to generate return type for function '%s'\n",
+            func_name);
     return NULL;
+  }
 
+  // Create function type
   LLVMTypeRef func_type = LLVMFunctionType(
       return_type, param_types, node->stmt.func_decl.param_count, false);
 
   LLVMModuleRef current_llvm_module =
       ctx->current_module ? ctx->current_module->module : ctx->module;
 
-  LLVMValueRef function = LLVMAddFunction(current_llvm_module,
-                                          node->stmt.func_decl.name, func_type);
+  // Check if function already exists
+  LLVMValueRef existing_function =
+      LLVMGetNamedFunction(current_llvm_module, func_name);
 
-  LLVMSetLinkage(function, get_function_linkage(node));
-  add_symbol(ctx, node->stmt.func_decl.name, function, func_type, true);
+  if (existing_function) {
+    // Function already declared - validate signature matches
+    LLVMTypeRef existing_type = LLVMGlobalGetValueType(existing_function);
 
-  // Set parameter names
-  for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
-    LLVMValueRef param = LLVMGetParam(function, i);
-    LLVMSetValueName2(param, node->stmt.func_decl.param_names[i],
-                      strlen(node->stmt.func_decl.param_names[i]));
+    // Compare return types
+    if (LLVMGetReturnType(existing_type) != return_type) {
+      fprintf(stderr,
+              "Error: Function '%s' redeclared with different return type\n",
+              func_name);
+      return NULL;
+    }
+
+    // Compare parameter counts
+    if (LLVMCountParamTypes(existing_type) !=
+        node->stmt.func_decl.param_count) {
+      fprintf(
+          stderr,
+          "Error: Function '%s' redeclared with different parameter count\n",
+          func_name);
+      return NULL;
+    }
+
+    // Compare parameter types
+    LLVMTypeRef *existing_param_types = (LLVMTypeRef *)arena_alloc(
+        ctx->arena, sizeof(LLVMTypeRef) * node->stmt.func_decl.param_count,
+        alignof(LLVMTypeRef));
+    LLVMGetParamTypes(existing_type, existing_param_types);
+
+    for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
+      if (existing_param_types[i] != param_types[i]) {
+        fprintf(stderr,
+                "Error: Function '%s' redeclared with different parameter %zu "
+                "type\n",
+                func_name, i);
+        return NULL;
+      }
+    }
+
+    // Signatures match
+    if (forward_declared) {
+      // This is another prototype - already exists, just return it
+      return existing_function;
+    }
+
+    // This is the implementation - check if it already has a body
+    if (LLVMCountBasicBlocks(existing_function) > 0) {
+      fprintf(stderr, "Error: Function '%s' already has an implementation\n",
+              func_name);
+      return NULL;
+    }
+
+    // Use the existing declaration for the implementation
+    LLVMValueRef function = existing_function;
+
+    // Update symbol table if needed (it should already be there)
+    // Just proceed to generate the body
+    goto generate_body;
+
+  } else {
+    // First declaration - create new function
+    LLVMValueRef function =
+        LLVMAddFunction(current_llvm_module, func_name, func_type);
+
+    if (!function) {
+      fprintf(stderr, "Error: Failed to create LLVM function '%s'\n",
+              func_name);
+      return NULL;
+    }
+
+    // Set linkage
+    LLVMSetLinkage(function, get_function_linkage(node));
+
+    // Add to symbol table
+    add_symbol(ctx, func_name, function, func_type, true);
+
+    // Set parameter names
+    for (size_t i = 0; i < node->stmt.func_decl.param_count; i++) {
+      LLVMValueRef param = LLVMGetParam(function, i);
+      LLVMSetValueName2(param, node->stmt.func_decl.param_names[i],
+                        strlen(node->stmt.func_decl.param_names[i]));
+    }
+
+    // If this is just a forward declaration (prototype), we're done
+    if (forward_declared) {
+      return function;
+    }
+
+    // Otherwise, proceed to generate the body
+    goto generate_body;
+  }
+
+generate_body: {
+  // At this point, 'function' or 'existing_function' is set
+  LLVMValueRef function =
+      existing_function ? existing_function
+                        : LLVMGetNamedFunction(current_llvm_module, func_name);
+
+  if (!function) {
+    fprintf(stderr, "Error: Function reference lost for '%s'\n", func_name);
+    return NULL;
+  }
+
+  // Function must have a body at this point
+  if (!node->stmt.func_decl.body) {
+    fprintf(stderr, "Error: Function '%s' implementation missing body\n",
+            func_name);
+    return NULL;
   }
 
   // Create entry block
@@ -180,9 +306,11 @@ LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
                                           node->stmt.func_decl.param_names[i]);
     LLVMBuildStore(ctx->builder, param, alloca);
 
-    // Extract element type for the pointer 
-    LLVMTypeRef element_type = extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
-    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i], alloca, param_types[i], element_type, false);
+    // Extract element type for the pointer
+    LLVMTypeRef element_type =
+        extract_element_type_from_ast(ctx, node->stmt.func_decl.param_types[i]);
+    add_symbol_with_element_type(ctx, node->stmt.func_decl.param_names[i],
+                                 alloca, param_types[i], element_type, false);
   }
 
   // Create blocks for normal return and cleanup
@@ -230,6 +358,7 @@ LLVMValueRef codegen_stmt_function(CodeGenContext *ctx, AstNode *node) {
   ctx->deferred_count = old_defer_count;
 
   return function;
+}
 }
 
 bool is_enum_constant(LLVM_Symbol *sym) {
@@ -387,11 +516,20 @@ LLVMValueRef codegen_stmt_block(CodeGenContext *ctx, AstNode *node) {
 
   // Process all statements in the block
   for (size_t i = 0; i < node->stmt.block.stmt_count; i++) {
+    AstNode *stmt = node->stmt.block.statements[i];
+
+    // ADD THESE CHECKS:
+    if (!stmt) {
+      fprintf(stderr, "ERROR: Statement %zu is NULL!\n", i);
+      continue;
+    }
+
     // Stop processing if we hit a terminator
     if (LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
       break;
     }
-    codegen_stmt(ctx, node->stmt.block.statements[i]);
+
+    codegen_stmt(ctx, stmt);
   }
 
   // Execute any deferred statements from this block scope (in reverse order)
@@ -780,7 +918,6 @@ LLVMValueRef codegen_infinite_loop(CodeGenContext *ctx, AstNode *node) {
 // loop (i < 10) { ... }
 // loop (i < 10) : (i++) { ... }
 LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
-  // Create basic blocks for the loop structure
   LLVMBasicBlockRef cond_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "while_cond");
   LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(
@@ -788,42 +925,43 @@ LLVMValueRef codegen_while_loop(CodeGenContext *ctx, AstNode *node) {
   LLVMBasicBlockRef after_block = LLVMAppendBasicBlockInContext(
       ctx->context, ctx->current_function, "while_end");
 
-  // Jump to condition check
+  // ADD THIS: Save and set loop context
+  LLVMBasicBlockRef old_continue = ctx->loop_continue_block;
+  LLVMBasicBlockRef old_break = ctx->loop_break_block;
+  ctx->loop_continue_block = cond_block; // Continue jumps back to condition
+  ctx->loop_break_block = after_block;   // Break jumps to after loop
+
   LLVMBuildBr(ctx->builder, cond_block);
 
-  // Generate condition block
   LLVMPositionBuilderAtEnd(ctx->builder, cond_block);
   if (node->stmt.loop_stmt.condition) {
     LLVMValueRef cond = codegen_expr(ctx, node->stmt.loop_stmt.condition);
     if (!cond) {
-      fprintf(
-          stderr,
-          "Error: Failed to generate condition for while loop at line %zu\n",
-          node->line);
+      // ADD THIS: Restore on error
+      ctx->loop_continue_block = old_continue;
+      ctx->loop_break_block = old_break;
       return NULL;
     }
     LLVMBuildCondBr(ctx->builder, cond, body_block, after_block);
   } else {
-    // Infinite loop if no condition
     LLVMBuildBr(ctx->builder, body_block);
   }
 
-  // Generate loop body
   LLVMPositionBuilderAtEnd(ctx->builder, body_block);
   codegen_stmt(ctx, node->stmt.loop_stmt.body);
 
-  // Generate increment expressions if they exist
   if (node->stmt.loop_stmt.optional) {
     codegen_expr(ctx, node->stmt.loop_stmt.optional);
   }
 
-  // If body doesn't have a terminator, jump back to condition check
   if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(ctx->builder))) {
-    LLVMBuildBr(ctx->builder,
-                cond_block); // Jump back to condition, not after_block
+    LLVMBuildBr(ctx->builder, cond_block);
   }
 
-  // Continue with after loop block
+  // ADD THIS: Restore old loop context
+  ctx->loop_continue_block = old_continue;
+  ctx->loop_break_block = old_break;
+
   LLVMPositionBuilderAtEnd(ctx->builder, after_block);
   return NULL;
 }
@@ -1061,9 +1199,73 @@ LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx,
     return NULL;
   }
 
-  // Get the enum name and member name
-  const char *enum_name = member_expr->expr.member.object->expr.identifier.name;
   const char *member_name = member_expr->expr.member.member;
+  AstNode *object = member_expr->expr.member.object;
+
+  // **NEW: Handle chained compile-time access (ast::ExprKind::EXPR_NUMBER)**
+  if (object->type == AST_EXPR_MEMBER &&
+      member_expr->expr.member.is_compiletime) {
+    // This is chained: module::Type::Member
+    // Example: ast::ExprKind::EXPR_NUMBER
+    //   object = ast::ExprKind (another member expr)
+    //   member = EXPR_NUMBER
+
+    if (object->expr.member.object->type != AST_EXPR_IDENTIFIER) {
+      fprintf(stderr, "Error: Expected identifier in chained compile-time "
+                      "access for case value\n");
+      return NULL;
+    }
+
+    const char *module_name = object->expr.member.object->expr.identifier.name;
+    const char *type_name = object->expr.member.member;
+
+    // Build the fully qualified name: TypeName.Member
+    char type_qualified_name[256];
+    snprintf(type_qualified_name, sizeof(type_qualified_name), "%s.%s",
+             type_name, member_name);
+
+    // Look in the specified module
+    ModuleCompilationUnit *source_module = find_module(ctx, module_name);
+    if (source_module) {
+      LLVM_Symbol *enum_member =
+          find_symbol_in_module(source_module, type_qualified_name);
+      if (enum_member && is_enum_constant(enum_member)) {
+        return LLVMGetInitializer(enum_member->value);
+      }
+    }
+
+    // If not found in the named module, try current module (in case it was
+    // imported)
+    LLVM_Symbol *enum_member =
+        find_symbol_in_module(ctx->current_module, type_qualified_name);
+    if (enum_member && is_enum_constant(enum_member)) {
+      return LLVMGetInitializer(enum_member->value);
+    }
+
+    // Try all modules as fallback
+    for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
+      if (unit == ctx->current_module)
+        continue;
+
+      LLVM_Symbol *sym = find_symbol_in_module(unit, type_qualified_name);
+      if (sym && is_enum_constant(sym)) {
+        return LLVMGetInitializer(sym->value);
+      }
+    }
+
+    fprintf(stderr,
+            "Error: Enum member '%s::%s::%s' not found for switch case\n",
+            module_name, type_name, member_name);
+    return NULL;
+  }
+
+  // Handle simple case: EnumType::Member
+  if (object->type != AST_EXPR_IDENTIFIER) {
+    fprintf(stderr, "Error: Expected identifier for enum case value\n");
+    return NULL;
+  }
+
+  const char *enum_name = object->expr.identifier.name;
 
   // Create qualified member name
   char qualified_name[256];
@@ -1073,7 +1275,8 @@ LLVMValueRef codegen_enum_member_case(CodeGenContext *ctx,
   // Look up the enum member symbol
   LLVM_Symbol *enum_member = find_symbol(ctx, qualified_name);
   if (!enum_member) {
-    fprintf(stderr, "Error: Enum member '%s' not found\n", qualified_name);
+    fprintf(stderr, "Error: Enum member '%s' not found for switch case\n",
+            qualified_name);
     return NULL;
   }
 

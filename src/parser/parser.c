@@ -20,7 +20,6 @@
 
 #include <stdalign.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "../ast/ast.h"
 #include "../c_libs/error/error.h"
@@ -48,21 +47,20 @@
  */
 void parser_error(Parser *psr, const char *error_type, const char *file,
                   const char *msg, int line, int col, int tk_length) {
-    (void)file;
-    ErrorInformation err = {
-        .error_type = error_type,
-        .file_path = psr->file_path,
-        .message = msg,
-        .line = line,
-        .col = col,
-        .line_text =
-            generate_line(psr->arena, psr->tks, psr->tk_count, err.line),
-        .token_length = tk_length,
-        .label = "Parser Error",
-        .note = NULL,
-        .help = NULL,
-    };
-    error_add(err);
+  (void)file;
+  ErrorInformation err = {
+      .error_type = error_type,
+      .file_path = psr->file_path,
+      .message = msg,
+      .line = line,
+      .col = col,
+      .line_text = generate_line(psr->arena, psr->tks, psr->tk_count, err.line),
+      .token_length = tk_length,
+      .label = "Parser Error",
+      .note = NULL,
+      .help = NULL,
+  };
+  error_add(err);
 }
 
 /**
@@ -86,69 +84,69 @@ void parser_error(Parser *psr, const char *error_type, const char *file,
  */
 
 Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config) {
-    // Initialize parser
-    Parser parser = {
-        .file_path = config->filepath,
-        .arena = arena,
-        .tks = (Token *)tks->data,
-        .tk_count = tks->count,
-        .capacity = (tks->count / 4) + 10,
-        .pos = 0,
-    };
+  // Initialize parser
+  Parser parser = {
+      .file_path = config->filepath,
+      .arena = arena,
+      .tks = (Token *)tks->data,
+      .tk_count = tks->count,
+      .capacity = (tks->count / 4) + 10,
+      .pos = 0,
+  };
 
-    if (!parser.tks) {
-        fprintf(stderr, "Failed to get tokens from GrowableArray\n");
-        return NULL;
+  if (!parser.tks) {
+    fprintf(stderr, "Failed to get tokens from GrowableArray\n");
+    return NULL;
+  }
+
+  // Initialize arrays
+  GrowableArray stmts, modules;
+  if (!init_parser_arrays(&parser, &stmts, &modules)) {
+    return NULL;
+  }
+
+  // Parse module declaration
+  Token module_tok = p_current(&parser);
+  const char *module_name = parse_module_declaration(&parser);
+  if (!module_name) {
+    return NULL;
+  }
+
+  // Create initial module node and add to modules array
+  Stmt *module_stmt = create_module_node(parser.arena, module_name, 0, NULL, 0,
+                                         module_tok.line, module_tok.col);
+
+  Stmt **module_slot = (Stmt **)growable_array_push(&modules);
+  if (!module_slot) {
+    fprintf(stderr, "Out of memory while growing modules array\n");
+    return NULL;
+  }
+  *module_slot = module_stmt;
+
+  // Parse all statements
+  while (p_current(&parser).type_ != TOK_EOF) {
+    Stmt *stmt = parse_stmt(&parser);
+    if (!stmt) {
+      // Error already reported in parse_stmt
+      return NULL;
     }
 
-    // Initialize arrays
-    GrowableArray stmts, modules;
-    if (!init_parser_arrays(&parser, &stmts, &modules)) {
-        return NULL;
+    Stmt **slot = (Stmt **)growable_array_push(&stmts);
+    if (!slot) {
+      fprintf(stderr, "Out of memory while growing statements array\n");
+      return NULL;
     }
+    *slot = stmt;
+  }
 
-    // Parse module declaration
-    Token module_tok = p_current(&parser);
-    const char *module_name = parse_module_declaration(&parser);
-    if (!module_name) {
-        return NULL;
-    }
+  // Update module with parsed statements
+  *module_slot =
+      create_module_node(parser.arena, module_name, 0, (Stmt **)stmts.data,
+                         stmts.count, module_tok.line, module_tok.col);
 
-    // Create initial module node and add to modules array
-    Stmt *module_stmt = create_module_node(parser.arena, module_name, 0, NULL,
-                                           0, module_tok.line, module_tok.col);
-
-    Stmt **module_slot = (Stmt **)growable_array_push(&modules);
-    if (!module_slot) {
-        fprintf(stderr, "Out of memory while growing modules array\n");
-        return NULL;
-    }
-    *module_slot = module_stmt;
-
-    // Parse all statements
-    while (p_current(&parser).type_ != TOK_EOF) {
-        Stmt *stmt = parse_stmt(&parser);
-        if (!stmt) {
-            // Error already reported in parse_stmt
-            return NULL;
-        }
-
-        Stmt **slot = (Stmt **)growable_array_push(&stmts);
-        if (!slot) {
-            fprintf(stderr, "Out of memory while growing statements array\n");
-            return NULL;
-        }
-        *slot = stmt;
-    }
-
-    // Update module with parsed statements
-    *module_slot =
-        create_module_node(parser.arena, module_name, 0, (Stmt **)stmts.data,
-                           stmts.count, module_tok.line, module_tok.col);
-
-    // Create and return program node
-    return create_program_node(parser.arena, (AstNode **)modules.data,
-                               modules.count, 0, 0);
+  // Create and return program node
+  return create_program_node(parser.arena, (AstNode **)modules.data,
+                             modules.count, 0, 0);
 }
 /**
  * @brief Gets the binding power (precedence) for a given token type
@@ -179,68 +177,74 @@ Stmt *parse(GrowableArray *tks, ArenaAllocator *arena, BuildConfig *config) {
  * @see BindingPower, LumaTokenType
  */
 BindingPower get_bp(LumaTokenType kind) {
-    switch (kind) {
-    // Assignment
-    case TOK_EQUAL:
-        return BP_ASSIGN;
+  switch (kind) {
+  // Assignment
+  case TOK_EQUAL:
+    return BP_ASSIGN;
 
-    // Ternary
-    case TOK_QUESTION:
-        return BP_TERNARY;
+  // Ternary
+  case TOK_QUESTION:
+    return BP_TERNARY;
 
-    // Logical
-    case TOK_OR:
-        return BP_LOGICAL_OR;
-    case TOK_AND:
-        return BP_LOGICAL_AND;
+  // Logical
+  case TOK_OR:
+    return BP_LOGICAL_OR;
+  case TOK_AND:
+    return BP_LOGICAL_AND;
 
-    // Bitwise
-    case TOK_PIPE:
-        return BP_BITWISE_OR;
-    case TOK_CARET:
-        return BP_BITWISE_XOR;
-    case TOK_AMP:
-        return BP_BITWISE_AND;
+  // Bitwise
+  case TOK_PIPE:
+    return BP_BITWISE_OR;
+  case TOK_CARET:
+    return BP_BITWISE_XOR;
+  case TOK_AMP:
+    return BP_BITWISE_AND;
 
-    // Equality
-    case TOK_EQEQ:
-    case TOK_NEQ:
-        return BP_EQUALITY;
+  // Equality
+  case TOK_EQEQ:
+  case TOK_NEQ:
+    return BP_EQUALITY;
 
-    // Relational
-    case TOK_LT:
-    case TOK_LE:
-    case TOK_GT:
-    case TOK_GE:
-        return BP_RELATIONAL;
+  // Relational
+  case TOK_LT:
+  case TOK_LE:
+  case TOK_GT:
+  case TOK_GE:
+    return BP_RELATIONAL;
 
-    // Arithmetic
-    case TOK_PLUS:
-    case TOK_MINUS:
-        return BP_SUM;
-    case TOK_STAR:
-    case TOK_SLASH:
-    case TOK_MODL:
-        return BP_PRODUCT;
+  // Shift operators (ADD THIS SECTION)
+  case TOK_SHIFT_LEFT:
+  case TOK_SHIFT_RIGHT:
+    return BP_SHIFT;
 
-    // Postfix
-    case TOK_PLUSPLUS:
-    case TOK_MINUSMINUS:
-        return BP_POSTFIX;
+  // Arithmetic
+  case TOK_PLUS:
+  case TOK_MINUS:
+    return BP_SUM;
+  case TOK_STAR:
+  case TOK_SLASH:
+  case TOK_MODL:
+    return BP_PRODUCT;
 
-    // Call/indexing/member access
-    case TOK_LPAREN:
-    case TOK_LBRACKET:
-    case TOK_DOT:
-    case TOK_RESOLVE:
-        return BP_CALL;
+  // Postfix
+  case TOK_PLUSPLUS:
+  case TOK_MINUSMINUS:
+    return BP_POSTFIX;
 
-    case TOK_RANGE:
-        return BP_RANGE;
+  // Call/indexing/member access
+  case TOK_LPAREN:
+  case TOK_LBRACKET:
+  case TOK_DOT:
+  case TOK_RESOLVE:
+  case TOK_LBRACE:
+    return BP_CALL;
 
-    default:
-        return BP_NONE;
-    }
+  case TOK_RANGE:
+    return BP_RANGE;
+
+  default:
+    return BP_NONE;
+  }
 }
 
 /**
@@ -263,45 +267,50 @@ BindingPower get_bp(LumaTokenType kind) {
  * @see led(), parse_expr(), primary(), unary(), grouping(), array_expr()
  */
 Expr *nud(Parser *parser) {
-    switch (p_current(parser).type_) {
-    case TOK_NUMBER:
-    case TOK_NUM_FLOAT:
-    case TOK_STRING:
-    case TOK_CHAR_LITERAL:
-    case TOK_IDENTIFIER:
-        return primary(parser);
-    case TOK_MINUS:
-    case TOK_PLUS:
-    case TOK_BANG:
-    case TOK_PLUSPLUS:
-    case TOK_MINUSMINUS:
-        return unary(parser);
-    case TOK_LPAREN:
-        return grouping(parser);
-    case TOK_LBRACKET:
-        return array_expr(parser);
-    case TOK_STAR:
-        return deref_expr(parser);
-    case TOK_AMP:
-        return addr_expr(parser);
-    case TOK_ALLOC:
-        return alloc_expr(parser);
-    case TOK_FREE:
-        return free_expr(parser);
-    case TOK_CAST:
-        return cast_expr(parser);
-    case TOK_INPUT:
-        return input_expr(parser);
-    case TOK_SYSTEM:
-        return system_expr(parser);
+  switch (p_current(parser).type_) {
+  case TOK_NUMBER:
+  case TOK_NUM_FLOAT:
+  case TOK_STRING:
+  case TOK_CHAR_LITERAL:
+  case TOK_IDENTIFIER:
+    return primary(parser);
+  case TOK_MINUS:
+  case TOK_PLUS:
+  case TOK_BANG:
+  case TOK_TILDE:
+  case TOK_PLUSPLUS:
+  case TOK_MINUSMINUS:
+    return unary(parser);
+  case TOK_LPAREN:
+    return grouping(parser);
+  case TOK_LBRACKET:
+    return array_expr(parser);
+  case TOK_LBRACE:
+    return struct_expr(parser);
+  case TOK_STAR:
+    return deref_expr(parser);
+  case TOK_AMP:
+    return addr_expr(parser);
+  case TOK_ALLOC:
+    return alloc_expr(parser);
+  case TOK_FREE:
+    return free_expr(parser);
+  case TOK_CAST:
+    return cast_expr(parser);
+  case TOK_INPUT:
+    return input_expr(parser);
+  case TOK_SYSTEM:
+    return system_expr(parser);
+  case TOK_SYSCALL:
+    return syscall_expr(parser);
 
-    // Compile time
-    case TOK_SIZE_OF:
-        return sizeof_expr(parser);
-    default:
-        p_advance(parser);
-        return NULL;
-    }
+  // Compile time
+  case TOK_SIZE_OF:
+    return sizeof_expr(parser);
+  default:
+    p_advance(parser);
+    return NULL;
+  }
 }
 
 /**
@@ -329,40 +338,43 @@ Expr *nud(Parser *parser) {
  * @see nud(), parse_expr(), binary(), call_expr(), assign_expr(), prefix_expr()
  */
 Expr *led(Parser *parser, Expr *left, BindingPower bp) {
-    switch (p_current(parser).type_) {
-    case TOK_PLUS:
-    case TOK_MINUS:
-    case TOK_STAR:
-    case TOK_SLASH:
-    case TOK_MODL:
-    case TOK_EQEQ:
-    case TOK_NEQ:
-    case TOK_LT:
-    case TOK_LE:
-    case TOK_GT:
-    case TOK_GE:
-    case TOK_AMP:
-    case TOK_PIPE:
-    case TOK_CARET:
-    case TOK_AND: // Add logical AND
-    case TOK_OR:  // Add logical OR
-    case TOK_RANGE:
-        return binary(parser, left, bp);
-    case TOK_LPAREN:
-        return call_expr(parser, left, bp);
-    case TOK_EQUAL:
-        return assign_expr(parser, left, bp);
-    case TOK_DOT:
-    case TOK_RESOLVE:
-    case TOK_PLUSPLUS:
-    case TOK_MINUSMINUS:
-    case TOK_LBRACKET:
-        // Handle member access, postfix increment/decrement, and indexing
-        return prefix_expr(parser, left, bp);
-    default:
-        p_advance(parser);
-        return left; // No valid LED found, return left expression
-    }
+  switch (p_current(parser).type_) {
+  case TOK_PLUS:
+  case TOK_MINUS:
+  case TOK_STAR:
+  case TOK_SLASH:
+  case TOK_MODL:
+  case TOK_EQEQ:
+  case TOK_NEQ:
+  case TOK_LT:
+  case TOK_LE:
+  case TOK_GT:
+  case TOK_GE:
+  case TOK_AMP:
+  case TOK_PIPE:
+  case TOK_CARET:
+  case TOK_AND:
+  case TOK_OR:
+  case TOK_RANGE:
+  case TOK_SHIFT_LEFT:
+  case TOK_SHIFT_RIGHT:
+    return binary(parser, left, bp);
+  case TOK_LPAREN:
+    return call_expr(parser, left, bp);
+  case TOK_EQUAL:
+    return assign_expr(parser, left, bp);
+  case TOK_DOT:
+  case TOK_RESOLVE:
+  case TOK_PLUSPLUS:
+  case TOK_MINUSMINUS:
+  case TOK_LBRACKET:
+    return prefix_expr(parser, left, bp);
+  case TOK_LBRACE:
+    return named_struct_expr(parser, left, bp);
+  default:
+    p_advance(parser);
+    return left;
+  }
 }
 
 /**
@@ -387,13 +399,14 @@ Expr *led(Parser *parser, Expr *left, BindingPower bp) {
  * @see nud(), led(), get_bp(), BindingPower
  */
 Expr *parse_expr(Parser *parser, BindingPower bp) {
-    Expr *left = nud(parser);
+  Expr *left = nud(parser);
 
-    while (p_has_tokens(parser) && get_bp(p_current(parser).type_) > bp) {
-        left = led(parser, left, get_bp(p_current(parser).type_));
-    }
+  while (p_has_tokens(parser) && get_bp(p_current(parser).type_) > bp) {
+    BindingPower current_bp = get_bp(p_current(parser).type_);
+    left = led(parser, left, current_bp);
+  }
 
-    return left;
+  return left;
 }
 
 /**
@@ -419,65 +432,63 @@ Expr *parse_expr(Parser *parser, BindingPower bp) {
  *      loop_stmt(), print_stmt(), break_continue_stmt(), expr_stmt()
  */
 Stmt *parse_stmt(Parser *parser) {
-    bool returns_ownership = false;
-    bool takes_ownership = false;
-    bool is_public = false;
+  bool returns_ownership = false;
+  bool takes_ownership = false;
+  bool is_public = false;
 
-    // Check for ownership modifiers
-    while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
-           p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-        if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
-            returns_ownership = true;
-            p_advance(parser);
-        } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-            takes_ownership = true;
-            p_advance(parser);
-        }
+  // Check for ownership modifiers
+  while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
+         p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+    if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+      returns_ownership = true;
+      p_advance(parser);
+    } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+      takes_ownership = true;
+      p_advance(parser);
     }
+  }
 
-    // Check for visibility modifiers
-    if (p_current(parser).type_ == TOK_PUBLIC) {
-        is_public = true;
-        p_advance(parser); // Advance past the public token
-    } else if (p_current(parser).type_ == TOK_PRIVATE) {
-        is_public = false;
-        p_advance(parser); // Advance past the private token
-    }
+  // Check for visibility modifiers
+  if (p_current(parser).type_ == TOK_PUBLIC) {
+    is_public = true;
+    p_advance(parser); // Advance past the public token
+  } else if (p_current(parser).type_ == TOK_PRIVATE) {
+    is_public = false;
+    p_advance(parser); // Advance past the private token
+  }
 
-    switch (p_current(parser).type_) {
-    case TOK_USE:
-        return use_stmt(parser);
-    case TOK_CONST:
-        return const_stmt(parser, is_public, returns_ownership,
-                          takes_ownership);
-    case TOK_VAR:
-        return var_stmt(parser, is_public);
-    case TOK_RETURN:
-        return return_stmt(parser);
-    case TOK_LBRACE:
-        return block_stmt(parser);
-    case TOK_IF:
-        return if_stmt(parser);
-    case TOK_LOOP:
-        return loop_stmt(parser);
-    case TOK_PRINT:
-        return print_stmt(parser, false);
-    case TOK_PRINTLN:
-        return print_stmt(parser, true);
-    case TOK_CONTINUE:
-    case TOK_BREAK:
-        return break_continue_stmt(parser,
-                                   p_current(parser).type_ == TOK_CONTINUE);
-    case TOK_DEFER:
-        return defer_stmt(parser);
-    case TOK_SWITCH:
-        return switch_stmt(parser);
-    case TOK_IMPL:
-        return impl_stmt(parser);
-    default:
-        return expr_stmt(
-            parser); // expression statements handle their own semicolon
-    }
+  switch (p_current(parser).type_) {
+  case TOK_USE:
+    return use_stmt(parser);
+  case TOK_CONST:
+    return const_stmt(parser, is_public, returns_ownership, takes_ownership);
+  case TOK_VAR:
+    return var_stmt(parser, is_public);
+  case TOK_RETURN:
+    return return_stmt(parser);
+  case TOK_LBRACE:
+    return block_stmt(parser);
+  case TOK_IF:
+    return if_stmt(parser);
+  case TOK_LOOP:
+    return loop_stmt(parser);
+  case TOK_PRINT:
+    return print_stmt(parser, false);
+  case TOK_PRINTLN:
+    return print_stmt(parser, true);
+  case TOK_CONTINUE:
+  case TOK_BREAK:
+    return break_continue_stmt(parser, p_current(parser).type_ == TOK_CONTINUE);
+  case TOK_DEFER:
+    return defer_stmt(parser);
+  case TOK_SWITCH:
+    return switch_stmt(parser);
+  case TOK_IMPL:
+    return impl_stmt(parser);
+  default:
+    return expr_stmt(
+        parser); // expression statements handle their own semicolon
+  }
 }
 
 /**
@@ -502,28 +513,24 @@ Stmt *parse_stmt(Parser *parser) {
  * @see tnud(), tled(), LumaTokenType
  */
 Type *parse_type(Parser *parser) {
-    LumaTokenType tok = p_current(parser).type_;
+  LumaTokenType tok = p_current(parser).type_;
 
-    switch (tok) {
-    case TOK_INT:
-    case TOK_UINT:
-    case TOK_DOUBLE:
-    case TOK_FLOAT:
-    case TOK_BOOL:
-    case TOK_STRINGT:
-    case TOK_VOID:
-    case TOK_CHAR:
-    case TOK_STAR:     // Pointer type
-    case TOK_LBRACKET: // Array type
-        return tnud(parser);
+  switch (tok) {
+  case TOK_INT:
+  case TOK_UINT:
+  case TOK_DOUBLE:
+  case TOK_FLOAT:
+  case TOK_BOOL:
+  case TOK_STRINGT:
+  case TOK_VOID:
+  case TOK_CHAR:
+  case TOK_STAR:     // Pointer type
+  case TOK_LBRACKET: // Array type
+  case TOK_IDENTIFIER: // Could be simple type or namespace::Type
+    return tnud(parser);
 
-    // Optionally: handle identifiers like 'MyStruct' or user-defined types
-    case TOK_IDENTIFIER:
-        return create_basic_type(parser->arena, get_name(parser),
-                                 parser->tks->line, parser->tks->col);
-
-    default:
-        fprintf(stderr, "[parse_type] Unexpected token for type: %d\n", tok);
-        return NULL;
-    }
+  default:
+    fprintf(stderr, "[parse_type] Unexpected token for type: %d\n", tok);
+    return NULL;
+  }
 }

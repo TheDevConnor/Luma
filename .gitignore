@@ -2,6 +2,9 @@ build
 obj
 lux
 
+# autotools
+autom4te.cache
+
 # Linux executables (files without extensions)
 *
 !*/
@@ -21,6 +24,9 @@ docs/xml/
 *.ll
 *.o
 *.s
+
+# Ignore IDE directories
+.vscode
 
 # ignore the lsp-client server node modules
 node_modules

@@ -51,26 +51,26 @@
  * Used to control operator precedence and associativity in Pratt parsing.
  */
 typedef enum {
-    BP_NONE = 0,    /**< No binding power */
-    BP_LOWEST,      /**< Lowest binding power */
-    BP_ASSIGN,      /**< Assignment operators (=, +=, etc.) */
-    BP_TERNARY,     /**< Ternary conditional operator (? :) */
-    BP_LOGICAL_OR,  /**< Logical OR operator (||) */
-    BP_LOGICAL_AND, /**< Logical AND operator (&&) */
-    BP_BITWISE_OR,  /**< Bitwise OR operator (|) */
-    BP_BITWISE_XOR, /**< Bitwise XOR operator (^) */
-    BP_BITWISE_AND, /**< Bitwise AND operator (&) */
-    BP_EQUALITY,    /**< Equality operators (==, !=) */
-    BP_RELATIONAL,  /**< Relational operators (<, >, <=, >=) */
-    BP_RANGE,       /**< Range operations (..) */
-    BP_SHIFT,       /**< Shift operators (<<, >>) */
-    BP_SUM,         /**< Addition and subtraction (+, -) */
-    BP_PRODUCT,     /**< Multiplication, division, modulo (*, /, %) */
-    BP_EXPONENT,    /**< Exponentiation operator (**) */
-    BP_UNARY,       /**< Unary operators (!, ~, +, -, prefix ++/--) */
-    BP_POSTFIX,     /**< Postfix operators (++/-- postfix) */
-    BP_CALL,        /**< Function call or indexing */
-    BP_PRIMARY      /**< Primary expressions (literals, variables) */
+  BP_NONE = 0,    /**< No binding power */
+  BP_LOWEST,      /**< Lowest binding power */
+  BP_ASSIGN,      /**< Assignment operators (=, +=, etc.) */
+  BP_TERNARY,     /**< Ternary conditional operator (? :) */
+  BP_LOGICAL_OR,  /**< Logical OR operator (||) */
+  BP_LOGICAL_AND, /**< Logical AND operator (&&) */
+  BP_BITWISE_OR,  /**< Bitwise OR operator (|) */
+  BP_BITWISE_XOR, /**< Bitwise XOR operator (^) */
+  BP_BITWISE_AND, /**< Bitwise AND operator (&) */
+  BP_EQUALITY,    /**< Equality operators (==, !=) */
+  BP_RELATIONAL,  /**< Relational operators (<, >, <=, >=) */
+  BP_RANGE,       /**< Range operations (..) */
+  BP_SHIFT,       /**< Shift operators (<<, >>) */
+  BP_SUM,         /**< Addition and subtraction (+, -) */
+  BP_PRODUCT,     /**< Multiplication, division, modulo (*, /, %) */
+  BP_EXPONENT,    /**< Exponentiation operator (**) */
+  BP_UNARY,       /**< Unary operators (!, ~, +, -, prefix ++/--) */
+  BP_POSTFIX,     /**< Postfix operators (++/-- postfix) */
+  BP_CALL,        /**< Function call or indexing */
+  BP_PRIMARY      /**< Primary expressions (literals, variables) */
 } BindingPower;
 
 /**
@@ -88,15 +88,16 @@ static const LiteralType PRIMARY_LITERAL_TYPE_MAP[] = {
  * @brief Maps token types to their corresponding binary operators.
  */
 static const BinaryOp TOKEN_TO_BINOP_MAP[] = {
-    [TOK_PLUS] = BINOP_ADD,      [TOK_MINUS] = BINOP_SUB,
-    [TOK_STAR] = BINOP_MUL,      [TOK_SLASH] = BINOP_DIV,
-    [TOK_EQEQ] = BINOP_EQ,       [TOK_NEQ] = BINOP_NE,
-    [TOK_LT] = BINOP_LT,         [TOK_LE] = BINOP_LE,
-    [TOK_GT] = BINOP_GT,         [TOK_GE] = BINOP_GE,
-    [TOK_AND] = BINOP_AND,       [TOK_OR] = BINOP_OR,
-    [TOK_AMP] = BINOP_BIT_AND,   [TOK_PIPE] = BINOP_BIT_OR,
-    [TOK_CARET] = BINOP_BIT_XOR, [TOK_RANGE] = BINOP_RANGE,
-    [TOK_MODL] = BINOP_MOD,
+    [TOK_PLUS] = BINOP_ADD,        [TOK_MINUS] = BINOP_SUB,
+    [TOK_STAR] = BINOP_MUL,        [TOK_SLASH] = BINOP_DIV,
+    [TOK_EQEQ] = BINOP_EQ,         [TOK_NEQ] = BINOP_NE,
+    [TOK_LT] = BINOP_LT,           [TOK_LE] = BINOP_LE,
+    [TOK_GT] = BINOP_GT,           [TOK_GE] = BINOP_GE,
+    [TOK_AND] = BINOP_AND,         [TOK_OR] = BINOP_OR,
+    [TOK_AMP] = BINOP_BIT_AND,     [TOK_PIPE] = BINOP_BIT_OR,
+    [TOK_CARET] = BINOP_BIT_XOR,   [TOK_RANGE] = BINOP_RANGE,
+    [TOK_MODL] = BINOP_MOD,        [TOK_SHIFT_LEFT] = BINOP_SHL,
+    [TOK_SHIFT_RIGHT] = BINOP_SHR,
 };
 
 /**
@@ -113,12 +114,12 @@ static const UnaryOp TOKEN_TO_UNOP_MAP[] = {
  * @brief Parser state holding token stream and current position.
  */
 typedef struct {
-    const char *file_path;
-    ArenaAllocator *arena; /**< Memory arena for AST node allocations */
-    Token *tks;            /**< Array of tokens to parse */
-    size_t tk_count;       /**< Number of tokens in the array */
-    size_t capacity;       /**< Capacity for statements and expressions */
-    size_t pos;            /**< Current token position */
+  const char *file_path;
+  ArenaAllocator *arena; /**< Memory arena for AST node allocations */
+  Token *tks;            /**< Array of tokens to parse */
+  size_t tk_count;       /**< Number of tokens in the array */
+  size_t capacity;       /**< Capacity for statements and expressions */
+  size_t pos;            /**< Current token position */
 } Parser;
 
 /**
@@ -189,7 +190,10 @@ Expr *free_expr(Parser *parser);
 Expr *cast_expr(Parser *parser);
 Expr *input_expr(Parser *parser);
 Expr *system_expr(Parser *parser);
+Expr *syscall_expr(Parser *parser);
 Expr *sizeof_expr(Parser *parser);
+Expr *struct_expr(Parser *parser);
+Expr *named_struct_expr(Parser *parser, Expr *left, BindingPower bp);
 
 Type *tnud(Parser *parser);
 Type *tled(Parser *parser, Type *left, BindingPower bp);

@@ -13,9 +13,10 @@ void static_memory_analyzer_init(StaticMemoryAnalyzer *analyzer,
 
 void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
                                size_t column, const char *var_name,
-                               const char *function_name,
-                               Token *tokens, size_t token_count,
-                               const char *file_path) {
+                               const char *function_name, Token *tokens,
+                               size_t token_count, const char *file_path) {
+  (void)tokens;
+  (void)token_count;
   if (!var_name || strcmp(var_name, "anonymous") == 0) {
     return;
   }
@@ -30,12 +31,12 @@ void static_memory_track_alloc(StaticMemoryAnalyzer *analyzer, size_t line,
     alloc->free_count = 0;
     alloc->use_after_free_count = 0;
     alloc->reported = false;
-    alloc->function_name = function_name
-                               ? arena_strdup(analyzer->arena, function_name)
-                               : NULL;
-    
-    alloc->file_path = file_path ? arena_strdup(analyzer->arena, file_path) : NULL;
-    
+    alloc->function_name =
+        function_name ? arena_strdup(analyzer->arena, function_name) : NULL;
+
+    alloc->file_path =
+        file_path ? arena_strdup(analyzer->arena, file_path) : NULL;
+
     growable_array_init(&alloc->aliases, analyzer->arena, 4, sizeof(char *));
   }
 }
@@ -57,11 +58,10 @@ static StaticAllocation *find_allocation_by_name(StaticMemoryAnalyzer *analyzer,
       // If we're tracking function names, ensure they match
       if (alloc->function_name && current_function) {
         if (strcmp(alloc->function_name, current_function) == 0) {
-          return alloc;
+          return alloc; // Return first match in this function
         }
-      } else {
-        // Legacy behavior: match by name only
-        return alloc;
+      } else if (!alloc->function_name && !current_function) {
+        return alloc; // Global scope match
       }
     }
 
@@ -75,7 +75,7 @@ static StaticAllocation *find_allocation_by_name(StaticMemoryAnalyzer *analyzer,
             if (strcmp(alloc->function_name, current_function) == 0) {
               return alloc;
             }
-          } else {
+          } else if (!alloc->function_name && !current_function) {
             return alloc;
           }
         }
@@ -115,6 +115,8 @@ bool static_memory_check_use_after_free(StaticMemoryAnalyzer *analyzer,
                                         Token *tokens, int token_count,
                                         const char *file_path,
                                         const char *function_name) {
+  (void)tokens;
+  (void)token_count;
   if (!var_name)
     return true;
 
@@ -219,20 +221,22 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
     if (alloc->free_count > 1) {
       // Double free - need to re-read the file
       const char *source = read_file(alloc->file_path);
-      if (!source) continue;
-      
+      if (!source)
+        continue;
+
       Lexer temp_lexer;
       init_lexer(&temp_lexer, source, arena);
-      
+
       GrowableArray temp_tokens;
       growable_array_init(&temp_tokens, arena, 100, sizeof(Token));
-      
+
       Token tk;
       while ((tk = next_token(&temp_lexer)).type_ != TOK_EOF) {
         Token *slot = (Token *)growable_array_push(&temp_tokens);
-        if (slot) *slot = tk;
+        if (slot)
+          *slot = tk;
       }
-      
+
       ErrorInformation error = {0};
       error.error_type = "Double Free";
       error.file_path = alloc->file_path;
@@ -247,30 +251,32 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
                "Variable '%s' freed %d times (should only be freed once)",
                alloc->variable_name, alloc->free_count);
       error.message = message;
-      error.line_text = generate_line(arena, (Token *)temp_tokens.data, 
-                                     temp_tokens.count, error.line);
-      
+      error.line_text = generate_line(arena, (Token *)temp_tokens.data,
+                                      temp_tokens.count, error.line);
+
       free((void *)source);
       error_add(error);
       issues_found++;
-      
+
     } else if (!alloc->has_matching_free) {
       // Memory leak - re-read the file
       const char *source = read_file(alloc->file_path);
-      if (!source) continue;
-      
+      if (!source)
+        continue;
+
       Lexer temp_lexer;
       init_lexer(&temp_lexer, source, arena);
-      
+
       GrowableArray temp_tokens;
       growable_array_init(&temp_tokens, arena, 100, sizeof(Token));
-      
+
       Token tk;
       while ((tk = next_token(&temp_lexer)).type_ != TOK_EOF) {
         Token *slot = (Token *)growable_array_push(&temp_tokens);
-        if (slot) *slot = tk;
+        if (slot)
+          *slot = tk;
       }
-      
+
       ErrorInformation error = {0};
       error.error_type = "Memory Leak";
       error.file_path = alloc->file_path;
@@ -303,8 +309,8 @@ int static_memory_check_and_report(StaticMemoryAnalyzer *analyzer,
 
       error.message = message;
       error.line_text = generate_line(arena, (Token *)temp_tokens.data,
-                                     temp_tokens.count, error.line);
-      
+                                      temp_tokens.count, error.line);
+
       free((void *)source);
       error_add(error);
       issues_found++;

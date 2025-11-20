@@ -1,0 +1,166 @@
+@module "ast"
+
+@use "string" as string
+
+pub const ExprKind -> enum {
+  EXPR_NUMBER,
+  EXPR_IDENT,
+  EXPR_STRING,
+  EXPR_BINARY,
+  EXPR_UNARY,
+  EXPR_GROUP
+};
+
+pub const StmtKind -> enum {
+  STMT_PROGRAM
+};
+
+pub const Expr -> struct { type: int };
+pub const Stmt -> struct { type: int };
+
+pub const Program -> struct {
+  base: Stmt,
+  nodes: *Expr,
+};
+
+pub const Number -> struct {
+  base: Expr,
+  value: int
+};
+
+pub const Ident -> struct {
+  base: Expr, 
+  name: *char
+};
+
+pub const StringLit -> struct {
+  base: Expr,
+  value: *char
+};
+
+pub const Binary -> struct {
+  base: Expr,
+  op: char,       
+  left: *Expr,
+  right: *Expr
+};
+
+pub const Unary -> struct {
+  base: Expr,
+  op: char,       
+  operand: *Expr
+};
+
+pub const Group -> struct {
+  base: Expr,      
+  expr: *Expr
+};
+
+#returns_ownership
+pub const create_program_node -> fn (nodes: *Expr, size: int) *Stmt {
+  let node: *Program = cast<*Program>(alloc(size * sizeof<Program>));
+  let base_node: *Stmt = cast<*Stmt>(node);  
+
+  base_node.type = StmtKind::STMT_PROGRAM;
+  node.nodes = nodes;
+  return cast<*Stmt>(node);
+}
+
+#returns_ownership
+pub const create_number_node -> fn (value: int) *Expr {
+  let node: *Number = cast<*Number>(alloc(sizeof<Number>));
+  let base_node: *Expr = cast<*Expr>(node);  
+
+  base_node.type = ExprKind::EXPR_NUMBER;
+  node.value = value;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_ident_node -> fn (name: *char) *Expr {
+  let node: *Ident = cast<*Ident>(alloc(sizeof<Ident>));
+  let base_node: *Expr = cast<*Expr>(node);  
+
+  base_node.type = ExprKind::EXPR_IDENT;
+  node.name = name;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_string_node -> fn (value: *char) *Expr {
+  let node: *StringLit = cast<*StringLit>(alloc(sizeof<StringLit>));
+  let base_node: *Expr = cast<*Expr>(node);
+
+  base_node.type = ExprKind::EXPR_STRING;
+  node.value = value;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_binary_node -> fn (op: char, left: *Expr, 
+                                right: *Expr) *Expr {
+  let node: *Binary = cast<*Binary>(alloc(sizeof<Binary>));
+  let base_node: *Expr = cast<*Expr>(node);  
+
+  base_node.type = ExprKind::EXPR_BINARY;
+  node.op = op;
+  node.left = left;
+  node.right = right;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_unary_node -> fn (op: char, operand: *Expr) *Expr {
+  let node: *Unary = cast<*Unary>(alloc(sizeof<Unary>));
+  let base_node: *Expr = cast<*Expr>(node);  
+
+  base_node.type = ExprKind::EXPR_UNARY;
+  node.op = op;
+  node.operand = operand;
+  return cast<*Expr>(node);
+}
+
+#returns_ownership
+pub const create_group_node -> fn (expr: *Expr) *Expr {
+  let node: *Group = cast<*Group>(alloc(sizeof<Group>));
+  let base_node: *Expr = cast<*Expr>(node);  
+  base_node.type = ExprKind::EXPR_GROUP;
+  node.expr = expr;
+  return cast<*Expr>(node);
+}
+
+#takes_ownership
+pub const free_expr -> fn (node: *Expr) void {
+  if (node == cast<*Expr>(0)) { return; }
+
+  switch(node.type) {
+    ExprKind::EXPR_NUMBER, ExprKind::EXPR_IDENT, ExprKind::EXPR_STRING -> { /* No child nodes to free */ }
+    ExprKind::EXPR_BINARY -> {
+      let bin_node: *Binary = cast<*Binary>(node);
+      free_expr(bin_node.left); free_expr(bin_node.right);
+    }
+    ExprKind::EXPR_UNARY  -> {
+      let unary_node: *Unary = cast<*Unary>(node);
+      free_expr(unary_node.operand);
+    }
+    ExprKind::EXPR_GROUP  -> {
+      let group_node: *Group = cast<*Group>(node);
+      free_expr(group_node.expr);
+    }
+    _ -> output("Node not found to free: ", node.type);
+  }
+
+  free(node);
+}
+
+#takes_ownership
+pub const free_stmt -> fn (node: *Stmt) void {
+  if (node == cast<*Stmt>(0)) { return; }
+
+  if (node.type == StmtKind::STMT_PROGRAM) {
+    let program_node: *Program = cast<*Program>(node);
+    free_expr(program_node.nodes);
+  }
+
+  free(node);
+}

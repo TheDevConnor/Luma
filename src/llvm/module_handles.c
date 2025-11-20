@@ -361,71 +361,90 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
   const char *member = node->expr.member.member;
   bool is_compiletime = node->expr.member.is_compiletime;
 
-  if (object->type != AST_EXPR_IDENTIFIER) {
+  if (object->type != AST_EXPR_IDENTIFIER && 
+      !(object->type == AST_EXPR_MEMBER && is_compiletime)) {
     // Handle complex expressions like function_call().field or (*ptr).field
     return codegen_expr_struct_access(ctx, node);
   }
 
-  const char *object_name = object->expr.identifier.name;
-
-  // NEW: First check if this is actually a local variable/parameter with struct type
-  // This prevents false positives when parameter names match module names
-  LLVM_Symbol *local_sym = find_symbol(ctx, object_name);
-  if (local_sym && !local_sym->is_function) {
-    // Check if this local variable has a struct type
-    LLVMTypeRef sym_type = local_sym->type;
-    LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
-    
-    // If it's a struct or pointer to struct, this is struct field access
-    bool is_struct_access = false;
-    
-    if (sym_kind == LLVMStructTypeKind) {
-      is_struct_access = true;
-    } else if (sym_kind == LLVMPointerTypeKind && local_sym->element_type) {
-      if (LLVMGetTypeKind(local_sym->element_type) == LLVMStructTypeKind) {
-        is_struct_access = true;
-      }
-    }
-    
-    if (is_struct_access) {
-      // This is definitely struct field access, not module access
-      if (is_compiletime) {
-        fprintf(stderr, "Error: Cannot use compile-time access '::' for struct field.\n"
-                       "  Variable '%s' is a struct, use runtime access '.' instead: %s.%s\n",
-                object_name, object_name, member);
+  // **FIX: For compile-time access (::), check module access FIRST**
+  if (is_compiletime) {
+    // **NEW: Handle chained compile-time access (ast::ExprKind::EXPR_NUMBER)**
+    // Check if object itself is a member expression (chained ::)
+    if (object->type == AST_EXPR_MEMBER && object->expr.member.is_compiletime) {
+      // This is chained: module::Type::Member
+      // Example: ast::ExprKind::EXPR_NUMBER
+      //   object = ast::ExprKind (another member expr)
+      //   member = EXPR_NUMBER
+      
+      if (object->expr.member.object->type != AST_EXPR_IDENTIFIER) {
+        fprintf(stderr, "Error: Expected identifier in chained compile-time access\n");
         return NULL;
       }
-      return codegen_expr_struct_access(ctx, node);
+      
+      const char *module_name = object->expr.member.object->expr.identifier.name;
+      const char *type_name = object->expr.member.member;
+      
+      // Build the fully qualified name: TypeName.Member
+      char type_qualified_name[256];
+      snprintf(type_qualified_name, sizeof(type_qualified_name), "%s.%s", type_name, member);
+      
+      // Look in the specified module
+      ModuleCompilationUnit *source_module = find_module(ctx, module_name);
+      if (source_module) {
+        LLVM_Symbol *enum_member = find_symbol_in_module(source_module, type_qualified_name);
+        if (enum_member && is_enum_constant(enum_member)) {
+          return LLVMGetInitializer(enum_member->value);
+        }
+      }
+      
+      // If not found in the named module, try current module (in case it was imported)
+      LLVM_Symbol *enum_member = find_symbol_in_module(ctx->current_module, type_qualified_name);
+      if (enum_member && is_enum_constant(enum_member)) {
+        return LLVMGetInitializer(enum_member->value);
+      }
+      
+      // Try all imported modules as fallback
+      for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
+        if (unit == ctx->current_module)
+          continue;
+          
+        LLVM_Symbol *sym = find_symbol_in_module(unit, type_qualified_name);
+        if (sym && is_enum_constant(sym)) {
+          return LLVMGetInitializer(sym->value);
+        }
+      }
+      
+      fprintf(stderr, "Error: Enum member '%s::%s::%s' not found\n", 
+              module_name, type_name, member);
+      return NULL;
     }
-  }
 
-  // Check if this is compile-time access (::)
-  if (is_compiletime) {
-    // This is compile-time access - handle module functions and enum members
+    // Handle simple compile-time access (module::symbol or Type::member)
+    const char *object_name = NULL;
+    if (object->type == AST_EXPR_IDENTIFIER) {
+      object_name = object->expr.identifier.name;
+    } else {
+      fprintf(stderr, "Error: Expected identifier for compile-time access\n");
+      return NULL;
+    }
 
-    // 1. First check if it's a direct qualified symbol (module.function or
-    // enum.member)
+    // 1. First check if it's a direct qualified symbol (module.function or enum.member)
     char qualified_name[256];
-    snprintf(qualified_name, sizeof(qualified_name), "%s.%s", object_name,
-             member);
+    snprintf(qualified_name, sizeof(qualified_name), "%s.%s", object_name, member);
 
-    LLVM_Symbol *qualified_sym =
-        find_symbol_in_module(ctx->current_module, qualified_name);
+    LLVM_Symbol *qualified_sym = find_symbol_in_module(ctx->current_module, qualified_name);
     if (qualified_sym) {
       if (qualified_sym->is_function) {
         return qualified_sym->value;
       } else if (is_enum_constant(qualified_sym)) {
-        // Enum constant - return the constant value directly
         return LLVMGetInitializer(qualified_sym->value);
       } else {
-        // Regular variable - load its value
-        return LLVMBuildLoad2(ctx->builder, qualified_sym->type,
-                              qualified_sym->value, "load");
+        return LLVMBuildLoad2(ctx->builder, qualified_sym->type, qualified_sym->value, "load");
       }
     }
 
-    // 1.5 Search all modules to find where this symbol exists
-    // (handles both direct module names and aliases)
+    // 2. Search all modules to find where this symbol exists
     for (ModuleCompilationUnit *search_module = ctx->modules; search_module;
          search_module = search_module->next) {
       if (search_module == ctx->current_module)
@@ -444,34 +463,28 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
         }
 
         // Now try to find the imported symbol again
-        qualified_sym =
-            find_symbol_in_module(ctx->current_module, qualified_name);
+        qualified_sym = find_symbol_in_module(ctx->current_module, qualified_name);
         if (qualified_sym) {
           if (qualified_sym->is_function) {
             return qualified_sym->value;
           } else {
-            return LLVMBuildLoad2(ctx->builder, qualified_sym->type,
-                                  qualified_sym->value, "load");
+            return LLVMBuildLoad2(ctx->builder, qualified_sym->type, qualified_sym->value, "load");
           }
         }
         break; // Found and imported, stop searching
       }
     }
 
-    // 2. Check if this is an imported module function
-    // Look for module import with this alias
+    // 3. Check if this is an imported module function
     for (ModuleCompilationUnit *unit = ctx->modules; unit; unit = unit->next) {
       if (unit == ctx->current_module)
         continue;
 
-      // Check if we have any imported symbols from this module with the alias
-      // pattern
+      // Check if we have any imported symbols from this module with the alias pattern
       char test_qualified_name[256];
-      snprintf(test_qualified_name, sizeof(test_qualified_name), "%s.%s",
-               object_name, member);
+      snprintf(test_qualified_name, sizeof(test_qualified_name), "%s.%s", object_name, member);
 
-      LLVM_Symbol *imported_sym =
-          find_symbol_in_module(ctx->current_module, test_qualified_name);
+      LLVM_Symbol *imported_sym = find_symbol_in_module(ctx->current_module, test_qualified_name);
       if (imported_sym && imported_sym->is_function) {
         return imported_sym->value;
       }
@@ -485,28 +498,50 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
         LLVMModuleRef current_llvm_module =
             ctx->current_module ? ctx->current_module->module : ctx->module;
 
-        LLVMValueRef existing =
-            LLVMGetNamedFunction(current_llvm_module, member);
+        LLVMValueRef existing = LLVMGetNamedFunction(current_llvm_module, member);
         if (!existing) {
           LLVMTypeRef func_type = LLVMGlobalGetValueType(original_sym->value);
           existing = LLVMAddFunction(current_llvm_module, member, func_type);
           LLVMSetLinkage(existing, LLVMExternalLinkage);
 
           // Add to current module's symbol table
-          add_symbol_to_module(ctx->current_module, test_qualified_name,
-                               existing, func_type, true);
+          add_symbol_to_module(ctx->current_module, test_qualified_name, existing, func_type, true);
         }
         return original_sym->value;
       }
     }
 
-    // 3. Error for compile-time access that wasn't found
-    fprintf(stderr, "Error: No compile-time symbol '%s::%s' found\n",
-            object_name, member);
+    // 4. Error for compile-time access that wasn't found
+    fprintf(stderr, "Error: No compile-time symbol '%s::%s' found\n", object_name, member);
     return NULL;
   }
 
-  // This is runtime access (.) - handle struct field access
+  // **NOW check for runtime access (.)**
+  const char *object_name = object->expr.identifier.name;
+  
+  // Only NOW do we check if this is a local struct variable
+  LLVM_Symbol *local_sym = find_symbol(ctx, object_name);
+  if (local_sym && !local_sym->is_function) {
+    // Check if this local variable has a struct type
+    LLVMTypeRef sym_type = local_sym->type;
+    LLVMTypeKind sym_kind = LLVMGetTypeKind(sym_type);
+
+    // If it's a struct or pointer to struct, this is struct field access
+    bool is_struct_access = false;
+
+    if (sym_kind == LLVMStructTypeKind) {
+      is_struct_access = true;
+    } else if (sym_kind == LLVMPointerTypeKind && local_sym->element_type) {
+      if (LLVMGetTypeKind(local_sym->element_type) == LLVMStructTypeKind) {
+        is_struct_access = true;
+      }
+    }
+
+    if (is_struct_access) {
+      // This is struct field/method access
+      return codegen_expr_struct_access(ctx, node);
+    }
+  }
 
   // 1. Check if base_name is a known module (give helpful error)
   bool is_module_access = false;
@@ -518,10 +553,8 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
 
     // Also check for alias pattern
     char test_qualified_name[256];
-    snprintf(test_qualified_name, sizeof(test_qualified_name), "%s.%s",
-             object_name, member);
-    LLVM_Symbol *test_sym =
-        find_symbol_in_module(ctx->current_module, test_qualified_name);
+    snprintf(test_qualified_name, sizeof(test_qualified_name), "%s.%s", object_name, member);
+    LLVM_Symbol *test_sym = find_symbol_in_module(ctx->current_module, test_qualified_name);
     if (test_sym && test_sym->is_function) {
       is_module_access = true;
       break;
@@ -546,8 +579,7 @@ LLVMValueRef codegen_expr_member_access_enhanced(CodeGenContext *ctx,
   }
 
   if (obj_sym->is_function) {
-    fprintf(stderr, "Error: Cannot use member access on function '%s'\n",
-            object_name);
+    fprintf(stderr, "Error: Cannot use member access on function '%s'\n", object_name);
     return NULL;
   }
 
@@ -674,7 +706,6 @@ void print_module_info(CodeGenContext *ctx) {
 // Also add this debug function to help diagnose linking issues:
 void debug_object_files(const char *output_dir) {
   printf("\n=== OBJECT FILE DEBUG INFO ===\n");
-
   char command[512];
   snprintf(command, sizeof(command), "ls -la %s/*.o", output_dir);
   printf("Object files in %s:\n", output_dir);

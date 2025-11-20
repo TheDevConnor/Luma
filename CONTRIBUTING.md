@@ -1,8 +1,8 @@
-# Contributing to Lux
+# Contributing to Luma
 
-Thank you for your interest in contributing to Lux, a simple yet powerful systems programming language!
+Thank you for your interest in contributing to Luma, a simple yet powerful systems programming language!
 
-This document outlines the guidelines and best practices to help you contribute effectively. Whether you're reporting bugs, suggesting features, or submitting code, we appreciate your help making Lux better for everyone.
+This document outlines the guidelines and best practices to help you contribute effectively. Whether you're reporting bugs, suggesting features, or submitting code, we appreciate your help making Luma better for everyone.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ By participating in this project, you agree to abide by the Contributor Covenant
 
 ### Reporting Issues
 
-If you find a bug or unexpected behavior in Lux, please open an issue on the GitHub repository with:
+If you find a bug or unexpected behavior in Luma, please open an issue on the GitHub repository with:
 
 - A clear and descriptive title
 - Steps to reproduce the problem
@@ -58,18 +58,20 @@ To set up a local development environment:
 
 1. Ensure you have the required dependencies installed (e.g., cmake, ninja, gcc or your preferred compiler).
 
-2. Clone the Lux repository:
-   ```bash
-   git clone https://github.com/your-username/lux.git
-   cd lux
-   ```
+2. Clone the Luma repository:
+
+```bash
+git clone https://github.com/your-username/luma.git
+cd luma
+```
 
 3. Build the project following instructions in the README (or specific build scripts).
 
 4. Run to ensure everything is working:
-   ```bash
-   ./lux
-   ```
+
+```bash
+./luma
+```
 
 ## Style Guide
 
@@ -93,4 +95,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-**Thank you for helping make Lux awesome!**
+**Thank you for helping make Luma awesome!**

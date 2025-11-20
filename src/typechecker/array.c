@@ -66,6 +66,7 @@ bool validate_array_type(AstNode *array_type, Scope *scope,
 // Enhanced array bounds checking for constant indices
 bool check_array_bounds(AstNode *array_type, AstNode *index_expr,
                         ArenaAllocator *arena) {
+  (void)arena;
   if (!array_type || array_type->type != AST_TYPE_ARRAY || !index_expr) {
     return true; // Can't check - assume valid
   }

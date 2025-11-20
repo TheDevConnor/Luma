@@ -105,6 +105,29 @@ AstNode *typecheck_binary_expr(AstNode *expr, Scope *scope,
     return array;
   }
 
+  // Bitwise operators (&, |, ^, <<, >>)
+  if (op == BINOP_BIT_AND || op == BINOP_BIT_OR || op == BINOP_BIT_XOR ||
+      op == BINOP_SHL || op == BINOP_SHR) {
+    if (!is_numeric_type(left_type)) {
+      tc_error_help(expr, "Type Error",
+                    "Bitwise operations require integer operands",
+                    "Left operand has non-integer type '%s'",
+                    type_to_string(left_type, arena));
+      return NULL;
+    }
+
+    if (!is_numeric_type(right_type)) {
+      tc_error_help(expr, "Type Error",
+                    "Bitwise operations require integer operands",
+                    "Right operand has non-integer type '%s'",
+                    type_to_string(right_type, arena));
+      return NULL;
+    }
+
+    // Bitwise operations return int
+    return create_basic_type(arena, "int", expr->line, expr->column);
+  }
+
   tc_error(expr, "Unsupported Operation", "Unsupported binary operation");
   return NULL;
 }
@@ -140,6 +163,14 @@ AstNode *typecheck_unary_expr(AstNode *expr, Scope *scope,
     return create_basic_type(arena, "bool", expr->line, expr->column);
   }
 
+  if (op == UNOP_BIT_NOT) {
+    if (!is_numeric_type(operand_type)) {
+      tc_error(expr, "Type Error", "Bitwise NOT on non-integer type");
+      return NULL;
+    }
+    return operand_type; // Bitwise NOT does not change type
+  }
+
   tc_error(expr, "Type Error", "Unsupported unary operation");
   return NULL;
 }
@@ -156,24 +187,20 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
 
   // Check for pointer assignment that might transfer ownership
   if (is_pointer_type(target_type) && is_pointer_type(value_type)) {
-    // fprintf(stderr, "DEBUG: Detected pointer assignment\n");
-
     // Extract variable names from both sides
     const char *target_var =
         extract_variable_name(expr->expr.assignment.target);
     const char *source_var = extract_variable_name(expr->expr.assignment.value);
 
-    // fprintf(stderr, "DEBUG: target_var='%s', source_var='%s'\n",
-    //         target_var ? target_var : "NULL", source_var ? source_var :
-    //         "NULL");
+    // CRITICAL FIX: Only track aliasing for direct variable-to-variable
+    // assignments NOT for struct member assignments like node1.next = node2
+    // Check if the target is a simple identifier (not a member access)
+    bool is_direct_assignment =
+        (expr->expr.assignment.target->type == AST_EXPR_IDENTIFIER);
 
-    if (target_var && source_var) {
+    if (target_var && source_var && is_direct_assignment) {
       StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
-      // fprintf(stderr, "DEBUG: Got analyzer: %p\n", (void *)analyzer);
       if (analyzer) {
-        // fprintf(stderr, "DEBUG: Calling track_alias('%s', '%s')\n",
-        // target_var,
-        //         source_var);
         static_memory_track_alias(analyzer, target_var, source_var);
       }
     }
@@ -192,6 +219,9 @@ AstNode *typecheck_assignment_expr(AstNode *expr, Scope *scope,
   return target_type;
 }
 
+// Complete typecheck_call_expr function with ownership tracking
+// Place this entire function in expr.c, replacing the existing one
+
 AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
                              ArenaAllocator *arena) {
   AstNode *callee = expr->expr.call.callee;
@@ -200,39 +230,26 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
 
   Symbol *func_symbol = NULL;
   const char *func_name = NULL;
-  bool is_method_call = false; // Track if this is a method call with injected self
+  bool is_method_call = false;
 
   if (callee->type == AST_EXPR_IDENTIFIER) {
-    // Simple function call: func()
     func_name = callee->expr.identifier.name;
     func_symbol = scope_lookup(scope, func_name);
-
   } else if (callee->type == AST_EXPR_MEMBER) {
-    
-    // Member function call: could be module::func() or obj.method()
     const char *base_name = callee->expr.member.object->expr.identifier.name;
     const char *member_name = callee->expr.member.member;
     bool is_compiletime = callee->expr.member.is_compiletime;
 
     if (is_compiletime) {
-      // Compile-time member function call: module::func() or
-      // Type::static_method()
       func_symbol = lookup_qualified_symbol(scope, base_name, member_name);
       func_name = member_name;
-
       if (!func_symbol) {
         tc_error(expr, "Compile-time Call Error",
                  "No compile-time callable '%s::%s' found", base_name,
                  member_name);
         return NULL;
       }
-
     } else {
-      // Runtime member function call: obj.method()
-      // This should be for instance methods on struct objects
-
-      // First, check if base_name is a known module (without calling
-      // lookup_qualified_symbol)
       bool is_module_access = false;
       Scope *current = scope;
       while (current) {
@@ -259,7 +276,6 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
         return NULL;
       }
 
-      // Check if base_name is a variable with a struct type
       Symbol *base_symbol = scope_lookup(scope, base_name);
       if (!base_symbol) {
         tc_error(expr, "Runtime Access Error", "Undefined identifier '%s'",
@@ -274,50 +290,42 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
       }
 
       AstNode *base_type = base_symbol->type;
-      // Handle pointer dereference: if we have a pointer to struct,
-      // automatically dereference it
       if (base_type->type == AST_TYPE_POINTER) {
         AstNode *pointee = base_type->type_data.pointer.pointee_type;
         if (pointee && pointee->type == AST_TYPE_BASIC) {
-          // Check if the pointee is a struct type name
           Symbol *struct_symbol =
               scope_lookup(scope, pointee->type_data.basic.name);
           if (struct_symbol && struct_symbol->type &&
               struct_symbol->type->type == AST_TYPE_STRUCT) {
-            base_type = struct_symbol->type; // Use the struct type
+            base_type = struct_symbol->type;
           }
         } else if (pointee && pointee->type == AST_TYPE_STRUCT) {
           base_type = pointee;
         }
       }
 
-      // Handle case where base_type is a basic type that references a struct
       if (base_type->type == AST_TYPE_BASIC) {
-        // Look up the struct type by name
         Symbol *struct_symbol =
             scope_lookup(scope, base_type->type_data.basic.name);
         if (struct_symbol && struct_symbol->type &&
             struct_symbol->type->type == AST_TYPE_STRUCT) {
-          base_type = struct_symbol->type; // Use the actual struct type
+          base_type = struct_symbol->type;
         }
       }
 
-      // Now check if it's a struct type and get the member
       if (base_type->type == AST_TYPE_STRUCT) {
         AstNode *member_type = get_struct_member_type(base_type, member_name);
 
         if (member_type && member_type->type == AST_TYPE_FUNCTION) {
-          // This is a method call on a struct instance
           func_symbol = arena_alloc(arena, sizeof(Symbol), alignof(Symbol));
           if (!func_symbol) {
-            tc_error(expr, "Memory Error", "Failed to allocate symbol for method '%s'", member_name);
+            tc_error(expr, "Memory Error",
+                     "Failed to allocate symbol for method '%s'", member_name);
             return NULL;
           }
-          
+
           func_symbol->name = member_name;
-          
           func_symbol->type = member_type;
-          
           func_symbol->is_public = true;
           func_symbol->is_mutable = false;
           func_symbol->scope_depth = 0;
@@ -325,54 +333,44 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
           func_symbol->takes_ownership = false;
           func_name = member_name;
 
-          // CRITICAL: For method calls, we need to inject 'self' as the first argument
-          // Verify we have a valid object before injectin
           if (!callee->expr.member.object) {
             tc_error(expr, "Internal Error", "Method call has no object");
             return NULL;
           }
 
-          // Create a new arguments array with 'self' prepended
           size_t new_arg_count = arg_count + 1;
-          AstNode **new_arguments = arena_alloc(arena, new_arg_count * sizeof(AstNode *), 
-                                                alignof(AstNode *));
-          
+          AstNode **new_arguments = arena_alloc(
+              arena, new_arg_count * sizeof(AstNode *), alignof(AstNode *));
           if (!new_arguments) {
-            tc_error(expr, "Memory Error", "Failed to allocate arguments array for method call");
+            tc_error(expr, "Memory Error",
+                     "Failed to allocate arguments array for method call");
             return NULL;
           }
-          
-          // CRITICAL: Check if we need to take the address of the object
-          // The method expects a pointer to the struct (self is Person*)
-          // But obj.method() gives us the struct value (Person)
-          // We need to automatically inject &obj instead of just obj
-          
-          // Get the method's parameter types to check what self expects
+
           if (!member_type || member_type->type != AST_TYPE_FUNCTION) {
             tc_error(expr, "Internal Error", "Method type is not a function");
             return NULL;
           }
-          
-          AstNode **method_param_types = member_type->type_data.function.param_types;
-          if (!method_param_types || member_type->type_data.function.param_count == 0) {
-            tc_error(expr, "Internal Error", "Method has no parameters (missing self?)");
+
+          AstNode **method_param_types =
+              member_type->type_data.function.param_types;
+          if (!method_param_types ||
+              member_type->type_data.function.param_count == 0) {
+            tc_error(expr, "Internal Error",
+                     "Method has no parameters (missing self?)");
             return NULL;
           }
-          
-          AstNode *self_param_type = method_param_types[0]; // First param is always self
+
+          AstNode *self_param_type = method_param_types[0];
           AstNode *object_node = callee->expr.member.object;
-          
-          // Check what the method expects for self
           bool expects_pointer = (self_param_type->type == AST_TYPE_POINTER);
-          
-          // Check what we have
           Symbol *obj_symbol = scope_lookup(scope, base_name);
-          bool have_pointer = (obj_symbol && obj_symbol->type && 
+          bool have_pointer = (obj_symbol && obj_symbol->type &&
                                obj_symbol->type->type == AST_TYPE_POINTER);
-          
+
           if (expects_pointer && !have_pointer) {
-            // Method expects pointer but we have value - take address
-            AstNode *addr_expr = arena_alloc(arena, sizeof(AstNode), alignof(AstNode));
+            AstNode *addr_expr =
+                arena_alloc(arena, sizeof(AstNode), alignof(AstNode));
             addr_expr->type = AST_EXPR_ADDR;
             addr_expr->category = Node_Category_EXPR;
             addr_expr->line = object_node->line;
@@ -380,23 +378,18 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
             addr_expr->expr.addr.object = object_node;
             new_arguments[0] = addr_expr;
           } else {
-            // Either method expects value, or we already have pointer
             new_arguments[0] = object_node;
           }
-          
-          // Copy the rest of the user-provided arguments
+
           for (size_t i = 0; i < arg_count; i++) {
             new_arguments[i + 1] = arguments[i];
           }
-          
-          // Update the arguments and count for the rest of the function
+
           arguments = new_arguments;
           arg_count = new_arg_count;
-          is_method_call = true; // Mark that we injected self
-
+          is_method_call = true;
           expr->expr.call.args = new_arguments;
           expr->expr.call.arg_count = new_arg_count;
-          
         } else if (member_type) {
           tc_error(expr, "Runtime Call Error",
                    "Cannot call non-function member '%s' on struct '%s'",
@@ -408,19 +401,17 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
           return NULL;
         }
       } else {
-        // Base is not a struct - runtime access is invalid
         tc_error(expr, "Runtime Call Error",
                  "Cannot use runtime access '.' on non-struct type '%s'",
                  type_to_string(base_type, arena));
         return NULL;
       }
     }
-
   } else {
     tc_error(expr, "Call Error", "Unsupported callee type for function call");
     return NULL;
   }
-  
+
   if (!func_symbol) {
     tc_error(expr, "Call Error", "Undefined function '%s'",
              func_name ? func_name : "unknown");
@@ -428,7 +419,6 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
   }
 
   AstNode *func_type = func_symbol->type;
-
   if (func_type->type != AST_TYPE_FUNCTION) {
     tc_error(expr, "Call Error", "'%s' is not a function", func_name);
     return NULL;
@@ -444,51 +434,86 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
     return NULL;
   }
 
-  // For method calls, start from index 1 to skip the injected 'self' parameter
   size_t start_index = is_method_call ? 1 : 0;
-  
   for (size_t i = start_index; i < arg_count; i++) {
-    // Validate the argument pointer before dereferencing
-    if (!arguments) {
-      tc_error(expr, "Call Error",
-               "Arguments array is NULL for call to '%s'", func_name);
+    if (!arguments || !arguments[i]) {
+      tc_error(expr, "Call Error", "Argument %zu in call to '%s' is NULL",
+               i + 1, func_name);
       return NULL;
     }
-    
-    if (!arguments[i]) {
-      tc_error(expr, "Call Error",
-               "Argument %zu in call to '%s' is NULL", i + 1, func_name);
-      return NULL;
-    }
-    
+
     AstNode *arg_type = typecheck_expression(arguments[i], scope, arena);
-    
     if (!arg_type) {
       tc_error(expr, "Call Error",
                "Failed to type-check argument %zu in call to '%s'", i + 1,
                func_name);
       return NULL;
     }
-    
-    // Validate param_types array
+
     if (!param_types || !param_types[i]) {
       tc_error(expr, "Call Error",
                "Parameter %zu type in function '%s' is NULL", i + 1, func_name);
       return NULL;
     }
-    
+
     TypeMatchResult match = types_match(param_types[i], arg_type);
     
-    if (match == TYPE_MATCH_NONE) {
-      fprintf(stderr, "DEBUG: Type mismatch - NONE - about to report error\n");
+    // NEW: Special handling for array argument padding
+    // If the parameter expects a larger array than provided, allow it with padding
+    if (match == TYPE_MATCH_NONE && 
+        param_types[i]->type == AST_TYPE_ARRAY && 
+        arg_type->type == AST_TYPE_ARRAY) {
       
+      // Check if element types match
+      TypeMatchResult element_match = 
+          types_match(param_types[i]->type_data.array.element_type,
+                      arg_type->type_data.array.element_type);
+      
+      if (element_match != TYPE_MATCH_NONE) {
+        // Element types match, check sizes
+        AstNode *param_size = param_types[i]->type_data.array.size;
+        AstNode *arg_size = arg_type->type_data.array.size;
+        
+        if (param_size && arg_size &&
+            param_size->type == AST_EXPR_LITERAL && 
+            arg_size->type == AST_EXPR_LITERAL &&
+            param_size->expr.literal.lit_type == LITERAL_INT &&
+            arg_size->expr.literal.lit_type == LITERAL_INT) {
+          
+          long long param_size_val = param_size->expr.literal.value.int_val;
+          long long arg_size_val = arg_size->expr.literal.value.int_val;
+          
+          // If argument array is smaller than parameter, allow it with padding
+          if (arg_size_val <= param_size_val) {
+            // Set a flag on the argument node to indicate it needs padding
+            // This will be handled by the code generator
+            if (arguments[i]->type == AST_EXPR_ARRAY) {
+              // Mark this array for padding to param_size_val elements
+              // Store the target size for the code generator to use
+              arguments[i]->expr.array.target_size = (size_t)param_size_val;
+            }
+            
+            // Continue to next argument - this is valid
+            continue;
+          } else {
+            // Argument array is LARGER than parameter - this is an error
+            tc_error_help(
+                expr, "Array Size Mismatch",
+                "Cannot pass larger array to function expecting smaller array",
+                "Argument %zu: parameter expects array of size %lld, got size %lld",
+                i + 1, param_size_val, arg_size_val);
+            return NULL;
+          }
+        }
+      }
+    }
+    
+    if (match == TYPE_MATCH_NONE) {
       const char *param_str = type_to_string(param_types[i], arena);
       const char *arg_str = type_to_string(arg_type, arena);
-      
-      tc_error_help(expr, "Call Error",
-                    "Argument %zu to function '%s' has wrong type.",
-                    "Expected '%s', got '%s'", i + 1, func_name,
-                    param_str, arg_str);
+      tc_error_help(
+          expr, "Call Error", "Argument %zu to function '%s' has wrong type.",
+          "Expected '%s', got '%s'", i + 1, func_name, param_str, arg_str);
       return NULL;
     }
   }
@@ -508,7 +533,33 @@ AstNode *typecheck_call_expr(AstNode *expr, Scope *scope,
       }
     }
   }
-  
+
+  // ADDITION: For method calls with #takes_ownership, track ownership transfer
+  // of 'self'
+  if (is_method_call && func_symbol->takes_ownership) {
+    if (arguments[0]) {
+      const char *self_var = NULL;
+
+      // Check if we injected &obj for the self parameter
+      if (arguments[0]->type == AST_EXPR_ADDR) {
+        // Extract the object from &obj
+        self_var = extract_variable_name(arguments[0]->expr.addr.object);
+      } else {
+        // Direct parameter (less common, but handle it)
+        self_var = extract_variable_name(arguments[0]);
+      }
+
+      if (self_var) {
+        StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
+        if (analyzer) {
+          const char *current_func = get_current_function_name(scope);
+          // Method takes ownership of self - mark as freed
+          static_memory_track_free(analyzer, self_var, current_func);
+        }
+      }
+    }
+  }
+
   return return_type;
 }
 
@@ -598,130 +649,266 @@ AstNode *typecheck_index_expr(AstNode *expr, Scope *scope,
 
 AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
-  const char *base_name = expr->expr.member.object->expr.identifier.name;
+  // Get the base object and member name
+  AstNode *base_object = expr->expr.member.object;
   const char *member_name = expr->expr.member.member;
   bool is_compiletime = expr->expr.member.is_compiletime;
 
   if (is_compiletime) {
     // Compile-time access (::) - for modules, enums, static members
 
-    // First try module-qualified symbol lookup
-    Symbol *module_symbol =
-        lookup_qualified_symbol(scope, base_name, member_name);
-    if (module_symbol) {
-      return module_symbol->type;
+    // CRITICAL FIX: Handle chained access (e.g., ast::ExprKind::EXPR_NUMBER)
+    // First, resolve the base to its type
+    AstNode *base_type = NULL;
+    const char *base_name = NULL;
+
+    if (base_object->type == AST_EXPR_IDENTIFIER) {
+      // Simple case: module::symbol or EnumType::Member
+      base_name = base_object->expr.identifier.name;
+
+      // First try module-qualified symbol lookup
+      Symbol *module_symbol =
+          lookup_qualified_symbol(scope, base_name, member_name);
+      if (module_symbol) {
+        return module_symbol->type;
+      }
+
+      // Try direct symbol lookup (for enum types in current scope)
+      Symbol *base_symbol = scope_lookup(scope, base_name);
+      if (base_symbol && base_symbol->type) {
+        base_type = base_symbol->type;
+        // base_name already set above
+      } else {
+        // Check if it's an undefined module
+        bool is_module = false;
+        Scope *current = scope;
+        while (current && !is_module) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+            if (strcmp(import->alias, base_name) == 0) {
+              is_module = true;
+              break;
+            }
+          }
+          current = current->parent;
+        }
+
+        if (is_module) {
+          tc_error(expr, "Compile-time Access Error",
+                   "Module '%s' has no exported symbol '%s'", base_name,
+                   member_name);
+        } else {
+          tc_error(expr, "Compile-time Access Error",
+                   "Undefined identifier '%s' in compile-time access",
+                   base_name);
+        }
+        return NULL;
+      }
+
+    } else if (base_object->type == AST_EXPR_MEMBER) {
+      // Chained case: ast::ExprKind::EXPR_NUMBER
+      // First resolve the inner member expression recursively
+      base_type = typecheck_member_expr(base_object, scope, arena);
+      if (!base_type) {
+        tc_error(expr, "Compile-time Access Error",
+                 "Failed to resolve base expression in chained access");
+        return NULL;
+      }
+
+      // CRITICAL FIX: Extract the name from the resolved type
+      // The resolved type should be a basic type (enum type name)
+      if (base_type->type == AST_TYPE_BASIC) {
+        base_name = base_type->type_data.basic.name;
+      } else if (base_type->type == AST_TYPE_STRUCT) {
+        base_name = base_type->type_data.struct_type.name;
+      } else {
+        tc_error(expr, "Compile-time Access Error",
+                 "Cannot use compile-time access '::' on complex type '%s'",
+                 type_to_string(base_type, arena));
+        return NULL;
+      }
+
+      // IMPORTANT: Now that we have base_name, we need to look up the qualified
+      // symbol Build the qualified name: base_name.member_name
+      size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
+      char *qualified_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
+
+      // Look up this qualified symbol (e.g., "ExprKind.EXPR_NUMBER")
+      Symbol *member_symbol = scope_lookup(scope, qualified_name);
+
+      if (!member_symbol) {
+        // Try looking in imported modules
+        Scope *current = scope;
+        while (current && !member_symbol) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+
+            member_symbol = scope_lookup_current_only_with_visibility(
+                import->module_scope, qualified_name, scope);
+
+            if (member_symbol) {
+              break;
+            }
+          }
+          current = current->parent;
+        }
+      }
+
+      if (member_symbol) {
+        return member_symbol->type;
+      }
+
+      tc_error(expr, "Compile-time Access Error",
+               "Type '%s' has no compile-time member '%s'", base_name,
+               member_name);
+      return NULL;
+
+    } else {
+      tc_error(expr, "Compile-time Access Error",
+               "Compile-time access '::' requires an identifier or member "
+               "expression on the left");
+      return NULL;
     }
 
-    // Try enum-style lookup (EnumName::Member)
+    // Now we have base_name and member_name - look up the qualified symbol
+    // Try enum-style lookup (EnumName::Member or Module::Type)
     size_t qualified_len = strlen(base_name) + strlen(member_name) + 2;
     char *qualified_name = arena_alloc(arena, qualified_len, 1);
     snprintf(qualified_name, qualified_len, "%s.%s", base_name, member_name);
 
+    // Look up the qualified symbol with visibility rules
     Symbol *member_symbol = scope_lookup(scope, qualified_name);
+
+    if (!member_symbol) {
+      // Try looking in imported modules explicitly
+      Scope *current = scope;
+      while (current && !member_symbol) {
+        for (size_t i = 0; i < current->imported_modules.count; i++) {
+          ModuleImport *import =
+              (ModuleImport *)((char *)current->imported_modules.data +
+                               i * sizeof(ModuleImport));
+
+          // Look in the imported module's scope
+          member_symbol = scope_lookup_current_only_with_visibility(
+              import->module_scope, qualified_name, scope);
+
+          if (member_symbol) {
+            break;
+          }
+        }
+        current = current->parent;
+      }
+    }
+
     if (member_symbol) {
       return member_symbol->type;
     }
 
-    // Error handling for compile-time access
-    Symbol *base_symbol = scope_lookup(scope, base_name);
-    if (!base_symbol) {
-      // Check if it's an unknown module
-      for (size_t i = 0; i < scope->imported_modules.count; i++) {
-        ModuleImport *import =
-            (ModuleImport *)((char *)scope->imported_modules.data +
-                             i * sizeof(ModuleImport));
-        if (strcmp(import->alias, base_name) == 0) {
-          tc_error(expr, "Compile-time Access Error",
-                   "Module '%s' has no exported symbol '%s'", base_name,
-                   member_name);
-          return NULL;
-        }
-      }
-      tc_error(expr, "Compile-time Access Error",
-               "Undefined identifier '%s' in compile-time access", base_name);
-    } else {
-      // Base exists but member doesn't - check what kind of symbol it is
-      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
-        // Could be an enum type
-        tc_error(expr, "Compile-time Access Error",
-                 "Type '%s' has no compile-time member '%s'", base_name,
-                 member_name);
-      } else {
-        tc_error(expr, "Compile-time Access Error",
-                 "Cannot use compile-time access '::' on runtime value '%s'",
-                 base_name);
-      }
-    }
+    // Error handling - symbol not found
+    tc_error(expr, "Compile-time Access Error",
+             "Type '%s' has no compile-time member '%s'", base_name,
+             member_name);
     return NULL;
 
   } else {
     // Runtime access (.) - for struct members, instance data
 
-    Symbol *base_symbol = scope_lookup(scope, base_name);
-    if (!base_symbol) {
-      tc_error(expr, "Runtime Access Error", "Undefined identifier '%s'",
-               base_name);
-      return NULL;
-    }
-
-    if (!base_symbol->type) {
+    // CRITICAL FIX: Typecheck the base expression first
+    // This handles complex expressions like lex.list[i]
+    AstNode *base_type = typecheck_expression(base_object, scope, arena);
+    if (!base_type) {
       tc_error(expr, "Runtime Access Error",
-               "Symbol '%s' has no type information", base_name);
+               "Failed to determine type of base expression");
       return NULL;
     }
-
-    AstNode *base_type = base_symbol->type;
-
-    // printf("DEBUG: Runtime member access - base '%s' has type %p (category
-    // %d, "
-    //        "type %d)\n",
-    //        base_name, (void *)base_type, base_type->category,
-    //        base_type->type);
 
     // Handle pointer dereference: if we have a pointer to struct, automatically
     // dereference it
     if (base_type->type == AST_TYPE_POINTER) {
-      // printf("DEBUG: Base type is pointer, checking pointee\n");
       AstNode *pointee = base_type->type_data.pointer.pointee_type;
       if (pointee && pointee->type == AST_TYPE_BASIC) {
-        // printf("DEBUG: Pointee is basic type: '%s'\n",
-        //        pointee->type_data.basic.name);
-        // Check if the pointee is a struct type name
-        Symbol *struct_symbol =
-            scope_lookup(scope, pointee->type_data.basic.name);
+        const char *type_name = pointee->type_data.basic.name;
+
+        // First try direct lookup
+        Symbol *struct_symbol = scope_lookup(scope, type_name);
+
+        // If not found, try looking in imported modules
+        if (!struct_symbol) {
+          // Check each imported module for this type
+          Scope *current = scope;
+          while (current && !struct_symbol) {
+            for (size_t i = 0; i < current->imported_modules.count; i++) {
+              ModuleImport *import =
+                  (ModuleImport *)((char *)current->imported_modules.data +
+                                   i * sizeof(ModuleImport));
+
+              // Try to find the type in the imported module's scope
+              struct_symbol = scope_lookup_current_only_with_visibility(
+                  import->module_scope, type_name, scope);
+
+              if (struct_symbol && struct_symbol->type &&
+                  struct_symbol->type->type == AST_TYPE_STRUCT) {
+                break;
+              }
+              struct_symbol = NULL;
+            }
+            current = current->parent;
+          }
+        }
+
         if (struct_symbol && struct_symbol->type &&
             struct_symbol->type->type == AST_TYPE_STRUCT) {
-          // printf("DEBUG: Found struct type through pointer\n");
           base_type = struct_symbol->type; // Use the struct type
         }
       } else if (pointee && pointee->type == AST_TYPE_STRUCT) {
-        // printf("DEBUG: Pointee is direct struct type\n");
         base_type = pointee;
       }
     }
 
     // Handle case where base_type is a basic type that references a struct
     if (base_type->type == AST_TYPE_BASIC) {
-      // printf("DEBUG: Base type is basic: '%s'\n",
-      //        base_type->type_data.basic.name);
-      // Look up the struct type by name
-      Symbol *struct_symbol =
-          scope_lookup(scope, base_type->type_data.basic.name);
+      const char *type_name = base_type->type_data.basic.name;
+
+      // First try direct lookup
+      Symbol *struct_symbol = scope_lookup(scope, type_name);
+
+      // If not found, try looking in imported modules
+      if (!struct_symbol) {
+        Scope *current = scope;
+        while (current && !struct_symbol) {
+          for (size_t i = 0; i < current->imported_modules.count; i++) {
+            ModuleImport *import =
+                (ModuleImport *)((char *)current->imported_modules.data +
+                                 i * sizeof(ModuleImport));
+
+            struct_symbol = scope_lookup_current_only_with_visibility(
+                import->module_scope, type_name, scope);
+
+            if (struct_symbol && struct_symbol->type &&
+                struct_symbol->type->type == AST_TYPE_STRUCT) {
+              break;
+            }
+            struct_symbol = NULL;
+          }
+          current = current->parent;
+        }
+      }
+
       if (struct_symbol && struct_symbol->type &&
           struct_symbol->type->type == AST_TYPE_STRUCT) {
-        // printf("DEBUG: Found struct type by name lookup\n");
         base_type = struct_symbol->type; // Use the actual struct type
       }
     }
 
     // Now check if it's a struct type and get the member
     if (base_type->type == AST_TYPE_STRUCT) {
-      // printf("DEBUG: Checking struct '%s' for member '%s'\n",
-      //        base_type->type_data.struct_type.name, member_name);
-
       AstNode *member_type = get_struct_member_type(base_type, member_name);
       if (member_type) {
-        // printf("DEBUG: Found member type: %p\n", (void *)member_type);
         return member_type;
       }
 
@@ -732,29 +919,9 @@ AstNode *typecheck_member_expr(AstNode *expr, Scope *scope,
 
     } else {
       // Base is not a struct - runtime access is invalid
-      // printf("DEBUG: Base type is not a struct (type=%d)\n",
-      // base_type->type);
-
-      // Check if user should have used compile-time access instead
-      if (base_symbol->type && base_symbol->type->type == AST_TYPE_BASIC) {
-        // Could be an enum or module
-        Symbol *potential_enum =
-            scope_lookup(scope, base_symbol->type->type_data.basic.name);
-        if (potential_enum) {
-          tc_error_help(expr, "Access Method Error",
-                        "Use '::' for compile-time access to enum members",
-                        "Cannot use runtime access '.' on type '%s' - did you "
-                        "mean '%s::%s'?",
-                        base_name, base_name, member_name);
-        } else {
-          tc_error(expr, "Runtime Access Error",
-                   "Cannot use runtime access '.' on non-struct type '%s'",
-                   base_name);
-        }
-      } else {
-        tc_error(expr, "Runtime Access Error",
-                 "Type '%s' does not support member access", base_name);
-      }
+      tc_error(expr, "Runtime Access Error",
+               "Cannot use runtime access '.' on non-struct type '%s'",
+               type_to_string(base_type, arena));
       return NULL;
     }
   }
@@ -847,38 +1014,49 @@ AstNode *typecheck_free_expr(AstNode *expr, Scope *scope,
   }
 
   StaticMemoryAnalyzer *analyzer = get_static_analyzer(scope);
-  if (analyzer->skip_memory_tracking) {
-    // We're in a defer - add to the FUNCTION scope's deferred list
+
+  // Get the variable name early
+  const char *var_name = NULL;
+  if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
+    var_name = expr->expr.free.ptr->expr.identifier.name;
+  }
+
+  if (analyzer && analyzer->skip_memory_tracking && var_name) {
+    // We're in a defer block - find the containing FUNCTION scope
     Scope *func_scope = scope;
     while (func_scope && !func_scope->is_function_scope) {
       func_scope = func_scope->parent;
     }
 
     if (func_scope) {
-      const char **slot =
-          (const char **)growable_array_push(&func_scope->deferred_frees);
-      if (slot) {
-        if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
-          const char *var_name = expr->expr.free.ptr->expr.identifier.name;
+      // Check if already in deferred list (avoid duplicates)
+      bool already_deferred = false;
+      for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
+        const char **existing =
+            (const char **)((char *)func_scope->deferred_frees.data +
+                            i * sizeof(const char *));
+        if (*existing && strcmp(*existing, var_name) == 0) {
+          already_deferred = true;
+          break;
+        }
+      }
+
+      if (!already_deferred) {
+        const char **slot =
+            (const char **)growable_array_push(&func_scope->deferred_frees);
+        if (slot) {
           *slot = var_name;
-        } else {
-          *slot = NULL; // Non-identifier, cannot track
         }
       }
     }
-  } else {
-    // Normal free - track in static analyzer
-    if (expr->expr.free.ptr->type == AST_EXPR_IDENTIFIER) {
-      const char *var_name = expr->expr.free.ptr->expr.identifier.name;
-      static_memory_track_free(analyzer, var_name, NULL);
-      // Error already reported if use-after-free detected, continue
-      // typechecking
-    }
+  } else if (analyzer && var_name) {
+    // Normal free - always track it
+    const char *func_name = get_current_function_name(scope);
+    static_memory_track_free(analyzer, var_name, func_name);
   }
 
   return create_basic_type(arena, "void", expr->line, expr->column);
 }
-
 AstNode *typecheck_memcpy_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   (void)expr;
@@ -1015,6 +1193,85 @@ AstNode *typecheck_system_expr(AstNode *expr, Scope *scope,
   return create_basic_type(arena, "int", expr->line, expr->column);
 }
 
+/**
+ * @brief Type check a syscall expression
+ *
+ * Syscall requires:
+ * - First argument: syscall number (int)
+ * - Remaining arguments: syscall parameters (typically int or pointer types)
+ *
+ * Returns: int (the return value from the syscall)
+ */
+AstNode *typecheck_syscall_expr(AstNode *expr, Scope *scope,
+                                ArenaAllocator *arena) {
+  if (expr->type != AST_EXPR_SYSCALL) {
+    tc_error(expr, "Internal Error", "Expected syscall expression node");
+    return NULL;
+  }
+
+  AstNode **args = expr->expr.syscall.args;
+  size_t arg_count = expr->expr.syscall.count;
+
+  // Syscall requires at least one argument (the syscall number)
+  if (arg_count == 0) {
+    tc_error(expr, "Syscall Error",
+             "syscall() requires at least one argument (syscall number)");
+    return NULL;
+  }
+
+  // Type check the syscall number (first argument)
+  AstNode *syscall_num_type = typecheck_expression(args[0], scope, arena);
+  if (!syscall_num_type) {
+    tc_error(expr, "Syscall Error",
+             "Failed to determine type of syscall number");
+    return NULL;
+  }
+
+  // Verify syscall number is numeric (typically int)
+  if (!is_numeric_type(syscall_num_type)) {
+    tc_error_help(expr, "Syscall Number Type Error",
+                  "The syscall number must be a numeric type (typically int)",
+                  "Syscall number has type '%s', expected numeric type",
+                  type_to_string(syscall_num_type, arena));
+    return NULL;
+  }
+
+  // Type check all remaining arguments
+  for (size_t i = 1; i < arg_count; i++) {
+    if (!args[i]) {
+      tc_error(expr, "Syscall Error", "Argument %zu is NULL", i + 1);
+      return NULL;
+    }
+
+    AstNode *arg_type = typecheck_expression(args[i], scope, arena);
+    if (!arg_type) {
+      tc_error(expr, "Syscall Error", "Failed to type-check argument %zu",
+               i + 1);
+      return NULL;
+    }
+
+    // Syscall arguments should typically be numeric or pointer types
+    // We allow any type but warn about non-standard types
+    bool is_valid_syscall_arg =
+        is_numeric_type(arg_type) || is_pointer_type(arg_type) ||
+        (arg_type->type == AST_TYPE_BASIC &&
+         strcmp(arg_type->type_data.basic.name, "void") == 0);
+
+    if (!is_valid_syscall_arg) {
+      tc_error_help(
+          expr, "Syscall Argument Type Warning",
+          "Syscall arguments are typically numeric or pointer types",
+          "Argument %zu has type '%s' which may not be valid for syscalls",
+          i + 1, type_to_string(arg_type, arena));
+      // Don't return false - this is a warning, not an error
+    }
+  }
+
+  // syscall() returns a long or int (platform dependent)
+  // For simplicity, we return int here
+  return create_basic_type(arena, "int", expr->line, expr->column);
+}
+
 AstNode *typecheck_sizeof_expr(AstNode *expr, Scope *scope,
                                ArenaAllocator *arena) {
   // sizeof always returns size_t (or int in simplified systems)
@@ -1063,7 +1320,20 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
 
   // Check all remaining elements match the first element's type
   for (size_t i = 1; i < element_count; i++) {
-    AstNode *element_type = typecheck_expression(elements[i], scope, arena);
+    AstNode *element_type = NULL;
+
+    // CRITICAL FIX: If this element is an anonymous struct expression,
+    // pass the first element's type as expected_type to ensure they match
+    if (elements[i]->type == AST_EXPR_STRUCT &&
+        !elements[i]->expr.struct_expr.name) {
+      // Anonymous struct - use internal function with expected type
+      element_type = typecheck_struct_expr_internal(elements[i], scope, arena,
+                                                    first_element_type);
+    } else {
+      // Regular expression - typecheck normally
+      element_type = typecheck_expression(elements[i], scope, arena);
+    }
+
     if (!element_type) {
       tc_error(expr, "Array Type Error",
                "Failed to determine type of array element %zu", i);
@@ -1082,7 +1352,12 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
     }
   }
 
-  // Create array size literal
+  // NEW: Check if this array is being used in a context with an expected size
+  // This happens during function call argument checking
+  // We'll set a flag on the array expression to indicate it should be padded
+  
+  // For now, just create the array type with the actual element count
+  // The padding will be handled during code generation or in a separate pass
   long long size_val = (long long)element_count;
   AstNode *size_expr = create_literal_expr(arena, LITERAL_INT, &size_val,
                                            expr->line, expr->column);
@@ -1091,4 +1366,240 @@ AstNode *typecheck_array_expr(AstNode *expr, Scope *scope,
   AstNode *array_type = create_array_type(arena, first_element_type, size_expr,
                                           expr->line, expr->column);
   return array_type;
+}
+
+AstNode *typecheck_struct_expr_internal(AstNode *expr, Scope *scope,
+                                        ArenaAllocator *arena,
+                                        AstNode *expected_type) {
+  if (expr->type != AST_EXPR_STRUCT) {
+    tc_error(expr, "Internal Error", "Expected struct expression node");
+    return NULL;
+  }
+
+  const char *struct_name = expr->expr.struct_expr.name;
+  char **field_names = expr->expr.struct_expr.field_names;
+  AstNode **field_values = expr->expr.struct_expr.field_value;
+  size_t field_count = expr->expr.struct_expr.field_count;
+
+  // Check for duplicate field names in the initializer
+  for (size_t i = 0; i < field_count; i++) {
+    for (size_t j = i + 1; j < field_count; j++) {
+      if (strcmp(field_names[i], field_names[j]) == 0) {
+        tc_error_help(expr, "Duplicate Field",
+                      "Each field can only be initialized once",
+                      "Field '%s' appears multiple times in struct initializer",
+                      field_names[i]);
+        return NULL;
+      }
+    }
+  }
+
+  if (struct_name) {
+    // Named struct initialization: Point { x: 10, y: 20 }
+
+    // Look up the struct type directly by name
+    Symbol *struct_symbol = scope_lookup(scope, struct_name);
+    if (!struct_symbol) {
+      tc_error_id(expr, struct_name, "Undefined Type",
+                  "Struct type '%s' not found", struct_name);
+      return NULL;
+    }
+
+    AstNode *struct_type = struct_symbol->type;
+    if (!struct_type) {
+      tc_error_id(expr, struct_name, "Type Error",
+                  "Type '%s' has no type information", struct_name);
+      return NULL;
+    }
+
+    if (struct_type->type != AST_TYPE_STRUCT) {
+      tc_error_id(expr, struct_name, "Type Error",
+                  "'%s' is not a struct type (it's a %s)", struct_name,
+                  struct_type->type == AST_TYPE_BASIC ? "basic type"
+                                                      : "other type");
+      return NULL;
+    }
+
+    // Validate each initialized field
+    for (size_t i = 0; i < field_count; i++) {
+      const char *field_name = field_names[i];
+      AstNode *field_value = field_values[i];
+
+      // Check if the field exists in the struct definition
+      AstNode *expected_field_type =
+          get_struct_member_type(struct_type, field_name);
+      if (!expected_field_type) {
+        tc_error_help(expr, "Unknown Field",
+                      "Check the struct definition for valid field names",
+                      "Struct '%s' has no field named '%s'", struct_name,
+                      field_name);
+        return NULL;
+      }
+
+      // Don't allow initializing methods
+      if (expected_field_type->type == AST_TYPE_FUNCTION) {
+        tc_error_help(expr, "Invalid Field Initialization",
+                      "Methods cannot be initialized in struct literals",
+                      "Cannot initialize method '%s' in struct '%s'",
+                      field_name, struct_name);
+        return NULL;
+      }
+
+      // Type check the field value
+      AstNode *actual_type = typecheck_expression(field_value, scope, arena);
+      if (!actual_type) {
+        tc_error(expr, "Type Error",
+                 "Failed to determine type of value for field '%s'",
+                 field_name);
+        return NULL;
+      }
+
+      // Check type compatibility
+      TypeMatchResult match = types_match(expected_field_type, actual_type);
+      if (match == TYPE_MATCH_NONE) {
+        tc_error_help(expr, "Field Type Mismatch",
+                      "The value type must match the struct field type",
+                      "Field '%s' expects type '%s', got '%s'", field_name,
+                      type_to_string(expected_field_type, arena),
+                      type_to_string(actual_type, arena));
+        return NULL;
+      }
+    }
+
+    // CRITICAL FIX: Return a basic type that references the struct name
+    // This matches how struct types are used in variable declarations
+    return create_basic_type(arena, struct_name, expr->line, expr->column);
+
+  } else {
+    // Anonymous struct initialization: { x: 10, y: 20 }
+
+    // If we have an expected type, try to match against it
+    if (expected_type) {
+      // Resolve the expected type to an actual struct type
+      AstNode *target_struct_type = expected_type;
+      const char *target_struct_name = NULL;
+
+      // If expected type is a basic type, resolve it to the struct
+      if (expected_type->type == AST_TYPE_BASIC) {
+        target_struct_name = expected_type->type_data.basic.name;
+        Symbol *struct_symbol = scope_lookup(scope, target_struct_name);
+
+        if (struct_symbol && struct_symbol->type &&
+            struct_symbol->type->type == AST_TYPE_STRUCT) {
+          target_struct_type = struct_symbol->type;
+        } else {
+          // Expected type is not a struct, fall through to create anonymous
+          target_struct_type = NULL;
+        }
+      } else if (expected_type->type != AST_TYPE_STRUCT) {
+        target_struct_type = NULL;
+      }
+
+      // If we successfully resolved to a struct type, validate against it
+      if (target_struct_type && target_struct_type->type == AST_TYPE_STRUCT) {
+        // Validate each field in the anonymous struct
+        for (size_t i = 0; i < field_count; i++) {
+          const char *field_name = field_names[i];
+          AstNode *field_value = field_values[i];
+
+          // Check if the field exists in the expected struct
+          AstNode *expected_field_type =
+              get_struct_member_type(target_struct_type, field_name);
+          if (!expected_field_type) {
+            tc_error_help(expr, "Unknown Field",
+                          "Anonymous struct field does not match expected type",
+                          "Type '%s' has no field named '%s'",
+                          target_struct_name ? target_struct_name : "struct",
+                          field_name);
+            return NULL;
+          }
+
+          // Don't allow initializing methods
+          if (expected_field_type->type == AST_TYPE_FUNCTION) {
+            tc_error_help(expr, "Invalid Field Initialization",
+                          "Methods cannot be initialized in struct literals",
+                          "Cannot initialize method '%s'", field_name);
+            return NULL;
+          }
+
+          // Type check the field value
+          AstNode *actual_type =
+              typecheck_expression(field_value, scope, arena);
+          if (!actual_type) {
+            tc_error(expr, "Type Error",
+                     "Failed to determine type of value for field '%s'",
+                     field_name);
+            return NULL;
+          }
+
+          // Check type compatibility
+          TypeMatchResult match = types_match(expected_field_type, actual_type);
+          if (match == TYPE_MATCH_NONE) {
+            tc_error_help(expr, "Field Type Mismatch",
+                          "The value type must match the struct field type",
+                          "Field '%s' expects type '%s', got '%s'", field_name,
+                          type_to_string(expected_field_type, arena),
+                          type_to_string(actual_type, arena));
+            return NULL;
+          }
+        }
+
+        // Return the expected type (as basic type reference)
+        if (target_struct_name) {
+          return create_basic_type(arena, target_struct_name, expr->line,
+                                   expr->column);
+        } else {
+          return expected_type;
+        }
+      }
+    }
+
+    // No expected type or couldn't resolve - create true anonymous struct
+    // Type check all field values
+    AstNode **field_types =
+        arena_alloc(arena, field_count * sizeof(AstNode *), alignof(AstNode *));
+    if (!field_types) {
+      tc_error(expr, "Memory Error",
+               "Failed to allocate memory for field types");
+      return NULL;
+    }
+
+    for (size_t i = 0; i < field_count; i++) {
+      AstNode *field_value = field_values[i];
+
+      AstNode *field_type = typecheck_expression(field_value, scope, arena);
+      if (!field_type) {
+        tc_error(expr, "Type Error",
+                 "Failed to determine type of value for field '%s'",
+                 field_names[i]);
+        return NULL;
+      }
+
+      field_types[i] = field_type;
+    }
+
+    // Create an anonymous struct type with the inferred field types
+    size_t anon_name_len = 50;
+    char *anon_name = arena_alloc(arena, anon_name_len, alignof(char));
+    snprintf(anon_name, anon_name_len, "__anon_struct_%zu_%zu", expr->line,
+             expr->column);
+
+    AstNode *anon_struct_type = create_struct_type(
+        arena, anon_name, field_types, (const char **)field_names, field_count,
+        expr->line, expr->column);
+
+    if (!anon_struct_type) {
+      tc_error(expr, "Type Creation Error",
+               "Failed to create anonymous struct type");
+      return NULL;
+    }
+
+    return anon_struct_type;
+  }
+}
+
+// Public wrapper that doesn't expose expected_type
+AstNode *typecheck_struct_expr(AstNode *expr, Scope *scope,
+                               ArenaAllocator *arena) {
+  return typecheck_struct_expr_internal(expr, scope, arena, NULL);
 }

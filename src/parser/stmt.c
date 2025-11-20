@@ -112,7 +112,6 @@ Stmt *const_stmt(Parser *parser, bool is_public, bool returns_ownership,
     p_consume(parser, TOK_COLON, "Expected ':' after const name");
 
     Type *type = parse_type(parser);
-    p_advance(parser); // Advance past the type token
 
     p_consume(parser, TOK_EQUAL, "Expected '=' after const type");
     Expr *value = parse_expr(parser, BP_LOWEST);
@@ -192,7 +191,6 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
       fprintf(stderr, "Failed to parse type for parameter '%s'\n", param_name);
       return NULL;
     }
-    p_advance(parser); // Advance past the type token
 
     // Store parameter name and type
     char **name_slot = (char **)growable_array_push(&param_names);
@@ -213,14 +211,21 @@ Stmt *fn_stmt(Parser *parser, const char *name, bool is_public,
   p_consume(parser, TOK_RPAREN, "Expected ')' after function parameters");
 
   Type *return_type = parse_type(parser);
-  p_advance(parser); // Advance past the return type token
+
+  if (p_current(parser).type_ == TOK_SEMICOLON) {
+    p_consume(parser, TOK_SEMICOLON, "Expected semicolon after function prototype");
+    return create_func_decl_stmt(parser->arena, name, (char **)param_names.data,
+                                 (AstNode **)param_types.data, param_names.count,
+                                 return_type, is_public, returns_ownership,
+                                 takes_ownership, true, NULL, line, col);
+  }
 
   Stmt *body = block_stmt(parser);
 
   return create_func_decl_stmt(parser->arena, name, (char **)param_names.data,
                                (AstNode **)param_types.data, param_names.count,
                                return_type, is_public, returns_ownership,
-                               takes_ownership, body, line, col);
+                               takes_ownership, false, body, line, col);
 }
 
 /**
@@ -342,35 +347,50 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     int field_line = p_current(parser).line;
     int field_col = p_current(parser).col;
 
+    // CRITICAL FIX: Check for ownership modifiers BEFORE parsing the field name
+    bool takes_ownership = false;
+    bool returns_ownership = false;
+
+    if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
+      returns_ownership = true;
+      p_advance(parser);
+    } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
+      takes_ownership = true;
+      p_advance(parser);
+    }
+
+    // Now parse the field name (after consuming any ownership modifiers)
     char *field_name = get_name(parser);
-    Stmt *field_function = NULL;
-    Type *field_type = NULL;
+    if (!field_name) {
+      parser_error(parser, "Parse Error", __FILE__,
+                   "Expected field or method name", field_line, field_col, 1);
+      return NULL;
+    }
+
     p_advance(parser);
 
-    // TODO: Add in a check to see if we have any function modifiers like
-    //  returns_ownership or takes_ownership
-
-    bool takes_ownership, returns_ownership = false;
-    while (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP ||
-           p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-        if (p_current(parser).type_ == TOK_RETURNES_OWNERSHIP) {
-            returns_ownership = true;
-            p_advance(parser);
-        } else if (p_current(parser).type_ == TOK_TAKES_OWNERSHIP) {
-            takes_ownership = true;
-            p_advance(parser);
-        }
-    }
+    Stmt *field_function = NULL;
+    Type *field_type = NULL;
 
     // Method: field_name -> fn(...)
     if (p_current(parser).type_ == TOK_RIGHT_ARROW) {
       p_consume(parser, TOK_RIGHT_ARROW, "Expected '->' after field name");
-      field_function = fn_stmt(parser, field_name, public_member, returns_ownership, takes_ownership);
+      field_function = fn_stmt(parser, field_name, public_member,
+                               returns_ownership, takes_ownership);
     } else {
       // Data field: field_name: Type
       p_consume(parser, TOK_COLON, "Expected ':' after field name");
       field_type = parse_type(parser);
-      p_advance(parser);
+
+      // Data fields shouldn't have ownership modifiers
+      if (takes_ownership || returns_ownership) {
+        parser_error(
+            parser, "Invalid Modifier", __FILE__,
+            "Ownership modifiers (#takes_ownership, #returns_ownership) "
+            "are only valid for methods, not data fields",
+            field_line, field_col, 1);
+        return NULL;
+      }
     }
 
     // Handle field separators
@@ -387,8 +407,14 @@ Stmt *struct_stmt(Parser *parser, const char *name, bool is_public) {
     Stmt *field_decl = create_field_decl_stmt(
         parser->arena, field_name, field_type, field_function, public_member,
         field_line, field_col);
+
     Stmt **slot = public_member ? (Stmt **)growable_array_push(&public_fields)
                                 : (Stmt **)growable_array_push(&private_fields);
+
+    if (!slot) {
+      fprintf(stderr, "Failed to add field to struct.\n");
+      return NULL;
+    }
 
     *slot = field_decl;
   }
@@ -430,7 +456,6 @@ Stmt *var_stmt(Parser *parser, bool is_public) {
 
   p_consume(parser, TOK_COLON, "Expected ':' after variable name");
   Type *type = parse_type(parser);
-  p_advance(parser); // Advance past the type token
 
   if (p_current(parser).type_ != TOK_EQUAL) {
     p_consume(parser, TOK_SEMICOLON,
@@ -662,7 +687,6 @@ Stmt *loop_init(Parser *parser, int line, int col) {
 
   p_consume(parser, TOK_COLON, "Expected ':' after loop initializer");
   Type *type = parse_type(parser);
-  p_advance(parser); // Advance past the type token
 
   p_consume(parser, TOK_EQUAL, "Expected '=' after loop initializer");
   Expr *initializer = parse_expr(parser, BP_LOWEST);
@@ -1072,7 +1096,6 @@ Stmt *impl_stmt(Parser *parser) {
               function_list_name);
       return NULL;
     }
-    p_advance(parser);
 
     char **name_identifier = (char **)growable_array_push(&function_name_list);
     Type **type_specifier = (Type **)growable_array_push(&function_name_types);

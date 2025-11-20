@@ -1,5 +1,8 @@
 @module "string"
 
+pub const cat -> fn (dest: *char, s1: *char, s2: *char) *char;
+pub const strlen -> fn (s: *char) int;
+
 #returns_ownership 
 pub const from_char -> fn (c: char) *char {
   let s: *char = cast<*char>(alloc(2 * sizeof<char>));
@@ -43,6 +46,62 @@ pub const from_int -> fn (n: int) *char {
   s[i] = cast<char>(0); // null terminator
 
   return s;
+}
+
+#returns_ownership
+pub const from_float -> fn (f: float, precision: int) *char {
+  let int_part: int = cast<int>(f);
+  let frac_part: float = f - cast<float>(int_part);
+  
+  let int_str: *char = from_int(int_part);
+  defer { free(int_str); }
+  
+  let frac_str: *char = cast<*char>(alloc((precision + 2) * sizeof<char>)); // +1 for '.' +1 for null
+  frac_str[0] = '.';
+  
+  loop [i: int = 1](i <= precision) : (++i) {
+    frac_part = frac_part * 10.0;
+    let digit: int = cast<int>(frac_part);
+    frac_str[i] = cast<char>(digit + cast<int>('0'));
+    frac_part = frac_part - cast<float>(digit);
+  }
+  
+  frac_str[precision + 1] = cast<char>(0); // null terminator
+  
+  let result_len: int = strlen(int_str) + strlen(frac_str) + 1;
+  let result: *char = cast<*char>(alloc(result_len * sizeof<char>));
+  
+  cat(result, int_str, frac_str);
+  
+  return result;
+}
+
+pub const int_to_str -> fn (num: int, buf: *char, buf_size: int) void {
+  let idx: int = 0;
+  let temp: int = num;
+  
+  if (temp == 0) {
+    buf[0] = '0';
+    buf[1] = '\0';
+    return;
+  }
+  
+  loop (temp > 0 && idx < buf_size - 1) {
+    buf[idx] = cast<char>((temp % 10) + 48);
+    temp = temp / 10;
+    idx = idx + 1;
+  }
+  
+  // Reverse the digits
+  let j: int = 0;
+  loop (j < idx / 2) {
+    let tmp: char = buf[j];
+    buf[j] = buf[idx - 1 - j];
+    buf[idx - 1 - j] = tmp;
+    j = j + 1;
+  }
+  
+  buf[idx] = '\0';
 }
 
 pub const strlen -> fn (s: *char) int {
@@ -134,4 +193,28 @@ pub const putchar -> fn(c: char) int {
   if (char_val != 10 && char_val != 9) { system(cmd); }
   
   return cast<int>(c);
+}
+
+pub const is_digit -> fn (ch: char) bool {
+  return (ch >= '0' && ch <= '9');
+}
+
+pub const is_alpha -> fn (ch: char) bool {
+  return ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' || ch == '@');
+}
+
+pub const is_alnum -> fn (ch: char) bool {
+  return (is_alpha(ch) || is_digit(ch));
+}
+
+pub const atio -> fn (value: *char) int {
+  let num: int = 0;
+  loop [i: int = 0](value[i] != '\0') : (++i) { 
+    if (cast<int>(value[i]) >= 48 && cast<int>(value[i]) <= 57) { 
+      num = num * 10 + (cast<int>(value[i]) - 48); 
+    } else { 
+      break; 
+    }
+  }
+  return num;
 }

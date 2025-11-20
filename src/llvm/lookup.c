@@ -2,6 +2,8 @@
 
 LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
   if (!node || node->category != Node_Category_EXPR) {
+    fprintf(stderr, "ERROR: codegen_expr - invalid node (node=%p, category=%d)\n", 
+            (void*)node, node ? (signed int)node->category : -1);
     return NULL;
   }
 
@@ -30,6 +32,8 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
     return codegen_expr_input(ctx, node);
   case AST_EXPR_SYSTEM:
     return codegen_expr_system(ctx, node);
+  case AST_EXPR_SYSCALL:
+    return codegen_expr_syscall(ctx, node);
   case AST_EXPR_SIZEOF:
     return codegen_expr_sizeof(ctx, node);
   case AST_EXPR_ALLOC:
@@ -41,8 +45,9 @@ LLVMValueRef codegen_expr(CodeGenContext *ctx, AstNode *node) {
   case AST_EXPR_ADDR:
     return codegen_expr_addr(ctx, node);
   case AST_EXPR_MEMBER:
-    // Enhanced member access that handles both module.symbol and struct.field
     return codegen_expr_member_access_enhanced(ctx, node);
+  case AST_EXPR_STRUCT:
+    return codegen_expr_struct_literal(ctx, node);
   default:
     fprintf(stderr, "Error: Unknown expression type: %d\n", node->type);
     return NULL;

@@ -180,3 +180,16 @@ pub const get_terminal_size -> fn () void {
     system("tput lines > /tmp/luma_lines");
     // Read back from files...
 }
+
+pub const get_line -> fn (prompt: *char, buffer: *char, size: int) void {
+  output(prompt);
+  let i: int = 0;
+  loop (i < size - 1) : (++i) {
+    let c: char = getch();
+    if (c == '\n' || c == '\r') {
+      break;
+    }
+    buffer[i] = c;
+  }
+  buffer[i] = '\0';
+}

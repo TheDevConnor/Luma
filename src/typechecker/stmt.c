@@ -87,6 +87,44 @@ bool is_pointer_assignment(AstNode *assignment) {
           value->type == AST_EXPR_IDENTIFIER);
 }
 
+static bool function_signatures_match(AstNode *proto_type, AstNode *impl_type,
+                                      ArenaAllocator *arena) {
+  if (!proto_type || !impl_type)
+    return false;
+  if (proto_type->type != AST_TYPE_FUNCTION ||
+      impl_type->type != AST_TYPE_FUNCTION)
+    return false;
+
+  // Check return types match
+  TypeMatchResult return_match =
+      types_match(proto_type->type_data.function.return_type,
+                  impl_type->type_data.function.return_type);
+
+  if (return_match == TYPE_MATCH_NONE) {
+    return false;
+  }
+
+  // Check parameter counts match
+  if (proto_type->type_data.function.param_count !=
+      impl_type->type_data.function.param_count) {
+    return false;
+  }
+
+  // Check each parameter type matches
+  size_t param_count = proto_type->type_data.function.param_count;
+  for (size_t i = 0; i < param_count; i++) {
+    TypeMatchResult param_match =
+        types_match(proto_type->type_data.function.param_types[i],
+                    impl_type->type_data.function.param_types[i]);
+
+    if (param_match == TYPE_MATCH_NONE) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *name = node->stmt.var_decl.name;
   AstNode *declared_type = node->stmt.var_decl.var_type;
@@ -168,7 +206,19 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   if (initializer) {
-    AstNode *init_type = typecheck_expression(initializer, scope, arena);
+    AstNode *init_type = NULL;
+
+    // SPECIAL HANDLING: If initializer is an anonymous struct expression
+    // and we have a declared type, pass it for validation
+    if (initializer->type == AST_EXPR_STRUCT &&
+        !initializer->expr.struct_expr.name && declared_type) {
+      // Call the internal version with expected type for anonymous structs
+      init_type = typecheck_struct_expr_internal(initializer, scope, arena,
+                                                 declared_type);
+    } else {
+      init_type = typecheck_expression(initializer, scope, arena);
+    }
+
     if (!init_type) {
       tc_error(node, "Type Error",
                "Cannot determine type of initializer for variable '%s'", name);
@@ -221,7 +271,6 @@ bool typecheck_var_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   return true;
 }
 
-// Stub implementations for remaining functions
 bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *name = node->stmt.func_decl.name;
   AstNode *return_type = node->stmt.func_decl.return_type;
@@ -232,6 +281,7 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   bool is_public = node->stmt.func_decl.is_public;
   bool returns_ownership = node->stmt.func_decl.returns_ownership;
   bool takes_ownership = node->stmt.func_decl.takes_ownership;
+  bool forward_declared = node->stmt.func_decl.forward_declared;
 
   // Validate return type
   if (!return_type || return_type->category != Node_Category_TYPE) {
@@ -258,6 +308,13 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       node->stmt.func_decl.is_public = true;
       is_public = true;
     }
+
+    // Main cannot be forward declared
+    if (forward_declared) {
+      tc_error(node, "Main Function Error",
+               "The 'main' function cannot be forward declared");
+      return false;
+    }
   }
 
   // Validate parameters
@@ -274,12 +331,75 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   AstNode *func_type = create_function_type(
       arena, param_types, param_count, return_type, node->line, node->column);
 
-  // Add function to scope WITH ownership flags
-  if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public, false,
-                                       returns_ownership, takes_ownership,
-                                       arena)) {
-    tc_error_id(node, name, "Duplicate Symbol",
-                "Function '%s' is already declared in this scope", name);
+  // Check if function already exists in scope
+  Symbol *existing = scope_lookup_current_only(scope, name);
+
+  if (existing) {
+    // Function already declared - check if this is valid
+
+    if (forward_declared) {
+      // Trying to add another prototype - error
+      tc_error_id(node, name, "Duplicate Prototype",
+                  "Function '%s' already has a prototype in this scope", name);
+      return false;
+    }
+
+    // This is an implementation - check if it matches the prototype
+    if (!existing->type || existing->type->type != AST_TYPE_FUNCTION) {
+      tc_error_id(node, name, "Symbol Conflict",
+                  "Symbol '%s' already exists but is not a function", name);
+      return false;
+    }
+
+    // Validate signature matches prototype
+    if (!function_signatures_match(existing->type, func_type, arena)) {
+      tc_error_help(node, "Signature Mismatch",
+                    "Function implementation must match its prototype",
+                    "Function '%s' implementation signature does not match "
+                    "prototype declaration",
+                    name);
+      return false;
+    }
+
+    // Check ownership flags match
+    if (existing->returns_ownership != returns_ownership ||
+        existing->takes_ownership != takes_ownership) {
+      tc_error_help(node, "Ownership Mismatch",
+                    "Function implementation ownership flags must match "
+                    "prototype",
+                    "Function '%s' has mismatched ownership annotations", name);
+      return false;
+    }
+
+    // Signature matches - this is a valid implementation
+    // Update the symbol to mark it as implemented (not forward declared)
+    // We'll update the symbol's type node if needed
+
+  } else {
+    // First declaration of this function
+    if (!scope_add_symbol_with_ownership(scope, name, func_type, is_public,
+                                         false, returns_ownership,
+                                         takes_ownership, arena)) {
+      tc_error_id(node, name, "Symbol Error",
+                  "Failed to add function '%s' to scope", name);
+      return false;
+    }
+  }
+
+  // If this is just a forward declaration (prototype), we're done
+  if (forward_declared) {
+    if (body) {
+      tc_error(node, "Forward Declaration Error",
+               "Forward declared function '%s' should not have a body", name);
+      return false;
+    }
+    return true;
+  }
+
+  // This is an implementation - must have a body
+  if (!body) {
+    tc_error(node, "Function Implementation Error",
+             "Function '%s' implementation must have a body", name);
     return false;
   }
 
@@ -287,6 +407,8 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Scope *func_scope = create_child_scope(scope, name, arena);
   func_scope->is_function_scope = true;
   func_scope->associated_node = node;
+
+  node->stmt.func_decl.scope = (void *)func_scope;
 
   // Add parameters to function scope (parameters are always local)
   for (size_t i = 0; i < param_count; i++) {
@@ -311,30 +433,23 @@ bool typecheck_func_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   // Typecheck function body
-  if (body) {
-    if (!typecheck_statement(body, func_scope, arena)) {
-      tc_error(node, "Function Body Error",
-               "Function '%s' body failed typechecking", name);
-      return false;
-    }
+  if (!typecheck_statement(body, func_scope, arena)) {
+    tc_error(node, "Function Body Error",
+             "Function '%s' body failed typechecking", name);
+    return false;
+  }
 
-    // Process all deferred frees at function exit
-    StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
-    if (analyzer && func_scope->deferred_frees.count > 0) {
-      bool old_skip = analyzer->skip_memory_tracking;
-      analyzer->skip_memory_tracking = false;
-
-      for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
-        const char **var =
-            (const char **)((char *)func_scope->deferred_frees.data +
-                            i * sizeof(const char *));
-        static_memory_track_free(analyzer, *var, name);
+  // Process deferred frees - these represent cleanup at function exit
+  StaticMemoryAnalyzer *analyzer = get_static_analyzer(func_scope);
+  if (analyzer && func_scope->deferred_frees.count > 0) {
+    for (size_t i = 0; i < func_scope->deferred_frees.count; i++) {
+      const char **var_ptr =
+          (const char **)((char *)func_scope->deferred_frees.data +
+                          i * sizeof(const char *));
+      if (*var_ptr) {
+        // Mark as freed at function exit
+        static_memory_track_free(analyzer, *var_ptr, name);
       }
-
-      // CRITICAL: Clear the deferred frees after processing
-      func_scope->deferred_frees.count = 0;
-
-      analyzer->skip_memory_tracking = old_skip;
     }
   }
 
@@ -384,7 +499,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < public_count; i++) {
     AstNode *member = public_members[i];
     if (!member || member->type != AST_STMT_FIELD_DECL) {
-      tc_error(node, "Struct Error", "Invalid public member %zu in struct '%s'", 
+      tc_error(node, "Struct Error", "Invalid public member %zu in struct '%s'",
                i, struct_name);
       return false;
     }
@@ -433,8 +548,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   for (size_t i = 0; i < private_count; i++) {
     AstNode *member = private_members[i];
     if (!member || member->type != AST_STMT_FIELD_DECL) {
-      tc_error(node, "Struct Error", "Invalid private member %zu in struct '%s'",
-               i, struct_name);
+      tc_error(node, "Struct Error",
+               "Invalid private member %zu in struct '%s'", i, struct_name);
       return false;
     }
 
@@ -490,14 +605,15 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   // Add struct type to scope BEFORE processing methods
-  if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false, arena)) {
+  if (!scope_add_symbol(scope, struct_name, struct_type, is_public, false,
+                        arena)) {
     tc_error_id(node, struct_name, "Symbol Error",
                 "Failed to add struct '%s' to scope", struct_name);
     return false;
   }
 
-  // Now we need to reserve space for methods in the arrays BEFORE processing them
-  // Count total fields (data + methods)
+  // Now we need to reserve space for methods in the arrays BEFORE processing
+  // them Count total fields (data + methods)
   size_t method_count = 0;
   for (size_t i = 0; i < public_count; i++) {
     if (public_members[i]->stmt.field_decl.function) {
@@ -511,24 +627,25 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   }
 
   size_t total_member_count = data_field_count + method_count;
-  
+
   // Reallocate the arrays to hold all members (data + methods)
-  AstNode **full_member_types = arena_alloc(arena, total_member_count * sizeof(AstNode *), 
-                                            alignof(AstNode *));
-  const char **full_member_names = arena_alloc(arena, total_member_count * sizeof(char *), 
-                                               alignof(char *));
-  
+  AstNode **full_member_types = arena_alloc(
+      arena, total_member_count * sizeof(AstNode *), alignof(AstNode *));
+  const char **full_member_names =
+      arena_alloc(arena, total_member_count * sizeof(char *), alignof(char *));
+
   // Copy existing data fields
   for (size_t i = 0; i < data_field_count; i++) {
     full_member_types[i] = all_member_types[i];
     full_member_names[i] = all_member_names[i];
   }
-  
+
   // Update struct type to use new arrays
   struct_type->type_data.struct_type.member_types = full_member_types;
   struct_type->type_data.struct_type.member_names = full_member_names;
-  struct_type->type_data.struct_type.member_count = data_field_count; // Start with data fields
-  
+  struct_type->type_data.struct_type.member_count =
+      data_field_count; // Start with data fields
+
   member_index = data_field_count; // Continue from where we left off
 
   // SECOND PASS: Process methods with explicit 'self' parameter
@@ -539,7 +656,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
     if (field_function) {
       // This is a method - typecheck it with 'self' parameter
-      
+
       AstNode *func_node = field_function;
       if (func_node->type != AST_STMT_FUNCTION) {
         tc_error(node, "Internal Error", "Expected function node for method");
@@ -551,13 +668,14 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       method_scope->is_function_scope = true;
       method_scope->associated_node = func_node;
 
-      // **KEY ADDITION**: Add 'self' as the first parameter
-      // 'self' is a reference to the struct instance (could be pointer or value)
-      // For simplicity, let's make it a pointer to the struct
-      AstNode *self_type = create_pointer_type(arena, struct_type, 
-                                                func_node->line, func_node->column);
-      
-      if (!scope_add_symbol(method_scope, "self", self_type, false, true, arena)) {
+      // Add 'self' as the first parameter
+      // 'self' is a reference to the struct instance (could be pointer or
+      // value) For simplicity, let's make it a pointer to the struct
+      AstNode *self_type = create_pointer_type(
+          arena, struct_type, func_node->line, func_node->column);
+
+      if (!scope_add_symbol(method_scope, "self", self_type, false, true,
+                            arena)) {
         tc_error(func_node, "Method Error",
                  "Failed to add 'self' parameter to method '%s'", field_name);
         return false;
@@ -569,8 +687,8 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       AstNode **param_types = func_node->stmt.func_decl.param_types;
 
       for (size_t j = 0; j < param_count; j++) {
-        if (!scope_add_symbol(method_scope, param_names[j], param_types[j], 
-                             false, true, arena)) {
+        if (!scope_add_symbol(method_scope, param_names[j], param_types[j],
+                              false, true, arena)) {
           tc_error(func_node, "Method Parameter Error",
                    "Could not add parameter '%s' to method '%s' scope",
                    param_names[j], field_name);
@@ -589,27 +707,34 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
         }
       }
 
-      // Register the method in the parent scope
+      // Register the method in the parent scope with QUALIFIED NAME
       // CRITICAL: Include 'self' as the first parameter in the method type
       AstNode *return_type = func_node->stmt.func_decl.return_type;
-      
+
       size_t method_param_count = param_count + 1; // +1 for self
-      AstNode **method_param_types = arena_alloc(arena, method_param_count * sizeof(AstNode *),
-                                                 alignof(AstNode *));
-      
+      AstNode **method_param_types = arena_alloc(
+          arena, method_param_count * sizeof(AstNode *), alignof(AstNode *));
+
       // First parameter is self
       method_param_types[0] = self_type;
-      
+
       // Copy the rest of the parameters
       for (size_t j = 0; j < param_count; j++) {
         method_param_types[j + 1] = param_types[j];
       }
-      
-      AstNode *method_type = create_function_type(
-          arena, method_param_types, method_param_count, return_type, 
-          func_node->line, func_node->column);
 
-      if (!scope_add_symbol(scope, field_name, method_type, is_public, false, arena)) {
+      AstNode *method_type =
+          create_function_type(arena, method_param_types, method_param_count,
+                               return_type, func_node->line, func_node->column);
+
+      // Create qualified method name: StructName.MethodName
+      size_t qualified_len = strlen(struct_name) + strlen(field_name) + 2;
+      char *qualified_method_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_method_name, qualified_len, "%s.%s", struct_name,
+               field_name);
+
+      if (!scope_add_symbol(scope, qualified_method_name, method_type,
+                            is_public, false, arena)) {
         tc_error(func_node, "Method Registration Error",
                  "Failed to register method '%s' in scope", field_name);
         return false;
@@ -619,7 +744,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       full_member_types[member_index] = method_type;
       full_member_names[member_index] = field_name;
       member_index++;
-      
+
       // Update the struct's member count to include this method
       struct_type->type_data.struct_type.member_count = member_index;
     }
@@ -643,10 +768,11 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       method_scope->associated_node = func_node;
 
       // Add 'self' parameter
-      AstNode *self_type = create_pointer_type(arena, struct_type,
-                                                func_node->line, func_node->column);
-      
-      if (!scope_add_symbol(method_scope, "self", self_type, false, true, arena)) {
+      AstNode *self_type = create_pointer_type(
+          arena, struct_type, func_node->line, func_node->column);
+
+      if (!scope_add_symbol(method_scope, "self", self_type, false, true,
+                            arena)) {
         tc_error(func_node, "Method Error",
                  "Failed to add 'self' parameter to method '%s'", field_name);
         return false;
@@ -658,7 +784,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
       for (size_t j = 0; j < param_count; j++) {
         if (!scope_add_symbol(method_scope, param_names[j], param_types[j],
-                             false, true, arena)) {
+                              false, true, arena)) {
           tc_error(func_node, "Method Parameter Error",
                    "Could not add parameter '%s' to method '%s' scope",
                    param_names[j], field_name);
@@ -677,25 +803,32 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       }
 
       AstNode *return_type = func_node->stmt.func_decl.return_type;
-      
+
       // CRITICAL: Include 'self' as the first parameter in the method type
       size_t method_param_count = param_count + 1; // +1 for self
-      AstNode **method_param_types = arena_alloc(arena, method_param_count * sizeof(AstNode *),
-                                                 alignof(AstNode *));
-      
+      AstNode **method_param_types = arena_alloc(
+          arena, method_param_count * sizeof(AstNode *), alignof(AstNode *));
+
       // First parameter is self
       method_param_types[0] = self_type;
-      
+
       // Copy the rest of the parameters
       for (size_t j = 0; j < param_count; j++) {
         method_param_types[j + 1] = param_types[j];
       }
-      
-      AstNode *method_type = create_function_type(
-          arena, method_param_types, method_param_count, return_type,
-          func_node->line, func_node->column);
 
-      if (!scope_add_symbol(scope, field_name, method_type, false, false, arena)) {
+      AstNode *method_type =
+          create_function_type(arena, method_param_types, method_param_count,
+                               return_type, func_node->line, func_node->column);
+
+      // Create qualified method name: StructName.MethodName
+      size_t qualified_len = strlen(struct_name) + strlen(field_name) + 2;
+      char *qualified_method_name = arena_alloc(arena, qualified_len, 1);
+      snprintf(qualified_method_name, qualified_len, "%s.%s", struct_name,
+               field_name);
+
+      if (!scope_add_symbol(scope, qualified_method_name, method_type, false,
+                            false, arena)) {
         tc_error(func_node, "Method Registration Error",
                  "Failed to register method '%s' in scope", field_name);
         return false;
@@ -705,7 +838,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
       full_member_types[member_index] = method_type;
       full_member_names[member_index] = field_name;
       member_index++;
-      
+
       // Update the struct's member count to include this method
       struct_type->type_data.struct_type.member_count = member_index;
     }
@@ -713,6 +846,7 @@ bool typecheck_struct_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   return true;
 }
+
 bool typecheck_enum_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   const char *enum_name = node->stmt.enum_decl.name;
   char **member_names = node->stmt.enum_decl.members;
@@ -840,6 +974,9 @@ bool typecheck_return_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
   Scope *then_branch = create_child_scope(scope, "then_branch", arena);
   Scope *else_branch = create_child_scope(scope, "else_branch", arena);
+  node->stmt.if_stmt.scope = (void *)scope;
+  node->stmt.if_stmt.then_scope = (void *)then_branch;
+  node->stmt.if_stmt.else_scope = (void *)else_branch;
 
   // Typecheck main if condition
   Type *expected =
@@ -861,6 +998,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     if (!typecheck_statement(node->stmt.if_stmt.then_stmt, then_branch,
                              arena)) {
       return false;
+    }
+
+    if (then_branch->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(then_branch);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+        for (size_t i = 0; i < then_branch->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)then_branch->deferred_frees.data +
+                              i * sizeof(const char *));
+          if (*var_ptr) {
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
+      }
     }
   }
 
@@ -904,6 +1056,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
                                  arena)) {
           return false;
         }
+
+        if (elif_scope->deferred_frees.count > 0) {
+          StaticMemoryAnalyzer *analyzer = get_static_analyzer(elif_scope);
+          if (analyzer) {
+            const char *func_name = get_current_function_name(scope);
+            for (size_t i = 0; i < elif_scope->deferred_frees.count; i++) {
+              const char **var_ptr =
+                  (const char **)((char *)elif_scope->deferred_frees.data +
+                                  i * sizeof(const char *));
+              if (*var_ptr) {
+                static_memory_track_free(analyzer, *var_ptr, func_name);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -913,6 +1080,21 @@ bool typecheck_if_decl(AstNode *node, Scope *scope, ArenaAllocator *arena) {
     if (!typecheck_statement(node->stmt.if_stmt.else_stmt, else_branch,
                              arena)) {
       return false;
+    }
+
+    if (else_branch->deferred_frees.count > 0) {
+      StaticMemoryAnalyzer *analyzer = get_static_analyzer(else_branch);
+      if (analyzer) {
+        const char *func_name = get_current_function_name(scope);
+        for (size_t i = 0; i < else_branch->deferred_frees.count; i++) {
+          const char **var_ptr =
+              (const char **)((char *)else_branch->deferred_frees.data +
+                              i * sizeof(const char *));
+          if (*var_ptr) {
+            static_memory_track_free(analyzer, *var_ptr, func_name);
+          }
+        }
+      }
     }
   }
 
@@ -1003,6 +1185,7 @@ bool typecheck_use_stmt(AstNode *node, Scope *current_scope,
 bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
                                   ArenaAllocator *arena) {
   Scope *loop_scope = create_child_scope(scope, "infinite_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)loop_scope;
 
   if (node->stmt.loop_stmt.body == NULL) {
     fprintf(stderr, "Error: Loop body cannot be null at line %zu\n",
@@ -1021,6 +1204,7 @@ bool typecheck_infinite_loop_decl(AstNode *node, Scope *scope,
 bool typecheck_while_loop_decl(AstNode *node, Scope *scope,
                                ArenaAllocator *arena) {
   Scope *while_loop = create_child_scope(scope, "while_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)while_loop;
 
   if (!typecheck_expression(node->stmt.loop_stmt.condition, while_loop,
                             arena)) {
@@ -1051,6 +1235,7 @@ bool typecheck_while_loop_decl(AstNode *node, Scope *scope,
 bool typecheck_for_loop_decl(AstNode *node, Scope *scope,
                              ArenaAllocator *arena) {
   Scope *lookup_scope = create_child_scope(scope, "for_loop", arena);
+  node->stmt.loop_stmt.scope = (void *)lookup_scope;
 
   // Define the initializer
   for (size_t i = 0; i < node->stmt.loop_stmt.init_count; i++) {
@@ -1166,6 +1351,7 @@ bool typecheck_switch_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena) {
 
   // Create a new scope for the switch body
   Scope *switch_scope = create_child_scope(scope, "switch", arena);
+  node->stmt.switch_stmt.scope = (void *)switch_scope;
 
   // Track if we've seen a default case
   bool has_default = false;
@@ -1328,9 +1514,6 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
     return false;
   }
 
-  // printf("DEBUG: Typechecking case with %zu values\n",
-  // node->stmt.case_clause.value_count);
-
   // Typecheck each case value
   for (size_t i = 0; i < node->stmt.case_clause.value_count; i++) {
     AstNode *case_value = node->stmt.case_clause.values[i];
@@ -1339,17 +1522,24 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
       return false;
     }
 
+    // CRITICAL FIX: Add null check before typechecking
     AstNode *value_type = typecheck_expression(case_value, scope, arena);
     if (!value_type) {
-      tc_error(node, "Case Error", "Failed to typecheck case value %zu", i);
+      tc_error(node, "Case Error",
+               "Failed to typecheck case value %zu - returned NULL type", i);
       return false;
     }
 
-    // printf("DEBUG: Case value %zu type: %s\n", i, type_to_string(value_type,
-    // arena));
-
     // If we know the expected type, check compatibility
     if (expected_type) {
+      // CRITICAL FIX: Validate expected_type before using it
+      if (expected_type->category != Node_Category_TYPE) {
+        tc_error(node, "Internal Error",
+                 "Expected type for switch is not a type node (category %d)",
+                 expected_type->category);
+        return false;
+      }
+
       TypeMatchResult match = types_match(expected_type, value_type);
       if (match == TYPE_MATCH_NONE) {
         tc_error_help(
@@ -1361,7 +1551,12 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
         return false;
       }
 
-      // Special validation for enum cases
+      // NEW: If types are compatible (enum <-> int), skip strict enum checking
+      if (match == TYPE_MATCH_COMPATIBLE) {
+        continue; // Skip to next case value
+      }
+
+      // Special validation for enum cases (only for EXACT matches)
       if (expected_type->type == AST_TYPE_BASIC &&
           value_type->type == AST_TYPE_BASIC) {
         const char *expected_name = expected_type->type_data.basic.name;
@@ -1369,11 +1564,35 @@ bool typecheck_case_stmt(AstNode *node, Scope *scope, ArenaAllocator *arena,
 
         // Check if they're the same enum type
         if (strcmp(expected_name, value_name) != 0) {
-          // Check if this is an enum member access pattern (EnumName.Member)
+          // Check if this is an enum member access pattern (EnumName::Member)
           if (case_value->type == AST_EXPR_MEMBER) {
-            const char *base_name =
-                case_value->expr.member.object->expr.identifier.name;
-            if (strcmp(base_name, expected_name) != 0) {
+            // CRITICAL FIX: Add null checks for member expression parts
+            if (!case_value->expr.member.object) {
+              tc_error(node, "Internal Error",
+                       "Case member expression has NULL object");
+              return false;
+            }
+
+            if (case_value->expr.member.object->type != AST_EXPR_IDENTIFIER &&
+                case_value->expr.member.object->type != AST_EXPR_MEMBER) {
+              tc_error(
+                  node, "Case Error",
+                  "Invalid case value - expected identifier or member access");
+              return false;
+            }
+
+            // For simple case (EnumType::Member), extract base name
+            const char *base_name = NULL;
+            if (case_value->expr.member.object->type == AST_EXPR_IDENTIFIER) {
+              base_name = case_value->expr.member.object->expr.identifier.name;
+            } else {
+              // For chained case (module::EnumType::Member), the value_name
+              // should already be correct because typecheck_member_expr
+              // resolved it
+              base_name = value_name;
+            }
+
+            if (base_name && strcmp(base_name, expected_name) != 0) {
               tc_error_help(node, "Enum Case Mismatch",
                             "Case values must belong to the same enum as the "
                             "switch condition",
